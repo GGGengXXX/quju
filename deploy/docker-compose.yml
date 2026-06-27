@@ -30,7 +30,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # 容器内通过服务名直连 quju-mysql:3306（同一 quju-net）
-      DB_URL: "jdbc:mysql://quju-mysql:3306/quju?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8mb4"
+      DB_URL: "jdbc:mysql://quju-mysql:3306/quju?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8"
       REDIS_HOST: quju-redis
       REDIS_PORT: "6379"
     expose: ["8080"]

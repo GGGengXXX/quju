@@ -4,7 +4,7 @@
 # 例:   scripts/dev-bootstrap.sh zhangsan activity-map activity
 #
 # 约定: 在主仓库目录 (/srv/quju/main) 内运行。worktree 建在同级目录。
-# 依赖: git, docker。DB 用服务器上的容器 quju-mysql(mysql:9.0.1, 宿主端口 13306)，
+# 依赖: git, docker。DB 用服务器上的容器 quju-mysql(mysql:8.4, 宿主端口 13306)，
 #   应用账号/密码读自 /root/quju/mysql.env(root-only, 不入库)。
 set -euo pipefail
 
@@ -50,7 +50,7 @@ DEV_NAME=$DEV
 FEATURE=$FEATURE
 # 后端
 SERVER_PORT=$BACKEND_PORT
-DB_URL=jdbc:mysql://127.0.0.1:13306/$DB_NAME?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8mb4
+DB_URL=jdbc:mysql://127.0.0.1:13306/$DB_NAME?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
 DB_USERNAME=quju
 DB_PASSWORD=$APP_PW
 REDIS_KEY_PREFIX=${DEV}:

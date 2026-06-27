@@ -12,7 +12,7 @@ quju-backend ── quju-mysql:3306(库 quju) ── quju-redis:6379
 ```
 
 ## 现状（已就绪）
-- ✅ `quju-mysql`(mysql:9.0.1) 已运行：宿主端口 13306，库 `quju`，账号 `quju`，凭证 `/root/quju/mysql.env`。
+- ✅ `quju-mysql`(mysql:8.4) 已运行：宿主端口 13306，库 `quju`，账号 `quju`，凭证 `/root/quju/mysql.env`。
 - ✅ docker 网络 `quju-net`、数据卷 `quju-mysql-data` 已创建。
 - ⬜ `quju-redis`：首次 `docker compose ... up` 时拉取 `redis:7-alpine`（hub 不可达则配镜像加速）。
 - ⬜ `backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`：随应用脚手架补全（模板已给）。

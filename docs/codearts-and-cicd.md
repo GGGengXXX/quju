@@ -100,7 +100,7 @@ nginx(443/80) ─┬─ /        → 前端静态(dist)
 ## 五、当前已就绪 & 你需要做/提供的（具体）
 
 ### ✅ 服务器侧我已搭好
-- MySQL：容器 `quju-mysql`(mysql:9.0.1)，宿主端口 `13306`，库 `quju`，账号 `quju`，凭证 `/root/quju/mysql.env`。
+- MySQL：容器 `quju-mysql`(mysql:8.4)，宿主端口 `13306`，库 `quju`，账号 `quju`，凭证 `/root/quju/mysql.env`。
 - docker 网络 `quju-net`、数据卷 `quju-mysql-data`。
 - `deploy/`：`docker-compose.yml` + `deploy.sh` + `.env.example`；`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf` 模板。
 - 两把 SSH 部署密钥（在 `/root/quju/`）：
