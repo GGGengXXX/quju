@@ -43,10 +43,15 @@ APP_PW=$(grep '^MYSQL_PASSWORD=' /root/quju/mysql.env | cut -d= -f2)
 if docker exec quju-mysql mysql -uquju -p"$APP_PW" \
      -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` DEFAULT CHARSET utf8mb4;" 2>/dev/null; then
   echo "==> 已创建数据库 $DB_NAME（容器 quju-mysql，宿主端口 13306）"
+  # 导入表结构基线（契约 DDL）
+  if docker exec -i quju-mysql mysql -uquju -p"$APP_PW" "$DB_NAME" < contracts/schema.sql 2>/dev/null; then
+    echo "==> 已导入表结构到 $DB_NAME（contracts/schema.sql）"
+  else
+    echo "!! 导入表结构失败：检查 contracts/schema.sql"
+  fi
 else
   echo "!! 建库失败：检查 quju-mysql 容器是否运行、/root/quju/mysql.env 是否可读"
 fi
-# <<TODO: 跑迁移基线，例如 (cd backend && mvn -Dflyway.url=jdbc:mysql://127.0.0.1:13306/$DB_NAME flyway:migrate)>>
 
 # --- 3. 写该 clone 的 .env (已 gitignore) ---
 cat > .env <<EOF

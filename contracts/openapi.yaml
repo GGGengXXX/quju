@@ -1,150 +1,621 @@
 openapi: 3.1.0
 info:
   title: 趣聚 QuJu API
-  version: 0.1.0
+  version: 1.0.0
   description: >
-    趣聚平台统一 API 契约。前后端的唯一事实来源。
-    约定见 ../AGENTS.md §3。改动本文件须先写 ADR 并由平台核心组评审。
+    趣聚平台统一 API 契约（前后端唯一事实来源）。
+    约定：所有业务接口返回统一信封 {code,message,data}，code=0 成功；列表用 page(从1)/size + PageResult；
+    URL kebab-case 复数、JSON camelCase、前缀 /v1；JWT Bearer 鉴权；时间 ISO-8601(UTC)。
+    枚举见 enums.md，错误码见 error-codes.md。改动须先写 ADR + 平台核心组评审。
 servers:
   - url: /v1
-    description: 所有业务接口统一前缀 /v1
-
-# ------------------------------------------------------------------
-# 全局安全：JWT Bearer。需要登录的接口加 `security: [{ bearerAuth: [] }]`
-# ------------------------------------------------------------------
 security:
   - bearerAuth: []
 
 tags:
-  - name: auth
-    description: 注册 / 登录 / 激活（示例模块，已给出完整范式，照此补全其余模块）
-  # <<TODO: 平台核心组在 Day0-2 补全以下 tag 与路径：
-  #   users(资料/商家审核) activities(创建/审核/发现/报名/签到/总结)
-  #   social(好友/关注) teams(兴趣小队) chat(IM) admin(后台管理) >>
+  - { name: auth, description: 注册/登录/激活/密码 }
+  - { name: users, description: 用户资料 }
+  - { name: merchants, description: 商家 }
+  - { name: activities, description: 活动：创建/审核/发现/详情 }
+  - { name: activity-signup, description: 活动报名/候补 }
+  - { name: activity-checkin, description: 活动签到 }
+  - { name: activity-summary, description: 活动总结/评价 }
+  - { name: social, description: 好友/关注/黑名单 }
+  - { name: chat, description: 即时通讯(IM)；实时推送走 WebSocket /ws }
+  - { name: teams, description: 兴趣小队 }
+  - { name: admin, description: 后台管理 }
 
 paths:
-  # ============== 示例：鉴权模块（作为所有模块的范式） ==============
+  # ========================= auth / users =========================
   /auth/register:
     post:
       tags: [auth]
-      summary: 用户注册（个人 / 商家）
-      security: []                       # 公开接口
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RegisterRequest' }
-      responses:
-        '200':
-          description: 注册成功，已发送激活邮件
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - properties:
-                      data: { $ref: '#/components/schemas/UserBrief' }
-
+      summary: 注册（个人/商家）
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RegisterRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/UserBriefResp' } }
+  /auth/activate:
+    post:
+      tags: [auth]
+      summary: 邮箱激活
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
   /auth/login:
     post:
       tags: [auth]
       summary: 邮箱密码登录
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/LoginRequest' }
-      responses:
-        '200':
-          description: 登录成功
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - properties:
-                      data: { $ref: '#/components/schemas/LoginResult' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/LoginResp' } }
+  /auth/password/reset-request:
+    post:
+      tags: [auth]
+      summary: 申请重置密码（发邮件）
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /auth/password/reset:
+    post:
+      tags: [auth]
+      summary: 用令牌重置密码
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token, newPassword], properties: { token: { type: string }, newPassword: { type: string, minLength: 8 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
 
-  # <<TODO: 其余路径按上面范式补全。一个分页列表接口的范式见下面的 #/components 复用件 >>
+  /users/me:
+    get:
+      tags: [users]
+      summary: 我的资料
+      responses: { '200': { $ref: '#/components/responses/UserProfileResp' } }
+    put:
+      tags: [users]
+      summary: 更新我的资料（头像/昵称/性别/生日/签名/兴趣标签）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateProfileRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/UserProfileResp' } }
+  /users/me/qrcode:
+    get:
+      tags: [users]
+      summary: 我的二维码内容（供加好友扫码）
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /users/{id}:
+    get:
+      tags: [users]
+      summary: 查看用户主页
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { $ref: '#/components/responses/UserProfileResp' } }
+
+  /merchants/apply:
+    post:
+      tags: [merchants]
+      summary: 提交商家身份申请（营业执照）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MerchantApplyRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /merchants/me:
+    get: { tags: [merchants], summary: 我的商家资料, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    put:
+      tags: [merchants]
+      summary: 更新商家资料（名称/昵称/关注领域）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MerchantApplyRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+
+  # ========================= activities =========================
+  /activities:
+    get:
+      tags: [activities]
+      summary: 活动发现（首页流/搜索/高级筛选）
+      parameters:
+        - { name: tab, in: query, schema: { type: string, enum: [RECOMMEND, LATEST, NEARBY] } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - { name: categories, in: query, description: 多选逗号分隔, schema: { type: string } }
+        - { name: city, in: query, schema: { type: string } }
+        - { name: startFrom, in: query, schema: { type: string, format: date-time } }
+        - { name: startTo, in: query, schema: { type: string, format: date-time } }
+        - { name: feeMin, in: query, schema: { type: number } }
+        - { name: feeMax, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: distanceKm, in: query, description: NEARBY/距离筛选, schema: { type: number } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses: { '200': { $ref: '#/components/responses/ActivityPageResp' } }
+    post:
+      tags: [activities]
+      summary: 创建活动（status=DRAFT 存草稿 / PENDING_REVIEW 提交）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityUpsertRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/ActivityResp' } }
+  /activities/mine:
+    get:
+      tags: [activities]
+      summary: 我创建的活动（含草稿）
+      parameters: [{ name: status, in: query, schema: { $ref: '#/components/schemas/ActivityStatus' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }]
+      responses: { '200': { $ref: '#/components/responses/ActivityPageResp' } }
+  /activities/map:
+    get:
+      tags: [activities]
+      summary: 地图模式（边界框内活动点位）
+      parameters:
+        - { name: minLng, in: query, required: true, schema: { type: number } }
+        - { name: minLat, in: query, required: true, schema: { type: number } }
+        - { name: maxLng, in: query, required: true, schema: { type: number } }
+        - { name: maxLat, in: query, required: true, schema: { type: number } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/ai-plan:
+    post:
+      tags: [activities]
+      summary: AI 活动策划（输入主题/类型→生成基础信息+参与设置，可逐项改）
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { theme: { type: string }, category: { $ref: '#/components/schemas/ActivityCategory' } } } } } }
+      responses: { '200': { $ref: '#/components/responses/ActivityResp' } }
+  /activity-templates:
+    get: { tags: [activities], summary: 活动模板列表, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /activities/{id}:
+    get:
+      tags: [activities]
+      summary: 活动详情（含时间相位/报名状态）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { $ref: '#/components/responses/ActivityDetailResp' } }
+    put:
+      tags: [activities]
+      summary: 编辑活动（草稿/被要求修改时）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ActivityUpsertRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/ActivityResp' } }
+    delete:
+      tags: [activities]
+      summary: 删除/取消活动
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/{id}/submit:
+    post: { tags: [activities], summary: 提交审核, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /activities/{id}/clone:
+    post: { tags: [activities], summary: 克隆活动, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/ActivityResp' } } }
+
+  # ----- 报名 / 候补 -----
+  /activities/{id}/signup:
+    post:
+      tags: [activity-signup]
+      summary: 立即报名（校验名额/信誉/年龄→确认）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { signupInfo: { type: object } } } } } }
+      responses: { '200': { $ref: '#/components/responses/SignupResultResp' } }
+    delete:
+      tags: [activity-signup]
+      summary: 取消报名（截止前；释放名额并自动递补）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/{id}/signups:
+    get:
+      tags: [activity-signup]
+      summary: 发起人查看报名+签到状态
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/{id}/waitlist:
+    get: { tags: [activity-signup], summary: 等待队列(含当前等待人数), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /activities/{id}/waitlist/confirm:
+    post: { tags: [activity-signup], summary: 候补被通知后限时确认报名, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ----- 签到 -----
+  /activities/{id}/checkin-code:
+    post: { tags: [activity-checkin], summary: 发起人生成签到二维码, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /activities/{id}/checkin:
+    post:
+      tags: [activity-checkin]
+      summary: 扫码签到（可带位置校验）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string }, lng: { type: number }, lat: { type: number } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+
+  # ----- 总结 / 评价 -----
+  /activities/{id}/summary:
+    get: { tags: [activity-summary], summary: 查看图文总结, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post:
+      tags: [activity-summary]
+      summary: 创建/发布图文总结
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { content: { type: string }, publish: { type: boolean } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/{id}/summary/images:
+    post:
+      tags: [activity-summary]
+      summary: 上传总结图片并 AI 分类（结果待人工确认）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [imageUrls], properties: { imageUrls: { type: array, items: { type: string } } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/{id}/summary/images/{imageId}:
+    put:
+      tags: [activity-summary]
+      summary: 确认/修改图片分类
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { name: imageId, in: path, required: true, schema: { type: integer, format: int64 } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [category], properties: { category: { $ref: '#/components/schemas/ActivityImageCategory' } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities/{id}/reviews:
+    get: { tags: [activity-summary], summary: 活动评价列表, parameters: [{ $ref: '#/components/parameters/PathId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post:
+      tags: [activity-summary]
+      summary: 提交评价（结束后限期）
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [rating], properties: { rating: { type: integer, minimum: 1, maximum: 5 }, content: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+
+  # ========================= social =========================
+  /friend-requests:
+    get: { tags: [social], summary: 收到的好友申请, parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post:
+      tags: [social]
+      summary: 发起好友申请（主页/参与者列表/扫码）
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [toUserId], properties: { toUserId: { type: integer, format: int64 }, source: { type: string }, message: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /friend-requests/{id}/accept:
+    post: { tags: [social], summary: 同意好友申请, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /friend-requests/{id}/reject:
+    post: { tags: [social], summary: 拒绝好友申请, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /friends:
+    get: { tags: [social], summary: 好友列表, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /friends/{userId}:
+    put:
+      tags: [social]
+      summary: 设置好友备注/分组
+      parameters: [{ name: userId, in: path, required: true, schema: { type: integer, format: int64 } }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { remark: { type: string }, groupTag: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    delete: { tags: [social], summary: 删除好友（双向解除）, parameters: [{ name: userId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /follows/{userId}:
+    post: { tags: [social], summary: 关注（互关升级好友）, parameters: [{ name: userId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    delete: { tags: [social], summary: 取消关注, parameters: [{ name: userId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /follows:
+    get: { tags: [social], summary: 我的关注/粉丝, parameters: [{ name: type, in: query, schema: { type: string, enum: [FOLLOWING, FOLLOWERS] } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /blocks/{userId}:
+    post: { tags: [social], summary: 拉黑, parameters: [{ name: userId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    delete: { tags: [social], summary: 移出黑名单, parameters: [{ name: userId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /blocks:
+    get: { tags: [social], summary: 黑名单列表, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ----- IM -----
+  /messages:
+    get:
+      tags: [chat]
+      summary: 拉取会话消息
+      parameters:
+        - { name: scope, in: query, required: true, schema: { type: string, enum: [FRIEND, TEAM] } }
+        - { name: peerId, in: query, description: FRIEND=对方userId / TEAM=teamId, required: true, schema: { type: integer, format: int64 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [chat]
+      summary: 发送消息（文字/表情/图片/位置）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SendMessageRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /messages/read:
+    post: { tags: [chat], summary: 标记已读, requestBody: { content: { application/json: { schema: { type: object, properties: { scope: { type: string }, peerId: { type: integer, format: int64 } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /messages/{id}/recall:
+    post: { tags: [chat], summary: 撤回(2分钟内), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /messages/{id}/forward:
+    post:
+      tags: [chat]
+      summary: 转发消息至好友/群
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { scope: { type: string }, peerId: { type: integer, format: int64 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+
+  # ========================= teams =========================
+  /teams:
+    get:
+      tags: [teams]
+      summary: 发现/搜索小队（名称/标签）
+      parameters: [{ name: keyword, in: query, schema: { type: string } }, { name: tag, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    post:
+      tags: [teams]
+      summary: 创建小队（创建者=队长）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TeamUpsertRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /teams/{id}:
+    get: { tags: [teams], summary: 小队详情, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    delete: { tags: [teams], summary: 解散小队(仅队长), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/join:
+    post: { tags: [teams], summary: 加入(公开直接/审核申请), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/leave:
+    post: { tags: [teams], summary: 退出小队, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/join-requests:
+    get: { tags: [teams], summary: 加入申请列表(队长/管理员), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/join-requests/{reqId}:
+    post:
+      tags: [teams]
+      summary: 处理加入申请(approve/reject)
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { name: reqId, in: path, required: true, schema: { type: integer, format: int64 } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [action], properties: { action: { type: string, enum: [APPROVE, REJECT] } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /teams/{id}/members:
+    get: { tags: [teams], summary: 成员列表, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/members/{userId}:
+    put:
+      tags: [teams]
+      summary: 设置成员角色(队长设管理员)
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { name: userId, in: path, required: true, schema: { type: integer, format: int64 } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role], properties: { role: { $ref: '#/components/schemas/TeamRole' } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+    delete: { tags: [teams], summary: 移除成员, parameters: [{ $ref: '#/components/parameters/PathId' }, { name: userId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/announcements:
+    get: { tags: [teams], summary: 群公告列表, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [teams], summary: 发布群公告(队长/管理员), parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [content], properties: { content: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/votes:
+    get: { tags: [teams], summary: 群投票列表, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [teams], summary: 发起群投票, parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [title, options], properties: { title: { type: string }, options: { type: array, items: { type: string } }, multiChoice: { type: boolean }, deadline: { type: string, format: date-time } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/votes/{voteId}/cast:
+    post:
+      tags: [teams]
+      summary: 投票
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { name: voteId, in: path, required: true, schema: { type: integer, format: int64 } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [optionIndexes], properties: { optionIndexes: { type: array, items: { type: integer } } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /teams/{id}/files:
+    get: { tags: [teams], summary: 群文件列表, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [teams], summary: 上传群文件, parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [fileName, fileUrl], properties: { fileName: { type: string }, fileUrl: { type: string }, fileSize: { type: integer } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/files/{fileId}:
+    delete: { tags: [teams], summary: 删除群文件, parameters: [{ $ref: '#/components/parameters/PathId' }, { name: fileId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/album:
+    get: { tags: [teams], summary: 相册列表, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [teams], summary: 上传相册照片, parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [imageUrls], properties: { imageUrls: { type: array, items: { type: string } } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/album/{photoId}:
+    delete: { tags: [teams], summary: 删除相册照片(队长/管理员), parameters: [{ $ref: '#/components/parameters/PathId' }, { name: photoId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/moments:
+    get: { tags: [teams], summary: 小队动态列表, parameters: [{ $ref: '#/components/parameters/PathId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [teams], summary: 发布动态, parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { content: { type: string }, images: { type: array, items: { type: string } } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/moments/{momentId}/feature:
+    post: { tags: [teams], summary: 精选动态(队长/管理员), parameters: [{ $ref: '#/components/parameters/PathId' }, { name: momentId, in: path, required: true, schema: { type: integer, format: int64 } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/points:
+    get: { tags: [teams], summary: 积分榜(昵称/积分/名次), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /teams/{id}/activities:
+    get: { tags: [teams], summary: 队内活动列表, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/ActivityPageResp' } } }
+
+  # ========================= admin =========================
+  /admin/login:
+    post:
+      tags: [admin]
+      summary: 管理员登录
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [username, password], properties: { username: { type: string }, password: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/LoginResp' } }
+  /admin/password:
+    put: { tags: [admin], summary: 修改本人密码, requestBody: { required: true, content: { application/json: { schema: { type: object, required: [oldPassword, newPassword], properties: { oldPassword: { type: string }, newPassword: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/users:
+    get:
+      tags: [admin]
+      summary: 查询用户(个人/商家)
+      parameters: [{ name: keyword, in: query, schema: { type: string } }, { name: userType, in: query, schema: { $ref: '#/components/schemas/UserType' } }, { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /admin/users/{id}:
+    get: { tags: [admin], summary: 用户详情(基本信息/状态/其活动与小队), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/users/{id}/ban:
+    post: { tags: [admin], summary: 封禁(必填原因+期限), parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string }, banUntil: { type: string, format: date-time, description: '空=永久' } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/users/{id}/unban:
+    post: { tags: [admin], summary: 解封, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/merchant-applications:
+    get: { tags: [admin], summary: 商家申请列表, parameters: [{ name: status, in: query, schema: { $ref: '#/components/schemas/AuditStatus' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/merchant-applications/{id}:
+    post:
+      tags: [admin]
+      summary: 审核商家(通过/驳回，驳回填原因)
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [action], properties: { action: { type: string, enum: [APPROVE, REJECT] }, reason: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /admin/activities:
+    get: { tags: [admin], summary: 查询活动(按状态筛选), parameters: [{ name: status, in: query, schema: { $ref: '#/components/schemas/ActivityStatus' } }, { name: keyword, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/ActivityPageResp' } } }
+  /admin/activities/pending-review:
+    get: { tags: [admin], summary: 待人工审核活动(报名>50或AI存疑), parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/ActivityPageResp' } } }
+  /admin/activities/{id}/review:
+    post:
+      tags: [admin]
+      summary: 人工审核(通过/驳回/要求修改)
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [result], properties: { result: { type: string, enum: [PASSED, REJECTED, NEEDS_REVISION] }, reason: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /admin/activities/{id}/takedown:
+    post: { tags: [admin], summary: 下架违规活动(必填原因), parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/activities/{id}/restore:
+    post: { tags: [admin], summary: 恢复活动, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/teams:
+    get: { tags: [admin], summary: 查询小队, parameters: [{ name: keyword, in: query, schema: { type: string } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/teams/{id}/suspend:
+    post: { tags: [admin], summary: 停用小队(必填原因), parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/teams/{id}/restore:
+    post: { tags: [admin], summary: 恢复小队, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/reports:
+    get: { tags: [admin], summary: 举报记录, parameters: [{ name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
 
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
 
-  # ------------ 复用：统一信封 / 分页 / 错误 ------------
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    Size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    PathId: { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+
+  responses:
+    Ok:
+      description: 成功（data 按接口语义）
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } }
+    UserBriefResp:
+      description: 用户摘要
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/UserBrief' } } }] } } }
+    UserProfileResp:
+      description: 用户资料
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/UserProfile' } } }] } } }
+    LoginResp:
+      description: 登录结果
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/LoginResult' } } }] } } }
+    ActivityResp:
+      description: 活动
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/Activity' } } }] } } }
+    ActivityDetailResp:
+      description: 活动详情
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/ActivityDetail' } } }] } } }
+    ActivityPageResp:
+      description: 活动分页
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { allOf: [{ $ref: '#/components/schemas/PageResult' }, { properties: { list: { type: array, items: { $ref: '#/components/schemas/Activity' } } } }] } } }] } } }
+    SignupResultResp:
+      description: 报名结果（成功 / 进入候补）
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/SignupResult' } } }] } } }
+
   schemas:
     ApiResponse:
       type: object
-      description: 统一响应信封。code=0 成功；非 0 见 error-codes.md
       required: [code, message]
       properties:
-        code:    { type: integer, example: 0 }
-        message: { type: string, example: "success" }
-        data:    { description: 业务数据，按各接口定义 }
-
+        code: { type: integer, example: 0 }
+        message: { type: string, example: success }
+        data: { description: 业务数据 }
     PageResult:
       type: object
-      description: 分页结果。配合 query 参数 page(从1开始)/size 使用
       required: [total, page, size, list]
       properties:
         total: { type: integer, format: int64 }
-        page:  { type: integer }
-        size:  { type: integer }
-        list:  { type: array, items: {} }
+        page: { type: integer }
+        size: { type: integer }
+        list: { type: array, items: {} }
 
-    # ------------ 示例模块 schema ------------
+    # ---- 枚举（与 enums.md / DB 一致）----
+    UserType: { type: string, enum: [INDIVIDUAL, MERCHANT] }
+    UserStatus: { type: string, enum: [PENDING_ACTIVATION, ACTIVE, BANNED] }
+    Gender: { type: string, enum: [MALE, FEMALE, UNKNOWN] }
+    AuditStatus: { type: string, enum: [PENDING, APPROVED, REJECTED, NEEDS_REVISION] }
+    ActivityCategory: { type: string, enum: [SPORTS, HIKING, BOARD_GAME, STUDY, CHARITY, CITY_WALK, OTHER] }
+    ActivityStatus: { type: string, enum: [DRAFT, PENDING_REVIEW, PUBLISHED, REJECTED, TAKEN_DOWN, CANCELLED] }
+    ActivityPhase: { type: string, enum: [NOT_STARTED, SIGNUP_OPEN, SIGNUP_CLOSED, ONGOING, ENDED], description: 由时间计算 }
+    ActivityImageCategory: { type: string, enum: [GROUP_PHOTO, VENUE, PROCESS, MATERIAL, RESULT] }
+    SignupStatus: { type: string, enum: [REGISTERED, CANCELLED, WAITLISTED] }
+    TeamRole: { type: string, enum: [OWNER, ADMIN, MEMBER] }
+    TeamJoinType: { type: string, enum: [PUBLIC, APPROVAL] }
+    MessageContentType: { type: string, enum: [TEXT, EMOJI, IMAGE, LOCATION] }
+
+    # ---- 实体 / DTO ----
+    UserBrief:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        nickname: { type: string }
+        avatar: { type: string }
+        userType: { $ref: '#/components/schemas/UserType' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/UserBrief'
+        - type: object
+          properties:
+            gender: { $ref: '#/components/schemas/Gender' }
+            birthday: { type: string, format: date }
+            signature: { type: string }
+            interestTags: { type: array, items: { type: string } }
+            reputation: { type: integer }
     RegisterRequest:
       type: object
       required: [email, password, userType]
       properties:
-        email:    { type: string, format: email }
+        email: { type: string, format: email }
         password: { type: string, minLength: 8, maxLength: 64 }
         userType: { $ref: '#/components/schemas/UserType' }
-        # 商家需上传营业执照（凭证 URL，先经文件上传接口拿到）
-        licenseUrl: { type: string, description: "userType=MERCHANT 时必填" }
-
+        licenseUrl: { type: string, description: 'userType=MERCHANT 时必填(营业执照)' }
     LoginRequest:
       type: object
       required: [email, password]
-      properties:
-        email:    { type: string, format: email }
-        password: { type: string }
-
+      properties: { email: { type: string, format: email }, password: { type: string } }
     LoginResult:
       type: object
       properties:
-        token:     { type: string, description: JWT }
-        expiresIn: { type: integer, description: 秒 }
-        user:      { $ref: '#/components/schemas/UserBrief' }
-
-    UserBrief:
+        token: { type: string, description: JWT }
+        expiresIn: { type: integer }
+        user: { $ref: '#/components/schemas/UserBrief' }
+    UpdateProfileRequest:
       type: object
       properties:
-        id:       { type: integer, format: int64 }
         nickname: { type: string }
-        avatar:   { type: string }
-        userType: { $ref: '#/components/schemas/UserType' }
-        status:   { $ref: '#/components/schemas/UserStatus' }
+        avatar: { type: string }
+        gender: { $ref: '#/components/schemas/Gender' }
+        birthday: { type: string, format: date }
+        signature: { type: string }
+        interestTags: { type: array, items: { type: string } }
+    MerchantApplyRequest:
+      type: object
+      required: [merchantName]
+      properties:
+        merchantName: { type: string }
+        nickname: { type: string }
+        focusFields: { type: string }
+        licenseUrl: { type: string }
 
-    # ------------ 共享枚举（与 enums.md 保持一致） ------------
-    UserType:
-      type: string
-      enum: [INDIVIDUAL, MERCHANT]
-    UserStatus:
-      type: string
-      enum: [PENDING_ACTIVATION, ACTIVE, BANNED]
+    Activity:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        intro: { type: string }
+        category: { $ref: '#/components/schemas/ActivityCategory' }
+        tags: { type: array, items: { type: string } }
+        coverImage: { type: string }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time }
+        signupDeadline: { type: string, format: date-time }
+        city: { type: string }
+        address: { type: string }
+        lng: { type: number }
+        lat: { type: number }
+        capacity: { type: integer }
+        fee: { type: number }
+        status: { $ref: '#/components/schemas/ActivityStatus' }
+        phase: { $ref: '#/components/schemas/ActivityPhase' }
+        signupCount: { type: integer }
+        creator: { $ref: '#/components/schemas/UserBrief' }
+        teamId: { type: integer, format: int64 }
+    ActivityDetail:
+      allOf:
+        - $ref: '#/components/schemas/Activity'
+        - type: object
+          properties:
+            mySignupStatus: { $ref: '#/components/schemas/SignupStatus' }
+            waitlistCount: { type: integer }
+    ActivityUpsertRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        intro: { type: string }
+        category: { $ref: '#/components/schemas/ActivityCategory' }
+        tags: { type: array, items: { type: string } }
+        coverImage: { type: string }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time }
+        signupDeadline: { type: string, format: date-time }
+        city: { type: string }
+        address: { type: string }
+        lng: { type: number }
+        lat: { type: number }
+        capacity: { type: integer }
+        fee: { type: number }
+        teamId: { type: integer, format: int64, description: 非空=队内活动 }
+        submit: { type: boolean, description: "true=提交审核; false/缺省=存草稿" }
+    SignupResult:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/SignupStatus' }
+        waitlistPosition: { type: integer, description: WAITLISTED 时的排位 }
 
-  # ------------ 复用：分页查询参数 ------------
-  parameters:
-    PageParam:
-      name: page
-      in: query
-      schema: { type: integer, minimum: 1, default: 1 }
-    SizeParam:
-      name: size
-      in: query
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SendMessageRequest:
+      type: object
+      required: [scope, peerId, contentType, content]
+      properties:
+        scope: { type: string, enum: [FRIEND, TEAM] }
+        peerId: { type: integer, format: int64, description: FRIEND=对方userId / TEAM=teamId }
+        contentType: { $ref: '#/components/schemas/MessageContentType' }
+        content: { type: string }
+    TeamUpsertRequest:
+      type: object
+      required: [name, joinType]
+      properties:
+        name: { type: string }
+        intro: { type: string }
+        avatar: { type: string }
+        tags: { type: array, items: { type: string } }
+        joinType: { $ref: '#/components/schemas/TeamJoinType' }
+        capacity: { type: integer }

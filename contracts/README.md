@@ -4,10 +4,11 @@
 
 | 文件 | 内容 |
 |---|---|
-| `openapi.yaml` | OpenAPI 3.1，所有接口的请求/响应/错误。生成后端 DTO/stub、前端类型/client、mock server。 |
-| `schema.dbml` | 数据库 schema（DBML）。是迁移脚本的基线。 |
-| `enums.md` | 跨端共享枚举登记。 |
-| `error-codes.md` | 统一错误码登记（按模块分区间）。 |
+| `openapi.yaml` | OpenAPI 3.1，全部 ~90 接口的请求/响应。生成后端 DTO/stub、前端类型/client、mock server。已 redocly lint 通过。 |
+| **`schema.sql`** | ⭐ **权威 DDL**（MySQL 8.4，33 张表）。已应用到生产库 `quju`，dev-bootstrap 自动导入各开发库；可作 Flyway V1 基线。 |
+| `schema.dbml` | 表清单/ER 概览（可读），细节以 `schema.sql` 为准。 |
+| `enums.md` | 跨端共享枚举登记（完整）。 |
+| `error-codes.md` | 统一错误码登记（按模块，已填）。 |
 
 ## 工作流：契约优先（contract-first）
 
