@@ -1,34 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-
-const health = ref<Record<string, unknown> | null>(null)
-const err = ref<string>('')
-
-onMounted(async () => {
-  try {
-    const r = await fetch('/v1/health')
-    health.value = await r.json()
-  } catch (e) {
-    err.value = String(e)
-  }
-})
+import { useRouter } from 'vue-router'
+import { useAuthStore } from './stores/auth'
+const auth = useAuthStore()
+const router = useRouter()
+function logout() { auth.logout(); router.push('/login') }
 </script>
 
 <template>
-  <main class="wrap">
-    <h1>趣聚 QuJu</h1>
-    <p class="sub">部署冒烟测试 · 前端(nginx) → <code>/v1</code> 反代 → 后端(Spring Boot) → MySQL</p>
-    <pre v-if="health" class="ok">{{ JSON.stringify(health, null, 2) }}</pre>
-    <p v-else-if="err" class="bad">后端未就绪：{{ err }}</p>
-    <p v-else>加载中…</p>
-  </main>
+  <el-container>
+    <el-header class="hd">
+      <span class="logo" @click="router.push('/')">趣聚 QuJu</span>
+      <span class="spacer" />
+      <template v-if="auth.token">
+        <el-button text @click="router.push('/profile')">我的</el-button>
+        <el-button text @click="logout">退出</el-button>
+      </template>
+    </el-header>
+    <el-main><router-view /></el-main>
+  </el-container>
 </template>
 
-<style scoped>
-.wrap { font-family: system-ui, -apple-system, sans-serif; max-width: 680px; margin: 60px auto; padding: 24px; }
-h1 { margin: 0 0 8px; }
-.sub { color: #555; }
-code { background: #f2f2f2; padding: 1px 5px; border-radius: 4px; }
-.ok { background: #0b1021; color: #6ee7b7; padding: 16px; border-radius: 8px; overflow: auto; }
-.bad { color: #c0392b; }
+<style>
+body { margin: 0; }
+.hd { display: flex; align-items: center; background: #409eff; color: #fff; }
+.logo { font-weight: 700; font-size: 18px; cursor: pointer; }
+.spacer { flex: 1; }
+.hd .el-button { color: #fff; }
 </style>
