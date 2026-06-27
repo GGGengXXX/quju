@@ -1,0 +1,150 @@
+openapi: 3.1.0
+info:
+  title: 趣聚 QuJu API
+  version: 0.1.0
+  description: >
+    趣聚平台统一 API 契约。前后端的唯一事实来源。
+    约定见 ../AGENTS.md §3。改动本文件须先写 ADR 并由平台核心组评审。
+servers:
+  - url: /v1
+    description: 所有业务接口统一前缀 /v1
+
+# ------------------------------------------------------------------
+# 全局安全：JWT Bearer。需要登录的接口加 `security: [{ bearerAuth: [] }]`
+# ------------------------------------------------------------------
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+    description: 注册 / 登录 / 激活（示例模块，已给出完整范式，照此补全其余模块）
+  # <<TODO: 平台核心组在 Day0-2 补全以下 tag 与路径：
+  #   users(资料/商家审核) activities(创建/审核/发现/报名/签到/总结)
+  #   social(好友/关注) teams(兴趣小队) chat(IM) admin(后台管理) >>
+
+paths:
+  # ============== 示例：鉴权模块（作为所有模块的范式） ==============
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: 用户注册（个人 / 商家）
+      security: []                       # 公开接口
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '200':
+          description: 注册成功，已发送激活邮件
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UserBrief' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 邮箱密码登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/LoginResult' }
+
+  # <<TODO: 其余路径按上面范式补全。一个分页列表接口的范式见下面的 #/components 复用件 >>
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ------------ 复用：统一信封 / 分页 / 错误 ------------
+  schemas:
+    ApiResponse:
+      type: object
+      description: 统一响应信封。code=0 成功；非 0 见 error-codes.md
+      required: [code, message]
+      properties:
+        code:    { type: integer, example: 0 }
+        message: { type: string, example: "success" }
+        data:    { description: 业务数据，按各接口定义 }
+
+    PageResult:
+      type: object
+      description: 分页结果。配合 query 参数 page(从1开始)/size 使用
+      required: [total, page, size, list]
+      properties:
+        total: { type: integer, format: int64 }
+        page:  { type: integer }
+        size:  { type: integer }
+        list:  { type: array, items: {} }
+
+    # ------------ 示例模块 schema ------------
+    RegisterRequest:
+      type: object
+      required: [email, password, userType]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 64 }
+        userType: { $ref: '#/components/schemas/UserType' }
+        # 商家需上传营业执照（凭证 URL，先经文件上传接口拿到）
+        licenseUrl: { type: string, description: "userType=MERCHANT 时必填" }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string }
+
+    LoginResult:
+      type: object
+      properties:
+        token:     { type: string, description: JWT }
+        expiresIn: { type: integer, description: 秒 }
+        user:      { $ref: '#/components/schemas/UserBrief' }
+
+    UserBrief:
+      type: object
+      properties:
+        id:       { type: integer, format: int64 }
+        nickname: { type: string }
+        avatar:   { type: string }
+        userType: { $ref: '#/components/schemas/UserType' }
+        status:   { $ref: '#/components/schemas/UserStatus' }
+
+    # ------------ 共享枚举（与 enums.md 保持一致） ------------
+    UserType:
+      type: string
+      enum: [INDIVIDUAL, MERCHANT]
+    UserStatus:
+      type: string
+      enum: [PENDING_ACTIVATION, ACTIVE, BANNED]
+
+  # ------------ 复用：分页查询参数 ------------
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    SizeParam:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }

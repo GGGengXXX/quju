@@ -1,0 +1,45 @@
+# 趣聚 QuJu 服务器部署编排（单机，CentOS7 + Docker）
+# MySQL 不在此编排内 —— 复用已存在的独立容器 quju-mysql（在外部网络 quju-net 上）。
+# 用法：在仓库根目录  docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+name: quju
+
+networks:
+  quju-net:
+    external: true            # 由 quju-mysql 创建；不存在则: docker network create quju-net
+
+volumes:
+  quju-redis-data:
+
+services:
+  redis:
+    image: redis:7-alpine     # 首次需 docker pull；若 hub 不可达，配置镜像加速
+    container_name: quju-redis
+    restart: unless-stopped
+    networks: [quju-net]
+    volumes: [quju-redis-data:/data]
+    command: ["redis-server", "--appendonly", "yes"]
+
+  backend:
+    build: ../backend         # 需 backend/Dockerfile（多阶段 Maven 构建）
+    image: quju-backend:latest
+    container_name: quju-backend
+    restart: unless-stopped
+    depends_on: [redis]
+    networks: [quju-net]
+    env_file: [./.env]        # 服务器本地：DB/OSS/JWT 等真实值，勿入库
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 容器内通过服务名直连 quju-mysql:3306（同一 quju-net）
+      DB_URL: "jdbc:mysql://quju-mysql:3306/quju?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8mb4"
+      REDIS_HOST: quju-redis
+      REDIS_PORT: "6379"
+    expose: ["8080"]
+
+  frontend:
+    build: ../frontend        # 需 frontend/Dockerfile（npm build → nginx）
+    image: quju-frontend:latest
+    container_name: quju-frontend
+    restart: unless-stopped
+    depends_on: [backend]
+    networks: [quju-net]
+    ports: ["80:80"]          # nginx：前端静态 + 反代 /v1 → quju-backend:8080

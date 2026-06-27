@@ -1,0 +1,30 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:13306/quju?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8mb4}
+    username: ${DB_USERNAME:quju}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+# AI（DeepSeek，OpenAI 兼容）—— 供后续 AI 网关读取
+quju:
+  ai:
+    base-url: ${AI_BASE_URL:https://hk.n1n.ai/v1}
+    model: ${AI_MODEL:deepseek-v3.2}
+    api-key: ${AI_API_KEY:}
+  oss:
+    endpoint: ${OSS_ENDPOINT:oss-cn-beijing.aliyuncs.com}
+    bucket: ${OSS_BUCKET:se-resource-bucket}
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

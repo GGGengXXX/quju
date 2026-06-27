@@ -1,0 +1,116 @@
+// 趣聚 QuJu 数据库 Schema（DBML 格式，https://dbml.dbdiagram.io）
+// 唯一事实来源。改动须先写 ADR，并由平台核心组评审。
+// 平台核心组在 Day0–2 完成全量定义；下面已给出"约定 + 基础表"，
+// 各模块表以 <<TODO>> 清单列出，由对应负责人在评审下补全。
+
+Project quju {
+  database_type: 'MySQL 8'
+  Note: '''
+  全局约定（所有表必须遵守）：
+  - 主键：`id bigint unsigned auto_increment`（或雪花，二选一，全库统一）。
+  - 命名：表/列 snake_case；表名单数（user, activity）。
+  - 审计列：所有业务表含 `created_at timestamp`、`updated_at timestamp`。
+  - 软删除：需要保留历史的表加 `deleted_at timestamp NULL`，查询默认过滤。
+  - 时间：统一存 UTC。
+  - 外键：用逻辑外键（应用层保证）或物理外键，全库统一（建议逻辑外键 + 索引）。
+  - 金额/距离等：避免浮点歧义，金额用 `decimal`，经纬度见 location 约定。
+  - 地理位置：含选点的表用 `point`（MySQL 空间类型）+ `SPATIAL INDEX`，
+    支持"附近活动 / 距离筛选 / 地图模式"。同时冗余 `lng decimal(10,7)`,
+    `lat decimal(10,7)` 便于展示。
+  '''
+}
+
+// ======================= 基础表（已定义，可直接用） =======================
+
+Table user {
+  id            bigint        [pk, increment]
+  email         varchar(128)  [unique, not null]
+  password_hash varchar(100)  [not null, note: 'BCrypt']
+  user_type     varchar(16)   [not null, note: 'INDIVIDUAL | MERCHANT']
+  status        varchar(24)   [not null, default: 'PENDING_ACTIVATION', note: 'PENDING_ACTIVATION | ACTIVE | BANNED']
+  nickname      varchar(32)   [unique, note: '全平台唯一']
+  avatar        varchar(255)
+  gender        varchar(8)    [note: 'MALE | FEMALE | UNKNOWN']
+  birthday      date
+  signature     varchar(140)  [note: '个性签名']
+  created_at    timestamp
+  updated_at    timestamp
+  deleted_at    timestamp     [null]
+
+  indexes {
+    email [unique]
+    nickname [unique]
+    status
+  }
+}
+
+Table user_interest_tag {        // 用户兴趣标签（多对多拆表）
+  id       bigint [pk, increment]
+  user_id  bigint [not null]
+  tag      varchar(32) [not null]
+  indexes { (user_id, tag) [unique] }
+}
+
+Table merchant_profile {         // 商家资料 + 审核
+  id            bigint [pk, increment]
+  user_id       bigint [not null, unique]
+  merchant_name varchar(64) [not null]
+  nickname      varchar(32)
+  focus_fields  varchar(255) [note: '关注活动领域']
+  license_url   varchar(255) [note: '营业执照/凭证']
+  audit_status  varchar(16)  [not null, default: 'PENDING', note: 'PENDING | APPROVED | REJECTED']
+  audit_reason  varchar(255)
+  created_at    timestamp
+  updated_at    timestamp
+}
+
+Table email_activation {         // 邮箱激活链接
+  id         bigint [pk, increment]
+  user_id    bigint [not null]
+  token      varchar(64) [unique, not null]
+  expires_at timestamp [not null]
+  used       boolean [default: false]
+}
+
+Table admin {                    // 后台管理员（系统预置，无注册）
+  id            bigint [pk, increment]
+  username      varchar(32) [unique, not null]
+  password_hash varchar(100) [not null]
+  created_at    timestamp
+  updated_at    timestamp
+}
+
+// ======================= 待补全（按模块，由对应负责人定义） =======================
+//
+// <<TODO: 活动模块 (owner: 活动组)>>
+//   activity             — 活动主表：name, tags, intro, start/end time,
+//                          location(point)+lng/lat, address, capacity,
+//                          signup_deadline, status(未开始/报名中/截止/活动中/结束),
+//                          audit_status(自动/人工/通过/驳回/改), creator_id, draft 标记
+//   activity_template    — 活动模板（运动/徒步/桌游/学习/公益/城市探索…）
+//   activity_signup      — 报名记录：user_id, activity_id, status(报名/取消/候补/递补)
+//   activity_waitlist    — 等待队列：activity_id, user_id, position, notified_at
+//   activity_checkin     — 签到：activity_id, user_id, checkin_at, geo 校验
+//   activity_summary     — 图文总结 + AI 图片分类结果（需人工确认）
+//   activity_review      — 用户评价（活动结束后限期可见）
+//   activity_audit_log   — 审核流水（AI/人工，通过/驳回/改 + 原因）
+//
+// <<TODO: 社交模块 (owner: 社交组)>>
+//   friendship           — 好友关系（含备注、分组）
+//   follow               — 单向关注（互关升级为好友）
+//   block                — 黑名单
+//   message              — 即时通讯消息（文字/表情/图片/位置；已读/撤回/转发）
+//
+// <<TODO: 兴趣小队模块 (owner: 社交组/小队负责人)>>
+//   team                 — 小队：name, tags, join_type(公开/审核), capacity, status, owner_id
+//   team_member          — 成员 + 角色(队长/管理员/普通) + 积分
+//   team_join_request    — 加入申请（审核制）
+//   team_announcement / team_vote / team_file / team_album / team_activity
+//   team_points_log      — 积分明细（参与活动/发动态/被精选…）
+//
+// <<TODO: 后台管理 (owner: 后台组)>>
+//   user_ban             — 封禁记录（原因 + 期限）
+//   moderation_action    — 活动下架/小队停用记录（原因 + 恢复）
+//   report               — 举报记录
+//
+// 完成后用 dbml2sql 或人工转 schema.sql，作为 Flyway/Liquibase 迁移基线。

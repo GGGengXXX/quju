@@ -1,0 +1,48 @@
+# --- secrets / env ---
+.env
+.env.*
+!.env.example
+*.local
+# 凭证文件：绝不入库（防止误拷进仓库）
+AccessKey*.csv
+*HuaweiCloud*
+credentials*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# --- backend (Java / Maven) ---
+backend/target/
+*.class
+*.jar
+!**/.mvn/wrapper/maven-wrapper.jar
+backend/.mvn/timing.properties
+hs_err_pid*
+
+# --- frontend (Node / Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- generated from contract (do NOT hand-edit) ---
+backend/src/main/generated/
+frontend/src/api/generated/
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# --- logs / tmp ---
+*.log
+logs/
+tmp/
+
+# --- worktrees live outside the repo dir, but ignore a local convenience link ---
+.worktrees/
