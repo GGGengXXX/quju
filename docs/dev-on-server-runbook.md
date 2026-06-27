@@ -24,17 +24,21 @@
 
 ```bash
 cd /srv/quju/main
+# 一次性设你的个人身份 + CodeArts push 凭证（每人不同；当前 SSH 会话内有效）：
+export GIT_EMAIL='你的邮箱'
+export CODEARTS_USER='你的账号/用户名'      # 形如 DeNeRATe-cool/DeNeRATe-cool
+export CODEARTS_PASS='你的代码托管HTTPS密码'  # 个人设置→代码托管/HTTPS密码（不是 IAM AK/SK）
 scripts/dev-bootstrap.sh <你的名字拼音> <feature-slug> [module]
 # 例：scripts/dev-bootstrap.sh zhangsan activity-map activity
 ```
 
 脚本会自动：
 1. 从 CodeArts 克隆到 `/srv/quju/dev-<name>-<feature>`，并基于 `origin/dev` 切出 `feat/<module>-<feature>` 分支
-2. 建独立库 `quju_dev_<name>_<feature>`（quju 账号已授权）
-3. 生成该 clone 的 `.env`：分配后端/前端端口（见 §2）、DB 名、Redis 前缀、各第三方占位
-4. 打印"下一步"提示
+2. 建独立库 `quju_dev_<name>_<feature>` 并**导入全部表结构**（contracts/schema.sql）
+3. 生成 `.env`：端口/DB + **OSS/AI/高德/邮件 等共享密钥自动注入（无需手填）**
+4. 配好你个人的 push 凭证（本 clone 专属；不设则回退共享凭证，提交作者仍是你）
 
-然后进入你的 clone 开发（先设 `git config user.email "<你的邮箱>"` 便于提交归属）：
+然后进入你的 clone 开发（`.env` 已就绪，可直接连 DB/OSS/AI/邮件）：
 ```bash
 cd /srv/quju/dev-<name>-<feature>
 # 后端

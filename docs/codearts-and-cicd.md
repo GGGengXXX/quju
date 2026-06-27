@@ -34,11 +34,11 @@
 
 ```bash
 cd quju
-git init -b main
+git init -b master
 git add .
-git commit -m "chore: 初始化 QuJu AI 开发工作区（治理层 + 契约骨架）"
+git commit -m "chore: 初始化工作区"
 git remote add origin https://codehub.devcloud.cn-north-4.huaweicloud.com/5c09170aa96c46008547da02db15afa0/quju.git
-git push -u origin main
+git push -u origin master && git push origin master:dev
 ```
 
 **代码推送鉴权（默认 HTTPS；部署始终 SSH）**：
@@ -63,74 +63,22 @@ git push -u origin feat/<module>-<slug>
 
 CodeArts 没有 GitHub 的路径级 CODEOWNERS，自动按目录指派 owner 的能力较弱。用以下组合达到同等约束：
 
-1. **保护 `main` 分支**：仓库 → 设置 → 分支管理/保护分支 → `main` 设为受保护：禁止直接 push、必须经 MR、要求 ≥1 通过评审、要求 CI 门禁通过。
+1. **保护 `master`/`dev` 分支**：仓库 → 设置 → 分支管理/保护分支 → 设为受保护：禁止直接 push、必须经 MR、要求 ≥1 通过评审。
 2. **平台核心组设为必选评审人**：仓库 → 设置 → 合并请求/评审规则 → 添加平台核心 2 人为必需评审者（或建评审组）。
 3. **约定**：改 `contracts/` 必须**单独 MR** + 先有 ADR；平台核心组在该 MR 上把关。MR 模板里有自检项强制声明"是否动了 contracts/"。
 4. （可选，若你们版本支持）「评审模板」「门禁(Gate)」：把测试/契约校验设为合并门禁。
 
 ---
 
-## 三、CI/CD：服务器自托管（需要你选一种方案）
+## 三、CI/CD（已建好：合并到 master → 自动部署）
 
-目标：合并到 `master` 后，**自动在 `1.92.124.5` 上**构建后端 jar、构建前端、重启服务。两种主流做法：
+CI/CD = **CodeArts 流水线**，已在 UI 配好并验证通过：
 
-### 方案 A：CodeArts Pipeline + 自定义执行机（华为云原生，推荐用于课程交付）
-- 在服务器上安装 **CodeArts 自定义执行机（agent）**，注册到你们的 CodeArts 项目。
-- 建一条 **Pipeline**：触发器 = 「push 到 master / 合并请求合并到 master」；阶段 = 代码检查 → 编译构建(Maven + npm) → 部署(在自定义执行机即本服务器上跑 `deploy/deploy.sh`)。
-- 好处：可视化、有构建/检查/部署记录、符合"用 CodeArts 全流程"的课程预期。
-- 代价：需配置执行机 + Pipeline；自动化创建需 API（见第四节）。
-- 参考：[Pipeline 使用流程](https://support.huaweicloud.com/usermanual-pipeline/pipeline_01_0013.html)、[服务扩展点](https://support.huaweicloud.com/usermanual-pipeline/pipeline_01_0011.html)。
+- **触发**：代码提交 / 合并到 `master`。
+- **部署任务**：CodeArts Deploy 主机组（主机 `1.92.124.5`，root:22，SSH 认证 = 服务器上 `/root/quju/codearts_deploy_key` 私钥）→ 动作「执行 Shell 命令」：`bash /srv/quju/main/deploy/deploy.sh`（拉 master → `docker compose up -d --build` 滚动重启）。
+- ⚠️ **关键坑**：必须用**能选主机组的「部署」动作**；流水线里通用的「执行shell」跑在 CodeArts 云端容器（找不到 `/srv/quju/main`，报 `No such file`）。
 
-### 方案 B：CodeArts Repo Webhook → 服务器部署监听器（最简、纯服务器）
-- 服务器上跑一个轻量 webhook 监听（小脚本/服务），CodeArts 仓库 → 设置 → Webhook 指向它。
-- `main` 有合并/push 事件 → 监听器校验签名 → 执行 `deploy/deploy.sh`（拉取 main → `mvn package` → `npm build` → 重启）。
-- 好处：不依赖华为执行机/Pipeline，完全在服务器自洽，易懂易调。
-- 代价：评审/构建记录不在 CodeArts 里可视化（CI 体感弱一些）。
+服务器侧全部就绪（部署密钥 / `deploy.sh` / docker 编排 / MySQL），详见 `deploy/README.md`。
+日常：feature →(MR)→ `dev` 联调 →(MR)→ `master` → 自动部署到 http://1.92.124.5 。
 
-> 两种方案都需要服务器上的 `deploy/deploy.sh` 与运行时编排（建议 `deploy/docker-compose.yml`：MySQL8 + Redis + backend + frontend(nginx)）。**待你选定方案后我立即生成这套部署脚本。**
-
-### 运行时拓扑（建议，服务器单机）
-```
-nginx(443/80) ─┬─ /        → 前端静态(dist)
-               └─ /v1/*    → 后端 Spring Boot(:8080)
-后端 ── MySQL8(:3306, 生产库 quju) ── Redis(:6379)
-对象存储 → 阿里云 OSS(se-resource-bucket)（外部，非本机）
-```
-> 注意：开发期每人用独立 schema（`quju_dev_*`），**生产/部署用单独的 `quju` 库**，与开发库隔离。
-
----
-
-## 四、若要我帮忙"自动化"，需要你提供的 API / 凭证
-
-按你想自动化的程度，分级提供（都不会写进仓库，仅用于一次性配置）：
-
-- **只手动按文档做** → 不需要给我任何额外凭证（仓库 URL + 服务器已够，文档已写全）。
-- **要我直接登服务器搭好 CI/CD（方案 B 最快）** → 授权我用 `HuaweiCloud.txt` 里的 `1.92.124.5` + 密码 SSH 登录配置（这是对你服务器的实际操作，我会先和你确认每一步）。建议同时给我：服务器 OS（`cat /etc/os-release`）、是否允许装 Docker。
-- **要我用 CodeArts OpenAPI 自动建 Pipeline/Webhook/分支保护（方案 A）** → 需要：华为云 **IAM AK/SK**（有 CodeArts 权限）、**region**=cn-north-4、**CodeArts 项目 ID / 仓库 ID**（URL 里的 `5c09170aa96c46008547da02db15afa0` 是仓库/项目标识，请确认是项目 ID 还是仓库 ID）、以及推送用的 **SSH 部署密钥或 HTTPS 凭证**。
-  - 参考：[CodeArts OpenAPI](https://support.huaweicloud.com/api-codeartspipeline/pipeline_07_0001.html)（Pipeline）、CodeArts Repo API。
-
-> 你的诉求"代码上传 CodeArts 后通过 action 在服务器部署"对应 **方案 A**（CodeArts Pipeline 的部署任务 SSH 到服务器执行 `deploy/deploy.sh`）。下面第五节是已就绪部分与你要做的事。
-
----
-
-## 五、当前已就绪 & 你需要做/提供的（具体）
-
-### ✅ 服务器侧我已搭好
-- MySQL：容器 `quju-mysql`(mysql:8.4)，宿主端口 `13306`，库 `quju`，账号 `quju`，凭证 `/root/quju/mysql.env`。
-- docker 网络 `quju-net`、数据卷 `quju-mysql-data`。
-- `deploy/`：`docker-compose.yml` + `deploy.sh` + `.env.example`；`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf` 模板。
-- 两把 SSH 部署密钥（在 `/root/quju/`）：
-  - `codearts_deploy_key`：**CodeArts→服务器**部署用，公钥已入服务器 `authorized_keys`。
-  - `codearts_repo_key`：**服务器→CodeArts**拉代码用（`deploy.sh` 的 `git pull`），已配 `~/.ssh/config`。
-
-### ⬜ 需要你做（按顺序）
-1. **把仓库只读拉取公钥加到 CodeArts**（让服务器能 pull 部署）：
-   公钥 = `/root/quju/codearts_repo_key.pub`（内容我已在会话里给出）。
-   优先加为**仓库级部署密钥(只读)**：仓库 → 设置 → 部署密钥；若无该功能则加到一个服务账号的 SSH 公钥。
-2. **首次把工作区推到 CodeArts**（用真实学号账号提交，便于课程统计）：见第一节命令。之后服务器 `git clone ... /srv/quju/main`。
-3. **建 CodeArts 流水线（方案 A）**：触发=push/合并到 `master` → 构建(可选) → **部署任务**：目标主机 `1.92.124.5`（SSH，认证用 `codearts_deploy_key` 私钥或服务器密码）→ 执行 `bash /srv/quju/main/deploy/deploy.sh`。
-
-### ❓ 你问"我需要提供什么"——三选一
-- **你自己在 CodeArts 网页点配置**（推荐，最稳）：什么都不用给我，照上面 1–3 做即可；我可远程帮你把"服务器侧 deploy.sh / 首次 clone"跑通。
-- **我用 CodeArts OpenAPI 帮你自动建流水线/主机/触发**：给我 华为云 **IAM AK/SK**(含 CodeArts 权限) + **region** `cn-north-4` + **CodeArts 项目 ID**（请确认 URL 里 `5c0917…` 是项目还是仓库 ID）。
-- **退路：方案 B（Webhook→服务器）**：无需 CodeArts 主机配置，我在服务器起一个 webhook 监听器，你在仓库 Webhook 填地址即可。
+运行时拓扑：`nginx(:80) → /v1/* 反代 backend:8080 → mysql:3306(quju) + redis:6379`（quju-net 内；OSS 走外部阿里云）。

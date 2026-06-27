@@ -1,48 +1,33 @@
-# deploy/ — 服务器自托管部署
+# deploy/ — 服务器部署
 
-单台服务器（`1.92.124.5`，CentOS7 + Docker）上的部署编排。CI/CD 模型：
-**CodeArts 上 `main` 更新 → 触发部署任务 → 在服务器执行 `deploy/deploy.sh` → docker compose 滚动重启。**
+单台服务器（`1.92.124.5`，CentOS7 + Docker）上的部署编排。
+**CI/CD = CodeArts 流水线**：合并到 `master` → 触发流水线 → **部署任务(主机组)** SSH 到本机执行 `deploy/deploy.sh`。
 
 ## 运行时拓扑
 ```
 nginx(:80, quju-frontend) ─┬─ /        前端静态(dist)
                            └─ /v1/*    反代 → quju-backend:8080
 quju-backend ── quju-mysql:3306(库 quju) ── quju-redis:6379
-（均在 docker 网络 quju-net 上；OSS 走外部阿里云）
+（均在 docker 网络 quju-net 上；对象存储走外部阿里云 OSS）
 ```
 
-## 现状（已就绪）
-- ✅ `quju-mysql`(mysql:8.4) 已运行：宿主端口 13306，库 `quju`，账号 `quju`，凭证 `/root/quju/mysql.env`。
-- ✅ docker 网络 `quju-net`、数据卷 `quju-mysql-data` 已创建。
-- ⬜ `quju-redis`：首次 `docker compose ... up` 时拉取 `redis:7-alpine`（hub 不可达则配镜像加速）。
-- ⬜ `backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`：随应用脚手架补全（模板已给）。
+## 文件
+- `docker-compose.yml`：backend + frontend(nginx) + redis（复用外部容器 `quju-mysql`）。
+- `deploy.sh`：拉取最新 `master`(可 `DEPLOY_BRANCH` 覆盖) → `docker compose up -d --build` → 滚动重启。
+- `.env.example`：部署期环境变量模板；真实值在服务器本地 `deploy/.env`（已 gitignore，勿入库）。
+- `../backend/Dockerfile`、`../frontend/Dockerfile`、`../frontend/nginx.conf`：镜像构建。
 
-## 前置（一次性）
-1. 服务器克隆主仓库到 `/srv/quju/main`（见 `docs/dev-on-server-runbook.md`）。
-2. `cp deploy/.env.example deploy/.env` 并填值（DB_PASSWORD 取自 `/root/quju/mysql.env`，OSS 取自 `AccessKey.csv`）。`deploy/.env` 不入库。
+## 现状（已就绪并在线）
+- ✅ `quju-mysql`(mysql:8.4)、`quju-redis`、`quju-backend`、`quju-frontend` 均运行中；外部访问 http://1.92.124.5（`/v1/health` 返回 `db:UP`）。
+- ✅ docker 网络 `quju-net`、数据卷已建；生产库 `quju` 已导入全部表（`contracts/schema.sql`）。
+- ✅ CodeArts 流水线已配好：push/合并到 `master` 自动部署。
 
-## 手动部署
+## CodeArts 流水线配置（已完成，备查）
+- **触发**：代码提交/合并到 `master`。
+- **部署任务**：CodeArts Deploy 主机组（主机 `1.92.124.5`，root，SSH 认证用 `/root/quju/codearts_deploy_key` 私钥）→ 动作「执行 Shell 命令」：`bash /srv/quju/main/deploy/deploy.sh`。
+- ⚠️ 关键：必须用**能选主机组的「部署」动作**；流水线里通用的「执行shell」跑在 CodeArts 云端容器（找不到 `/srv/quju/main`，报 No such file）。
+
+## 手动部署（应急）
 ```bash
 cd /srv/quju/main && bash deploy/deploy.sh
 ```
-
-## 自动部署（已启用：合并到 master → ≤30s 自动部署）
-
-机制 = 服务器 systemd 看护：`deploy/auto-deploy.sh` 每 ~30s 检查 `origin/master`，有新提交就跑 `deploy.sh`。
-单机最稳，无需开放入站端口或云端复杂配置。安装（一次性，服务器上 root）：
-
-```bash
-cp /srv/quju/main/deploy/systemd/quju-autodeploy.* /etc/systemd/system/
-systemctl daemon-reload && systemctl enable --now quju-autodeploy.timer
-systemctl list-timers quju-autodeploy.timer      # 查看下次触发
-tail -f /root/quju/auto-deploy.log               # 看部署日志
-```
-
-> 流程：feature→dev（MR）联调；要部署就把 `dev` 合并到 `master`（MR）→ 看护在 30s 内自动部署。
-> 若改用 CodeArts 原生 Pipeline（云端可视化 CI），见 ../docs/codearts-and-cicd.md。
-
-## 接入 CodeArts（二选一，见 ../docs/codearts-and-cicd.md 第三节）
-- **方案 A**：CodeArts Pipeline（触发=合并到 main）→ Deploy 任务 SSH 到本机执行 `deploy/deploy.sh`。
-- **方案 B**：CodeArts 仓库 Webhook → 本机监听器收到 main 事件 → 执行 `deploy/deploy.sh`。
-
-> CodeArts SSH 到本机所需凭证：本机已生成专用部署密钥 `/root/quju/codearts_deploy_key`（公钥已加入 authorized_keys）。在 CodeArts 主机配置里用该私钥或服务器密码均可。详见 codearts 文档。

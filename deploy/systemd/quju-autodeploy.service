@@ -1,8 +1,0 @@
-[Unit]
-Description=QuJu auto-deploy (poll master, run deploy.sh on change)
-After=network-online.target docker.service
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /srv/quju/main/deploy/auto-deploy.sh
