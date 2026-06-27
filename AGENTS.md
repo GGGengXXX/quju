@@ -46,7 +46,7 @@ make gen-backend               # 由 openapi.yaml 生成后端 DTO/接口
 make gen-frontend              # 由 openapi.yaml 生成前端 TS 类型 + API client
 make mock                      # 启动 mock server（前端可在后端未就绪时联调）
 ```
-> `make` 目标见 `contracts/README.md`。`<<TODO: 若团队不用 make，请改成对应脚本命令>>`
+> `make` 目标见根 `Makefile`（lint-contract / gen-frontend / gen-backend / mock）。
 
 ## 3. 全局编码约定（前后端共同遵守）
 

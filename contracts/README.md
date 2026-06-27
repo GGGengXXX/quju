@@ -21,7 +21,7 @@
 
 ## 代码生成（建议命令，按需落地为 Makefile / 脚本）
 
-> `<<TODO: 平台核心组确认并落地以下命令；下方为推荐工具，可替换>>`
+> 命令已落地在根 `Makefile`（`make gen-frontend` / `make gen-backend` / `make mock` / `make lint-contract`）。下面是等价命令：
 
 ```bash
 # 后端：openapi-generator 生成 DTO + Spring 接口（只生成，不写实现）
