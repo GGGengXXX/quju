@@ -39,7 +39,7 @@
 - 修复后再过一遍。注意：reviewer 总能挑出东西，别为"风格偏好"过度设计。
 
 ### ⑥ PR
-按 `docs/merge-request-template.md` 提**合并请求(MR)**（CodeArts，非 GitHub）：关联 spec、列出涉及端点、确认 DoD、贴验证证据。CI 门禁全绿 + 1 人评审后合并；合并到 `main` 自动触发服务器 CI/CD 部署（见 `docs/codearts-and-cicd.md`）。
+按 `docs/merge-request-template.md` 提**合并请求(MR)**（CodeArts，非 GitHub），**目标 `dev`**：关联 spec、列出涉及端点、确认 DoD、贴验证证据。CI 门禁全绿 + 1 人评审后合并到 `dev` 联调。**部署**时把 `dev` 合并到 `master` → 自动触发服务器部署（分支模型见 `docs/codearts-and-cicd.md` §〇）。
 
 ## 契约变更怎么走（高频坑）
 发现需要新增/改端点、表、枚举、错误码？**不要在 feature 分支直接改 `contracts/`**：

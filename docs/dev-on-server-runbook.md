@@ -28,7 +28,7 @@ scripts/dev-bootstrap.sh <你的名字拼音> <feature-slug>
 ```
 
 脚本会自动：
-1. `git fetch && git worktree add ../wt-<name>-<feature> -b feat/<module>-<feature> origin/main`
+1. `git fetch && git worktree add ../wt-<name>-<feature> -b feat/<module>-<feature> origin/dev`（feature 从 dev 拉出）
 2. 建独立库：`CREATE DATABASE quju_dev_<name>_<feature>`（从 schema 基线迁移）
 3. 生成该 worktree 的 `.env`：分配后端/前端端口（见 §2 端口表）、DB 名、Redis key 前缀
 4. 打印"下一步"提示
@@ -60,7 +60,7 @@ cd frontend && npm ci && npm run dev
 
 ```bash
 # 同步主干（在你的 worktree 里）
-git fetch origin && git rebase origin/main      # 或 merge，团队统一
+git fetch origin && git rebase origin/dev       # feature 跟随 dev；或 merge，团队统一
 
 # 契约变了 → 重新生成（在 contracts/ 或用 make）
 make gen-backend && make gen-frontend
@@ -68,7 +68,7 @@ make gen-backend && make gen-frontend
 # 提交 & 推送 & 开 PR
 git add -p && git commit -m "<module>: ..."     # 信息见 AGENTS §7
 git push -u origin feat/<module>-<feature>
-# 然后在 CodeArts 网页新建合并请求(MR)，目标 main，描述用 docs/merge-request-template.md
+# 然后在 CodeArts 新建合并请求(MR)，目标 dev，描述用 docs/merge-request-template.md（部署时 dev→master）
 ```
 
 ## 4. 收尾：删除 worktree

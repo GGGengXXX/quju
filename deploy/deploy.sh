@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 服务器部署脚本：拉取最新 main → 构建镜像 → 滚动重启。
-# CodeArts 的部署任务 / Webhook 在 main 更新后调用本脚本即可。
-# 也可手动执行：bash deploy/deploy.sh
+# 服务器部署脚本：拉取最新 master → 构建镜像 → 滚动重启。
+# CodeArts 流水线/Webhook 在 master 更新(dev 合并入 master)后调用本脚本即可。
+# 部署分支可用 DEPLOY_BRANCH 覆盖（默认 master）。也可手动执行：bash deploy/deploy.sh
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/srv/quju/main}"
@@ -10,11 +10,12 @@ COMPOSE="docker compose -f deploy/docker-compose.yml --env-file deploy/.env"
 cd "$REPO_DIR"
 echo "[deploy] 仓库目录: $REPO_DIR"
 
-# 1) 取最新 main
+# 1) 取最新部署分支（默认 master）
+BRANCH="${DEPLOY_BRANCH:-master}"
 git fetch --all --prune
-git checkout main
-git reset --hard origin/main
-echo "[deploy] 已更新到 $(git rev-parse --short HEAD)"
+git checkout "$BRANCH"
+git reset --hard "origin/$BRANCH"
+echo "[deploy] 已更新 $BRANCH 到 $(git rev-parse --short HEAD)"
 
 # 2) 确保外部网络 / 部署 env 存在
 docker network inspect quju-net >/dev/null 2>&1 || docker network create quju-net >/dev/null
