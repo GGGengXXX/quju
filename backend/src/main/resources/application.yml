@@ -19,8 +19,16 @@ spring:
       mail.smtp.ssl.enable: true
       mail.smtp.ssl.trust: smtp.163.com
 
-# 发件人地址 + AI（DeepSeek，OpenAI 兼容）—— 供后续业务/AI 网关读取
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+# JWT + 发件人 + AI(DeepSeek) + OSS —— 供业务读取
 quju:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-change-me-please-32bytes-min}
+    expire-seconds: 604800
+  web-base-url: ${WEB_BASE_URL:http://1.92.124.5}
   mail:
     from: ${MAIL_FROM:tluvx0806@163.com}
   ai:
