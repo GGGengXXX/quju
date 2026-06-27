@@ -26,6 +26,21 @@ quju-backend ── quju-mysql:3306(库 quju) ── quju-redis:6379
 cd /srv/quju/main && bash deploy/deploy.sh
 ```
 
+## 自动部署（已启用：合并到 master → ≤30s 自动部署）
+
+机制 = 服务器 systemd 看护：`deploy/auto-deploy.sh` 每 ~30s 检查 `origin/master`，有新提交就跑 `deploy.sh`。
+单机最稳，无需开放入站端口或云端复杂配置。安装（一次性，服务器上 root）：
+
+```bash
+cp /srv/quju/main/deploy/systemd/quju-autodeploy.* /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now quju-autodeploy.timer
+systemctl list-timers quju-autodeploy.timer      # 查看下次触发
+tail -f /root/quju/auto-deploy.log               # 看部署日志
+```
+
+> 流程：feature→dev（MR）联调；要部署就把 `dev` 合并到 `master`（MR）→ 看护在 30s 内自动部署。
+> 若改用 CodeArts 原生 Pipeline（云端可视化 CI），见 ../docs/codearts-and-cicd.md。
+
 ## 接入 CodeArts（二选一，见 ../docs/codearts-and-cicd.md 第三节）
 - **方案 A**：CodeArts Pipeline（触发=合并到 main）→ Deploy 任务 SSH 到本机执行 `deploy/deploy.sh`。
 - **方案 B**：CodeArts 仓库 Webhook → 本机监听器收到 main 事件 → 执行 `deploy/deploy.sh`。

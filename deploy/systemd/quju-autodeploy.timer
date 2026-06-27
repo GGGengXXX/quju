@@ -1,0 +1,10 @@
+[Unit]
+Description=QuJu auto-deploy timer (every ~30s poll master)
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=30
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
