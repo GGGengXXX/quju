@@ -9,7 +9,8 @@ BRANCH="${DEPLOY_BRANCH:-master}"
 LOG="${AUTODEPLOY_LOG:-/root/quju/auto-deploy.log}"
 
 cd "$REPO_DIR"
-git fetch origin "$BRANCH" --quiet || exit 0
+# 显式 refspec：兼容 CentOS7 的 git 1.8（带 refspec 的 fetch 不会更新 origin/<b> 跟踪引用）
+git fetch origin "$BRANCH:refs/remotes/origin/$BRANCH" --quiet || exit 0
 LOCAL=$(git rev-parse "$BRANCH" 2>/dev/null || echo none)
 REMOTE=$(git rev-parse "origin/$BRANCH")
 
