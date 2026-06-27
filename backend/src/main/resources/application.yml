@@ -7,9 +7,22 @@ spring:
     username: ${DB_USERNAME:quju}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  # 邮件（网易163，账号激活/密码重置）—— 需引入 spring-boot-starter-mail 才生效
+  mail:
+    host: ${SMTP_HOST:smtp.163.com}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
+      mail.smtp.ssl.trust: smtp.163.com
 
-# AI（DeepSeek，OpenAI 兼容）—— 供后续 AI 网关读取
+# 发件人地址 + AI（DeepSeek，OpenAI 兼容）—— 供后续业务/AI 网关读取
 quju:
+  mail:
+    from: ${MAIL_FROM:tluvx0806@163.com}
   ai:
     base-url: ${AI_BASE_URL:https://hk.n1n.ai/v1}
     model: ${AI_MODEL:deepseek-v3.2}

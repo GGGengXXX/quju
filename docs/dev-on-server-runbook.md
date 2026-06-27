@@ -12,7 +12,8 @@
   ```bash
   sudo mkdir -p /srv/quju && sudo chown $USER /srv/quju
   cd /srv/quju
-  git clone https://codehub.devcloud.cn-north-4.huaweicloud.com/5c09170aa96c46008547da02db15afa0/quju.git main   # 主工作目录（CodeArts）
+  # 默认 HTTPS（首次提示输入 CodeArts「HTTPS 密码」，非 IAM AK/SK）；偏好 SSH 者先 export QUJU_REPO_URL=git@codehub.devcloud.cn-north-4.huaweicloud.com:5c09170aa96c46008547da02db15afa0/quju.git
+  git clone "${QUJU_REPO_URL:-https://codehub.devcloud.cn-north-4.huaweicloud.com/5c09170aa96c46008547da02db15afa0/quju.git}" main   # 主工作目录（CodeArts）
   ```
 - **MySQL 已就绪**：docker 容器 `quju-mysql`(mysql:8.4)，宿主端口 `13306`，生产库 `quju`，应用账号 `quju`；凭证在 `/root/quju/mysql.env`(root-only，**勿入库**)。`dev-bootstrap.sh` 用 `quju` 账号为每人建独立 `quju_dev_*` 库（已授权）。
 

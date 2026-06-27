@@ -28,9 +28,12 @@ git remote add origin https://codehub.devcloud.cn-north-4.huaweicloud.com/5c0917
 git push -u origin main
 ```
 
-**鉴权方式**（二选一）：
-- **HTTPS**：用 CodeArts 个人「HTTPS 用户名/密码」（控制台 → 个人设置 → 代码托管 → HTTPS 密码）。首次 push 会提示输入。
-- **SSH**：把每人 `~/.ssh/id_ed25519.pub` 加到 CodeArts 个人 SSH 公钥；remote 改用 `git@codehub.devcloud.cn-north-4.huaweicloud.com:...`。**服务器多人协作推荐 SSH，每人一把 key。**
+**代码推送鉴权（默认 HTTPS；部署始终 SSH）**：
+- **HTTPS（默认，用于代码上传/push）**：用 CodeArts **代码托管 HTTPS 密码**（控制台 → 个人设置 → 代码托管/HTTPS 密码：设置并复制；用户名以该页显示为准）。`git push` 时填入，凭证管理器（macOS Keychain / `git config --global credential.helper store`）可记住，后续免输。
+  - ⚠️ **华为云 IAM AK/SK（Access Key/Secret，如 `credentials.csv`）不是 git HTTPS 密码**，拿它 push 会被拒（`HTTP Basic: Access denied`）。务必用上面的「HTTPS 密码」。
+- **SSH（可选，按队员喜好）**：把个人 `~/.ssh/id_ed25519.pub` 加到 CodeArts 个人 SSH 公钥；remote 用 `git@codehub.devcloud.cn-north-4.huaweicloud.com:5c09170aa96c46008547da02db15afa0/quju.git`。
+- **协议可配置**：由 remote URL 决定；脚本用 `QUJU_REPO_URL` 环境变量切换（默认 HTTPS，偏好 SSH 者改为 `git@…` 形式）。
+- **部署链路始终走 SSH 密钥**（CodeArts→服务器 部署、服务器→CodeArts 拉代码），与个人 push 用什么协议无关，见第五节。
 
 ---
 

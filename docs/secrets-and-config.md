@@ -22,7 +22,9 @@
 | AI base_url | `AI_BASE_URL` | `https://hk.n1n.ai/v1` | OpenAI 兼容端点 |
 | AI 默认模型 | `AI_MODEL` | `deepseek-v3.2` | 活动策划/审核/图片分类默认模型 |
 | 高德地图 key | `VITE_AMAP_KEY` | `高德地图-api-key.txt` | 选点/附近/距离/地图模式（前端构建期注入） |
-| 邮件 SMTP | `SMTP_URL` / `SMTP_PASSWORD` | `<<TODO: 待提供>>` | 账号激活 |
+| 邮件 SMTP 主机/端口 | `SMTP_HOST` / `SMTP_PORT` | `smtp.163.com` / `465`(SSL) | 网易 163 |
+| 邮件 SMTP 账号 | `SMTP_USERNAME` / `MAIL_FROM` | `tluvx0806@163.com` | 发件邮箱 |
+| 邮件 SMTP 密码 | `SMTP_PASSWORD` | `邮箱验证配置信息.txt` 的授权码 | **勿入库**；163 授权码非登录密码 |
 | 短信服务 | `SMS_*` | `<<TODO: 待提供>>` | 需求中第三方 |
 
 ## 阿里云 OSS（Java 后端接入要点）
