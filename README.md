@@ -16,7 +16,7 @@
 
 ## 第一次来？按顺序读
 
-1. [`docs/dev-on-server-runbook.md`](docs/dev-on-server-runbook.md) — 如何在服务器上用 worktree 开始你的 feature
+1. [`docs/dev-on-server-runbook.md`](docs/dev-on-server-runbook.md) — 如何在服务器上为你的 feature 建独立 clone 并开始开发
 2. [`docs/workflow.md`](docs/workflow.md) — 每个需求的 AI 实现流程（spec → plan → tasks → implement → review → MR）
 3. [`docs/requirements-breakdown.md`](docs/requirements-breakdown.md) — 4 大模块 → 子功能 → 负责人 → 端点/表
 4. [`AGENTS.md`](AGENTS.md) — 编码规范与铁律

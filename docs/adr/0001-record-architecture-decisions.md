@@ -22,10 +22,10 @@
 - 代价：改契约多一步写 ADR —— 这是有意的"摩擦"，用来保护唯一事实来源。
 
 ## 待决策（后续 ADR）
-- `<<TODO: ADR 0002 — HTTP 状态码语义 vs 统一 200 信封>>`
-- `<<TODO: ADR 0003 — Flyway vs Liquibase>>`
-- `<<TODO: ADR 0004 — AI 服务提供商（活动策划/内容审核/图片分类）>>`
-- `<<TODO: ADR 0005 — IM 方案（WebSocket/STOMP；是否引入消息中间件）>>`
+- ✅ HTTP 状态码：**统一 200 + 信封 code**（已采用，见 error-codes.md）
+- ✅ AI 服务商：**DeepSeek**（deepseek-v3.2 via hk.n1n.ai，OpenAI 兼容）
+- ✅ IM 方案：**WebSocket**（nginx 已配 upgrade 反代）
+- ⬜ Flyway vs Liquibase（实现真实后端时定；schema.sql 可直接作 Flyway V1 基线）
 
 ---
 ### ADR 模板（复制此段新建）

@@ -23,7 +23,7 @@ deploy/      服务器部署脚本/编排（自托管 CI-CD，见 docs/codearts-
 
 ## 2. 环境与常用命令
 
-> 标准开发环境是**服务器上的 worktree**，不在本地。新功能开始前先读 `docs/dev-on-server-runbook.md`。
+> 标准开发环境是**服务器上的独立 clone**（每 feature 一个），不在本地。新功能开始前先读 `docs/dev-on-server-runbook.md`。
 
 ```bash
 # 新建一个 feature 的独立 clone + 隔离 DB schema + 分配端口（在 /srv/quju/main 运行）
