@@ -1,14 +1,15 @@
-# 服务器开发手册（worktree + 每人隔离 DB / 端口）
+# 服务器开发手册（每人独立 clone + 隔离 DB / 端口）
 
-> 所有人**直接在服务器上**开发，不在本地。每个 feature 一分支一 worktree，互不干扰。
+> 所有人**直接在服务器上**开发，不在本地。每个 feature 一个独立 clone（一分支），互不干扰。
+> （CentOS7 自带 git 1.8 无 `worktree`，故用独立 clone；隔离性更好。）
 > 共用一台 MySQL/Redis，但**每人一个独立 DB schema + 一段端口**，避免迁移/数据/端口冲突。
 
 ## 0. 一次性：服务器准备（平台核心组做）
 
 服务器 `1.92.124.5`（CentOS 7，root 登录，密码见 `HuaweiCloud.txt`，**勿入库**）。Docker 26.x 已装。
 
-- 已就绪：Docker、MySQL（容器 `quju-mysql`）。各 worktree 需要：JDK 17、Maven、Node 18+、Git（缺则 yum/手装）、各人的 AI CLI（Claude Code / Cursor server / …）。Redis 由部署编排提供（见 `deploy/`）。
-- 在固定位置克隆"主仓库"一次（**裸/主**仓库，供大家 add worktree）：
+- 已就绪：Docker、MySQL（容器 `quju-mysql`）、Git 1.8、root 已存 CodeArts HTTPS 凭证（clone/push 免输）。开发需：JDK 17、Maven、Node 18+、各人的 AI CLI（Claude Code / Cursor server / …）。Redis 由部署编排提供（见 `deploy/`）。
+- 在固定位置克隆"主/部署仓库"一次（部署用，分支 master）：
   ```bash
   sudo mkdir -p /srv/quju && sudo chown $USER /srv/quju
   cd /srv/quju
@@ -17,29 +18,29 @@
   ```
 - **MySQL 已就绪**：docker 容器 `quju-mysql`(mysql:8.4)，宿主端口 `13306`，生产库 `quju`，应用账号 `quju`；凭证在 `/root/quju/mysql.env`(root-only，**勿入库**)。`dev-bootstrap.sh` 用 `quju` 账号为每人建独立 `quju_dev_*` 库（已授权）。
 
-## 1. 每人/每 feature：开一个 worktree
+## 1. 每人/每 feature：建一个独立 clone
 
 在 `/srv/quju/main` 下运行 bootstrap 脚本（见 `scripts/dev-bootstrap.sh`）：
 
 ```bash
 cd /srv/quju/main
-scripts/dev-bootstrap.sh <你的名字拼音> <feature-slug>
-# 例：scripts/dev-bootstrap.sh zhangsan activity-map
+scripts/dev-bootstrap.sh <你的名字拼音> <feature-slug> [module]
+# 例：scripts/dev-bootstrap.sh zhangsan activity-map activity
 ```
 
 脚本会自动：
-1. `git fetch && git worktree add ../wt-<name>-<feature> -b feat/<module>-<feature> origin/dev`（feature 从 dev 拉出）
-2. 建独立库：`CREATE DATABASE quju_dev_<name>_<feature>`（从 schema 基线迁移）
-3. 生成该 worktree 的 `.env`：分配后端/前端端口（见 §2 端口表）、DB 名、Redis key 前缀
+1. 从 CodeArts 克隆到 `/srv/quju/dev-<name>-<feature>`，并基于 `origin/dev` 切出 `feat/<module>-<feature>` 分支
+2. 建独立库 `quju_dev_<name>_<feature>`（quju 账号已授权）
+3. 生成该 clone 的 `.env`：分配后端/前端端口（见 §2）、DB 名、Redis 前缀、各第三方占位
 4. 打印"下一步"提示
 
-然后进入你的 worktree 开发：
+然后进入你的 clone 开发（先设 `git config user.email "<你的邮箱>"` 便于提交归属）：
 ```bash
-cd /srv/quju/wt-<name>-<feature>
+cd /srv/quju/dev-<name>-<feature>
 # 后端
 cd backend && mvn spring-boot:run
-# 前端（另开一个终端/复用）
-cd frontend && npm ci && npm run dev
+# 前端（另开终端）
+cd frontend && npm install && npm run dev
 ```
 
 ## 2. 端口 / DB 分配表（避免撞端口）
@@ -59,7 +60,7 @@ cd frontend && npm ci && npm run dev
 ## 3. 日常
 
 ```bash
-# 同步主干（在你的 worktree 里）
+# 同步 dev（在你的 clone 里）
 git fetch origin && git rebase origin/dev       # feature 跟随 dev；或 merge，团队统一
 
 # 契约变了 → 重新生成（在 contracts/ 或用 make）
@@ -71,18 +72,16 @@ git push -u origin feat/<module>-<feature>
 # 然后在 CodeArts 新建合并请求(MR)，目标 dev，描述用 docs/merge-request-template.md（部署时 dev→master）
 ```
 
-## 4. 收尾：删除 worktree
+## 4. 收尾：删除 clone
 
-PR 合并后清理，释放磁盘与端口：
+MR 合并后清理，释放磁盘与端口：
 ```bash
-cd /srv/quju/main
-git worktree remove ../wt-<name>-<feature>
-git branch -d feat/<module>-<feature>           # 远端分支由 PR 合并时删
+rm -rf /srv/quju/dev-<name>-<feature>           # 直接删该 clone 目录
 # 可选：DROP DATABASE quju_dev_<name>_<feature>;
 ```
 
 ## 5. 注意
 
-- **不要**在 `main` 主工作目录里直接改代码 —— 它只用来 add worktree / 跑 CI 基线。
-- 每人只在自己的 worktree + 自己负责的目录里改（见 `work-assignment.md`）。
+- **不要**在 `/srv/quju/main` 主工作目录里直接改代码 —— 它是部署用的（master），由流水线维护。
+- 每人只在自己的 clone + 自己负责的目录里改（见 `work-assignment.md`）。
 - 密钥放各自 `.env`（已 gitignore），不要提交。

@@ -52,7 +52,7 @@ git push -u origin main
 
 ## 二、代码推送 + 合并请求(MR) 流程
 
-CodeArts 用**合并请求（Merge Request, MR）**而非 GitHub PR。日常（在你的 worktree 内）：
+CodeArts 用**合并请求（Merge Request, MR）**而非 GitHub PR。日常（在你的 clone 内）：
 
 ```bash
 git push -u origin feat/<module>-<slug>

@@ -13,7 +13,7 @@
    - 后端：Java 17 + Spring Boot 3 + MyBatis-Plus + MySQL 8 + Redis
    - 前端：Vue 3 + TypeScript + Vite + Pinia + Element Plus
    - 契约：OpenAPI 3.1 + DBML，contract-first
-   - 协作：Monorepo + 服务器 git worktree + 华为云 CodeArts 合并请求(MR) + 服务器自托管 CI/CD；规格驱动（Spec Kit）
+   - 协作：Monorepo + 服务器每 feature 独立 clone + 华为云 CodeArts 合并请求(MR) + CodeArts 流水线自动部署；规格驱动（Spec Kit）
    - 代码托管：华为云 CodeArts Repo（cn-north-4）；对象存储：阿里云 OSS（bucket `se-resource-bucket`）；部署：单台服务器 `1.92.124.5`
    - 工具中立规则：`AGENTS.md`（+ `CLAUDE.md` 导入）
 

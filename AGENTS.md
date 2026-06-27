@@ -7,7 +7,7 @@
 
 1. **契约即法律。** `contracts/`（DB schema + OpenAPI + 枚举/错误码）是前后端唯一事实来源。**任何对 `contracts/` 的改动都必须**：先写 ADR（`docs/adr/`）→ 单独的合并请求(MR) → 平台核心组批准（CodeArts 分支保护 + 必选评审，见 `docs/codearts-and-cicd.md`）。严禁在 feature 分支里"顺手"改契约。
 2. **先看契约/已有代码，再动手。** 实现任何端点/页面前，先读对应的 OpenAPI 定义与同模块已有实现，遵循既有模式，不要另起一套。
-3. **一个 feature = 一个分支 = 一个 worktree。** 只在你自己的 worktree 与你负责的目录/表内改动（见 `docs/work-assignment.md`）。不要碰别人负责的文件。
+3. **一个 feature = 一个分支 = 一个独立 clone。** 只在你自己的 clone 与你负责的目录/表内改动（见 `docs/work-assignment.md`）。不要碰别人负责的文件。
 4. **完成必须可验证。** 每次实现都要写测试并运行通过；后端 `mvn test`，前端 `npm run test`/`type-check`。没有通过的验证不算完成（见 §6 Definition of Done）。
 5. **不提交密钥。** 第三方 key（高德、LLM、SMTP、OSS、短信）一律走环境变量 / `.env`（已 gitignore），代码与提交里不得出现明文。
 
@@ -26,7 +26,7 @@ deploy/      服务器部署脚本/编排（自托管 CI-CD，见 docs/codearts-
 > 标准开发环境是**服务器上的 worktree**，不在本地。新功能开始前先读 `docs/dev-on-server-runbook.md`。
 
 ```bash
-# 新建一个 feature 的 worktree + 隔离 DB schema + 分配端口（在仓库根目录运行）
+# 新建一个 feature 的独立 clone + 隔离 DB schema + 分配端口（在 /srv/quju/main 运行）
 scripts/dev-bootstrap.sh <your-name> <feature-slug>
 
 # 后端（在 backend/）
