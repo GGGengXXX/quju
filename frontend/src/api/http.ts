@@ -1,6 +1,12 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    silentError?: boolean
+  }
+}
+
 // 生产由 nginx 反代 /v1；开发用 .env 的 VITE_API_BASE
 const baseURL = (import.meta as any).env?.VITE_API_BASE || '/v1'
 const http = axios.create({ baseURL, timeout: 15000 })
@@ -22,13 +28,13 @@ http.interceptors.response.use(
         localStorage.removeItem('quju_token')
         if (!location.pathname.startsWith('/login')) location.assign('/login')
       }
-      ElMessage.error(r.message || '请求失败')
+      if (!resp.config.silentError) ElMessage.error(r.message || '请求失败')
       return Promise.reject(new Error(r.message || 'error'))
     }
     return r
   },
   (err) => {
-    ElMessage.error(err?.message || '网络错误')
+    if (!err?.config?.silentError) ElMessage.error(err?.message || '网络错误')
     return Promise.reject(err)
   }
 )

@@ -17,6 +17,18 @@ public enum ErrorCode {
     ACTIVATION_TOKEN_INVALID(2004, "激活/重置令牌无效或过期"),
     MERCHANT_LICENSE_REQUIRED(2005, "商家需上传营业执照"),
     ACCOUNT_BANNED(2007, "账号已被封禁"),
+    // 活动 3000-3999
+    ACTIVITY_FULL(3000, "活动名额已满"),
+    SIGNUP_DEADLINE_PASSED(3001, "已过报名截止"),
+    ALREADY_SIGNED_UP(3002, "已报名"),
+    NOT_SIGNED_UP(3003, "未报名"),
+    ACTIVITY_NOT_PUBLISHED(3004, "活动未发布或不可报名"),
+    SIGNUP_CHECK_FAILED(3005, "报名校验未通过"),
+    WAITLIST_CONFIRM_EXPIRED(3006, "候补确认超时"),
+    CHECKIN_CODE_INVALID(3007, "签到码无效"),
+    CHECKIN_LOCATION_TOO_FAR(3008, "签到位置不在活动地点附近"),
+    REVIEW_WINDOW_CLOSED(3009, "评价入口已关闭"),
+    ACTIVITY_NOT_OWNER(3010, "非活动发起人"),
     // 社交/好友/IM 4000-4999
     ALREADY_FRIENDS(4000, "已是好友"),
     BLOCKED_RELATION(4001, "存在黑名单关系，操作受限"),
