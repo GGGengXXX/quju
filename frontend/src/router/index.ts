@@ -6,6 +6,7 @@ const routes = [
   { path: '/register', component: () => import('../views/Register.vue') },
   { path: '/activate', component: () => import('../views/Activate.vue') },
   { path: '/profile', component: () => import('../views/Profile.vue'), meta: { auth: true } },
+  { path: '/teams', component: () => import('../views/team/TeamHub.vue'), meta: { auth: true } },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })

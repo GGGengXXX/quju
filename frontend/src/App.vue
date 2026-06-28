@@ -12,6 +12,7 @@ function logout() { auth.logout(); router.push('/login') }
       <span class="logo" @click="router.push('/')">趣聚 QuJu</span>
       <span class="spacer" />
       <template v-if="auth.token">
+        <el-button text @click="router.push('/teams')">小队</el-button>
         <el-button text @click="router.push('/profile')">我的</el-button>
         <el-button text @click="logout">退出</el-button>
       </template>

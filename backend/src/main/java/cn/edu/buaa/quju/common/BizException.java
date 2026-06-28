@@ -14,5 +14,10 @@ public class BizException extends RuntimeException {
         this.code = ec.getCode();
     }
 
+    public BizException(int code, String message) {
+        super(message);
+        this.code = code;
+    }
+
     public int getCode() { return code; }
 }
