@@ -1,22 +1,46 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const form = reactive({ email: '', password: '' })
 const loading = ref(false)
+
+const demoAccounts = {
+  owner: { label: 'Owner Demo', email: 'activity.demo.owner@example.com', password: 'Pass123456!' },
+  member: { label: 'Member Demo', email: 'activity.demo.member@example.com', password: 'Pass123456!' },
+} as const
+
+function fillDemo(email: string, password: string) {
+  form.email = email
+  form.password = password
+}
 
 async function submit() {
   loading.value = true
   try {
     await auth.login(form.email, form.password)
     ElMessage.success('登录成功')
-    router.push('/profile')
-  } catch { /* http 拦截器已提示 */ } finally { loading.value = false }
+    router.push('/activities')
+  } catch {
+    // http 拦截器已提示
+  } finally {
+    loading.value = false
+  }
 }
+
+onMounted(async () => {
+  if (!(import.meta as any).env?.DEV) return
+  const demo = typeof route.query.demo === 'string' ? route.query.demo : ''
+  if (demo !== 'owner' && demo !== 'member') return
+  const account = demoAccounts[demo]
+  fillDemo(account.email, account.password)
+  await submit()
+})
 </script>
 
 <template>
@@ -27,8 +51,20 @@ async function submit() {
       <el-form-item label="密码"><el-input v-model="form.password" type="password" show-password /></el-form-item>
       <el-button type="primary" :loading="loading" style="width:100%" @click="submit">登录</el-button>
     </el-form>
+    <div class="demo-row">
+      <el-button text @click="fillDemo(demoAccounts.owner.email, demoAccounts.owner.password)">
+        {{ demoAccounts.owner.label }}
+      </el-button>
+      <el-button text @click="fillDemo(demoAccounts.member.email, demoAccounts.member.password)">
+        {{ demoAccounts.member.label }}
+      </el-button>
+    </div>
     <p class="tip">没有账号？<router-link to="/register">去注册</router-link></p>
   </el-card>
 </template>
 
-<style scoped>.box{max-width:420px;margin:60px auto}.tip{text-align:center;margin-top:12px}</style>
+<style scoped>
+.box{max-width:420px;margin:60px auto}
+.tip{text-align:center;margin-top:12px}
+.demo-row{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+</style>
