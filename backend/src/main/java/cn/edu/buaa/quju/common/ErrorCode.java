@@ -16,7 +16,13 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(2003, "邮箱或密码错误"),
     ACTIVATION_TOKEN_INVALID(2004, "激活/重置令牌无效或过期"),
     MERCHANT_LICENSE_REQUIRED(2005, "商家需上传营业执照"),
-    ACCOUNT_BANNED(2007, "账号已被封禁");
+    ACCOUNT_BANNED(2007, "账号已被封禁"),
+    // 社交/好友/IM 4000-4999
+    ALREADY_FRIENDS(4000, "已是好友"),
+    BLOCKED_RELATION(4001, "存在黑名单关系，操作受限"),
+    FRIEND_REQUEST_DUPLICATE(4002, "重复的好友申请"),
+    NOT_FRIENDS(4003, "非好友关系"),
+    MESSAGE_RECALL_EXPIRED(4004, "超过2分钟，不可撤回");
 
     private final int code;
     private final String message;
