@@ -1,5 +1,6 @@
 package cn.edu.buaa.quju.config;
 
+import cn.edu.buaa.quju.common.AdminAuthInterceptor;
 import cn.edu.buaa.quju.common.AuthInterceptor;
 import cn.edu.buaa.quju.common.JwtUtil;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new AuthInterceptor(jwt)).addPathPatterns("/v1/**");
+        registry.addInterceptor(new AdminAuthInterceptor(jwt)).addPathPatterns("/v1/admin/**");
     }
 
     @Override
