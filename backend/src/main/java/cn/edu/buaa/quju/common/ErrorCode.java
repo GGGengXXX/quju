@@ -22,7 +22,11 @@ public enum ErrorCode {
     BLOCKED_RELATION(4001, "存在黑名单关系，操作受限"),
     FRIEND_REQUEST_DUPLICATE(4002, "重复的好友申请"),
     NOT_FRIENDS(4003, "非好友关系"),
-    MESSAGE_RECALL_EXPIRED(4004, "超过2分钟，不可撤回");
+    MESSAGE_RECALL_EXPIRED(4004, "超过2分钟，不可撤回"),
+    // 后台管理 6000-6999
+    BAN_REASON_REQUIRED(6000, "封禁需填写原因与期限"),
+    REJECT_REASON_REQUIRED(6001, "驳回需填写原因"),
+    TAKEDOWN_REASON_REQUIRED(6002, "下架/停用需填写原因");
 
     private final int code;
     private final String message;
