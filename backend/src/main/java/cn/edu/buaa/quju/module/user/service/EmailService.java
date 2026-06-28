@@ -22,19 +22,30 @@ public class EmailService {
         this.webBaseUrl = webBaseUrl;
     }
 
-    /** 发送激活邮件（尽力而为，失败不阻断注册）。 */
     public void sendActivation(String to, String token) {
+        send(to, "【趣聚】激活你的账号",
+                "欢迎注册趣聚！请点击以下链接激活账号（24 小时内有效）：\n"
+                + webBaseUrl + "/activate?token=" + token);
+    }
+
+    public void sendPasswordReset(String to, String token) {
+        send(to, "【趣聚】重置密码",
+                "你申请了重置密码，请点击以下链接（1 小时内有效）：\n"
+                + webBaseUrl + "/reset-password?token=" + token
+                + "\n如非本人操作请忽略此邮件。");
+    }
+
+    private void send(String to, String subject, String text) {
         try {
             SimpleMailMessage m = new SimpleMailMessage();
             m.setFrom(from);
             m.setTo(to);
-            m.setSubject("【趣聚】激活你的账号");
-            m.setText("欢迎注册趣聚！请点击以下链接激活账号（24 小时内有效）：\n"
-                    + webBaseUrl + "/activate?token=" + token);
+            m.setSubject(subject);
+            m.setText(text);
             sender.send(m);
-            log.info("激活邮件已发送 -> {}", to);
+            log.info("邮件已发送 subject='{}' -> {}", subject, to);
         } catch (Exception e) {
-            log.warn("激活邮件发送失败 -> {}: {}", to, e.getMessage());
+            log.warn("邮件发送失败 -> {}: {}", to, e.getMessage());
         }
     }
 }

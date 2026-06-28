@@ -5,6 +5,8 @@ import cn.edu.buaa.quju.common.ErrorCode;
 import cn.edu.buaa.quju.common.JwtUtil;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.LoginReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.LoginResp;
+import cn.edu.buaa.quju.module.user.dto.UserDtos.PasswordResetReq;
+import cn.edu.buaa.quju.module.user.dto.UserDtos.PasswordResetRequestReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.RegisterReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.entity.EmailToken;
@@ -27,7 +29,8 @@ public class AuthService {
     private final JwtUtil jwt;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public AuthService(UserMapper userMapper, EmailTokenMapper tokenMapper, EmailService emailService, JwtUtil jwt) {
+    public AuthService(UserMapper userMapper, EmailTokenMapper tokenMapper,
+                       EmailService emailService, JwtUtil jwt) {
         this.userMapper = userMapper;
         this.tokenMapper = tokenMapper;
         this.emailService = emailService;
@@ -51,24 +54,14 @@ public class AuthService {
         u.setReputation(100);
         userMapper.insert(u);
 
-        EmailToken et = new EmailToken();
-        et.setUserId(u.getId());
-        et.setToken(UUID.randomUUID().toString().replace("-", ""));
-        et.setType("ACTIVATION");
-        et.setExpiresAt(LocalDateTime.now().plusHours(24));
-        et.setUsed(false);
-        tokenMapper.insert(et);
-
-        emailService.sendActivation(u.getEmail(), et.getToken());
-        return new UserBrief(u.getId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus());
+        String token = createToken(u.getId(), "ACTIVATION", 24);
+        emailService.sendActivation(u.getEmail(), token);
+        return toUserBrief(u);
     }
 
     @Transactional
     public void activate(String token) {
-        EmailToken et = tokenMapper.selectOne(Wrappers.<EmailToken>lambdaQuery()
-                .eq(EmailToken::getToken, token).eq(EmailToken::getType, "ACTIVATION"));
-        if (et == null || Boolean.TRUE.equals(et.getUsed()) || et.getExpiresAt().isBefore(LocalDateTime.now()))
-            throw new BizException(ErrorCode.ACTIVATION_TOKEN_INVALID);
+        EmailToken et = requireValidToken(token, "ACTIVATION");
         User u = userMapper.selectById(et.getUserId());
         if (u == null) throw new BizException(ErrorCode.ACTIVATION_TOKEN_INVALID);
         u.setStatus("ACTIVE");
@@ -85,7 +78,52 @@ public class AuthService {
         if ("BANNED".equals(u.getStatus())) throw new BizException(ErrorCode.ACCOUNT_BANNED);
         if ("PENDING_ACTIVATION".equals(u.getStatus())) throw new BizException(ErrorCode.ACCOUNT_NOT_ACTIVATED);
         String token = jwt.generate(u.getId());
-        return new LoginResp(token, jwt.getExpireSeconds(),
-                new UserBrief(u.getId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus()));
+        return new LoginResp(token, jwt.getExpireSeconds(), toUserBrief(u));
+    }
+
+    @Transactional
+    public void requestPasswordReset(PasswordResetRequestReq req) {
+        User u = userMapper.selectOne(Wrappers.<User>lambdaQuery()
+                .eq(User::getEmail, req.email()).isNull(User::getDeletedAt));
+        // 不泄露邮箱是否存在：始终返回成功
+        if (u == null || !"ACTIVE".equals(u.getStatus())) return;
+        String token = createToken(u.getId(), "RESET_PASSWORD", 1);
+        emailService.sendPasswordReset(u.getEmail(), token);
+    }
+
+    @Transactional
+    public void resetPassword(PasswordResetReq req) {
+        EmailToken et = requireValidToken(req.token(), "RESET_PASSWORD");
+        User u = userMapper.selectById(et.getUserId());
+        if (u == null) throw new BizException(ErrorCode.ACTIVATION_TOKEN_INVALID);
+        u.setPasswordHash(encoder.encode(req.newPassword()));
+        userMapper.updateById(u);
+        et.setUsed(true);
+        tokenMapper.updateById(et);
+    }
+
+    // ---- 工具方法 ----
+
+    private String createToken(Long userId, String type, int expiryHours) {
+        EmailToken et = new EmailToken();
+        et.setUserId(userId);
+        et.setToken(UUID.randomUUID().toString().replace("-", ""));
+        et.setType(type);
+        et.setExpiresAt(LocalDateTime.now().plusHours(expiryHours));
+        et.setUsed(false);
+        tokenMapper.insert(et);
+        return et.getToken();
+    }
+
+    private EmailToken requireValidToken(String token, String type) {
+        EmailToken et = tokenMapper.selectOne(Wrappers.<EmailToken>lambdaQuery()
+                .eq(EmailToken::getToken, token).eq(EmailToken::getType, type));
+        if (et == null || Boolean.TRUE.equals(et.getUsed()) || et.getExpiresAt().isBefore(LocalDateTime.now()))
+            throw new BizException(ErrorCode.ACTIVATION_TOKEN_INVALID);
+        return et;
+    }
+
+    private UserBrief toUserBrief(User u) {
+        return new UserBrief(u.getId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus());
     }
 }
