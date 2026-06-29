@@ -6,9 +6,9 @@ import cn.edu.buaa.quju.module.admin.dto.AdminDtos.BanReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.MerchantAppVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.MerchantReviewReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
+import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserDetailVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserListVO;
 import cn.edu.buaa.quju.module.admin.service.AdminUserService;
-import cn.edu.buaa.quju.module.user.entity.User;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,7 +36,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/users/{id}")
-    public R<User> getUserDetail(@PathVariable Long id) {
+    public R<UserDetailVO> getUserDetail(@PathVariable Long id) {
         AdminContext.require();
         return R.ok(userService.getUserDetail(id));
     }

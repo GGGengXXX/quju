@@ -6,6 +6,7 @@ import cn.edu.buaa.quju.module.admin.dto.AdminDtos.BanReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.MerchantAppVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.MerchantReviewReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
+import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserDetailVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserListVO;
 import cn.edu.buaa.quju.module.admin.entity.UserBan;
 import cn.edu.buaa.quju.module.admin.mapper.UserBanMapper;
@@ -51,10 +52,12 @@ public class AdminUserService {
         return new PageResult<>(p.getTotal(), page, size, list);
     }
 
-    public User getUserDetail(long userId) {
+    public UserDetailVO getUserDetail(long userId) {
         User u = userMapper.selectById(userId);
         if (u == null || u.getDeletedAt() != null) throw new BizException(ErrorCode.NOT_FOUND);
-        return u;
+        return new UserDetailVO(u.getId(), u.getEmail(), u.getNickname(), u.getAvatar(),
+                u.getUserType(), u.getStatus(), u.getGender(), u.getBirthday(),
+                u.getSignature(), u.getReputation(), u.getCreatedAt(), u.getUpdatedAt());
     }
 
     @Transactional
