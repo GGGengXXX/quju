@@ -2,6 +2,7 @@ package cn.edu.buaa.quju.module.admin.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public final class AdminDtos {
@@ -16,7 +17,11 @@ public final class AdminDtos {
     // ---- 用户管理 ----
     public record UserListVO(Long id, String email, String nickname, String userType,
                               String status, LocalDateTime createdAt) {}
-    public record BanReq(@NotBlank String reason, LocalDateTime banUntil) {}
+    public record BanReq(String reason, LocalDateTime banUntil) {}
+    public record UserDetailVO(Long id, String email, String nickname, String avatar,
+                                String userType, String status, String gender, LocalDate birthday,
+                                String signature, Integer reputation,
+                                LocalDateTime createdAt, LocalDateTime updatedAt) {}
 
     // ---- 商家审核 ----
     public record MerchantReviewReq(@NotBlank String action, String reason) {}
@@ -27,7 +32,7 @@ public final class AdminDtos {
     public record ActivityListVO(Long id, Long creatorId, String name, String category,
                                   String status, LocalDateTime startTime, LocalDateTime createdAt) {}
     public record ActivityReviewReq(@NotBlank String action, String reason) {}
-    public record ReasonReq(@NotBlank String reason) {}
+    public record ReasonReq(String reason) {}
 
     // ---- 小队管理 ----
     public record TeamListVO(Long id, Long ownerId, String name, String status,
