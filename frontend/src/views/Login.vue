@@ -20,12 +20,12 @@ function fillDemo(email: string, password: string) {
   form.password = password
 }
 
-async function submit() {
+async function submit(nextPath = '/activities') {
   loading.value = true
   try {
     await auth.login(form.email, form.password)
     ElMessage.success('登录成功')
-    router.push('/activities')
+    router.push(nextPath)
   } catch {
     // http 拦截器已提示
   } finally {
@@ -33,13 +33,17 @@ async function submit() {
   }
 }
 
+async function loginDemo(type: keyof typeof demoAccounts) {
+  const account = demoAccounts[type]
+  fillDemo(account.email, account.password)
+  await submit('/teams')
+}
+
 onMounted(async () => {
   if (!(import.meta as any).env?.DEV) return
   const demo = typeof route.query.demo === 'string' ? route.query.demo : ''
   if (demo !== 'owner' && demo !== 'member') return
-  const account = demoAccounts[demo]
-  fillDemo(account.email, account.password)
-  await submit()
+  await loginDemo(demo)
 })
 </script>
 
@@ -49,13 +53,13 @@ onMounted(async () => {
     <el-form label-width="64px" @submit.prevent>
       <el-form-item label="邮箱"><el-input v-model="form.email" placeholder="you@example.com" /></el-form-item>
       <el-form-item label="密码"><el-input v-model="form.password" type="password" show-password /></el-form-item>
-      <el-button type="primary" :loading="loading" style="width:100%" @click="submit">登录</el-button>
+      <el-button type="primary" :loading="loading" style="width:100%" @click="submit()">登录</el-button>
     </el-form>
     <div class="demo-row">
-      <el-button text @click="fillDemo(demoAccounts.owner.email, demoAccounts.owner.password)">
+      <el-button text @click="loginDemo('owner')">
         {{ demoAccounts.owner.label }}
       </el-button>
-      <el-button text @click="fillDemo(demoAccounts.member.email, demoAccounts.member.password)">
+      <el-button text @click="loginDemo('member')">
         {{ demoAccounts.member.label }}
       </el-button>
     </div>

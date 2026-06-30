@@ -94,21 +94,23 @@ async function pollAnnouncements() {
       const latestId = Math.max(...announcements.map(item => item.id))
       const teamKey = String(team.id)
       const lastSeenId = Number(seenMap[teamKey] || 0)
+      const isFirstVisitForTeam = !(teamKey in seenMap)
+      const relevantAnnouncements = announcements
+        .filter(item => isRelevantAnnouncement(userId, nickname, item))
+        .sort((a, b) => a.id - b.id)
 
-      if (!(teamKey in seenMap)) {
+      if (isFirstVisitForTeam) {
+        if (relevantAnnouncements.length) {
+          notifyAnnouncement(team)
+        }
         seenMap[teamKey] = latestId
         changed = true
         continue
       }
 
-      const unseenAnnouncements = announcements
-        .filter(item => item.id > lastSeenId)
-        .sort((a, b) => a.id - b.id)
-
-      for (const item of unseenAnnouncements) {
-        if (isRelevantAnnouncement(userId, nickname, item)) {
-          notifyAnnouncement(team)
-        }
+      const unseenRelevantAnnouncements = relevantAnnouncements.filter(item => item.id > lastSeenId)
+      if (unseenRelevantAnnouncements.length) {
+        notifyAnnouncement(team)
       }
 
       if (latestId > lastSeenId) {

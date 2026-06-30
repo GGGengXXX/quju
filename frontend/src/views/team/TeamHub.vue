@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useAuthStore } from '../../stores/auth'
 import { teamApi, type TeamDetail, type TeamSummary, type TeamMemberItem, type TeamJoinRequestItem, type TeamAnnouncementItem, type TeamVoteItem, type TeamFileItem, type TeamAlbumPhotoItem, type TeamMomentItem, type TeamPointItem, type ActivityItem } from '../../api/team'
 
+const auth = useAuthStore()
 const loading = ref(false)
 const keyword = ref('')
 const tag = ref('')
@@ -32,10 +34,37 @@ const isOwner = computed(() => selectedTeam.value?.myRole === 'OWNER')
 const createDialogVisible = ref(false)
 const createForm = reactive({ name: '', intro: '', avatar: '', tags: '', joinType: 'PUBLIC', capacity: 100 })
 const announcementText = ref('')
+const announcementInputRef = ref<any>(null)
+const mentionMenuVisible = ref(false)
+const mentionQuery = ref('')
+const mentionStartIndex = ref(-1)
+const mentionDropdownStyle = ref<Record<string, string>>({})
+const hideMentionTimer = ref<number | null>(null)
 const voteForm = reactive({ title: '', optionsText: '', multiChoice: false, deadline: '' })
 const fileForm = reactive({ fileName: '', fileUrl: '', fileSize: undefined as number | undefined })
 const albumUrls = ref('')
 const momentForm = reactive({ content: '', imagesText: '' })
+
+const mentionCandidates = computed(() => {
+  if (!canManage.value) return [] as Array<{ key: string; label: string; mentionValue: string; type: 'all' | 'member' }>
+  const query = mentionQuery.value.trim().toLowerCase()
+  const memberItems = members.value
+    .filter(member => member.nickname)
+    .filter(member => !query || member.nickname!.toLowerCase().includes(query))
+    .map(member => ({
+      key: `member-${member.userId}`,
+      label: member.nickname || '',
+      mentionValue: member.nickname || '',
+      type: 'member' as const,
+    }))
+
+  const everyone = !query || '所有人'.includes(query)
+    ? [{ key: 'all', label: '所有人', mentionValue: '所有人', type: 'all' as const }]
+    : []
+
+  const dedupedMembers = memberItems.filter((item, index, list) => list.findIndex(candidate => candidate.mentionValue === item.mentionValue) === index)
+  return [...everyone, ...dedupedMembers].slice(0, 8)
+})
 
 function splitLines(value: string) {
   return value.split(/\n|,/).map(item => item.trim()).filter(Boolean)
@@ -78,6 +107,88 @@ function resetTeamCollections() {
   moments.value = []
   points.value = []
   activities.value = []
+}
+
+function clearHideMentionTimer() {
+  if (hideMentionTimer.value !== null) {
+    window.clearTimeout(hideMentionTimer.value)
+    hideMentionTimer.value = null
+  }
+}
+
+function hideMentionMenu() {
+  clearHideMentionTimer()
+  mentionMenuVisible.value = false
+  mentionQuery.value = ''
+  mentionStartIndex.value = -1
+}
+
+function scheduleHideMentionMenu() {
+  clearHideMentionTimer()
+  hideMentionTimer.value = window.setTimeout(() => {
+    hideMentionMenu()
+  }, 120)
+}
+
+function getAnnouncementTextarea(): HTMLTextAreaElement | null {
+  return announcementInputRef.value?.textarea || null
+}
+
+function updateMentionDropdownPosition(textarea: HTMLTextAreaElement) {
+  const container = textarea.closest('.announcement-editor') as HTMLElement | null
+  if (!container) return
+  mentionDropdownStyle.value = {
+    left: '0px',
+    top: `${textarea.offsetTop + textarea.offsetHeight + 8}px`,
+    width: `${Math.max(textarea.offsetWidth, 240)}px`,
+  }
+}
+
+function syncMentionState() {
+  const textarea = getAnnouncementTextarea()
+  if (!textarea || !canManage.value) {
+    hideMentionMenu()
+    return
+  }
+  const cursor = textarea.selectionStart ?? announcementText.value.length
+  const beforeCursor = announcementText.value.slice(0, cursor)
+  const atIndex = beforeCursor.lastIndexOf('@')
+  if (atIndex < 0) {
+    hideMentionMenu()
+    return
+  }
+  const query = beforeCursor.slice(atIndex + 1)
+  if (/\s/.test(query) || query.includes('@')) {
+    hideMentionMenu()
+    return
+  }
+  mentionStartIndex.value = atIndex
+  mentionQuery.value = query
+  updateMentionDropdownPosition(textarea)
+  mentionMenuVisible.value = mentionCandidates.value.length > 0
+}
+
+function handleAnnouncementInput() {
+  syncMentionState()
+}
+
+function handleAnnouncementClick() {
+  syncMentionState()
+}
+
+function selectMention(mentionValue: string) {
+  const textarea = getAnnouncementTextarea()
+  if (!textarea || mentionStartIndex.value < 0) return
+  const cursor = textarea.selectionStart ?? announcementText.value.length
+  const before = announcementText.value.slice(0, mentionStartIndex.value)
+  const after = announcementText.value.slice(cursor)
+  announcementText.value = `${before}@${mentionValue} ${after}`
+  hideMentionMenu()
+  nextTick(() => {
+    textarea.focus()
+    const nextCursor = `${before}@${mentionValue} `.length
+    textarea.setSelectionRange(nextCursor, nextCursor)
+  })
 }
 
 async function loadTeams() {
@@ -188,6 +299,7 @@ async function publishAnnouncement() {
   if (!selectedTeam.value || !announcementText.value.trim()) return
   await teamApi.createAnnouncement(selectedTeam.value.id, announcementText.value)
   announcementText.value = ''
+  hideMentionMenu()
   ElMessage.success('公告已发布')
   await refreshDetails()
 }
@@ -266,6 +378,9 @@ async function featureMoment(momentId: number) {
 }
 
 onMounted(loadTeams)
+onBeforeUnmount(() => {
+  hideMentionMenu()
+})
 </script>
 
 <template>
@@ -389,7 +504,32 @@ onMounted(loadTeams)
           </el-tab-pane>
 
           <el-tab-pane label="公告" name="announcements">
-            <el-input v-if="canManage" v-model="announcementText" type="textarea" :rows="2" placeholder="发布群公告，支持 @所有人 或 @成员昵称" />
+            <div v-if="canManage" class="announcement-editor">
+              <el-input
+                ref="announcementInputRef"
+                v-model="announcementText"
+                type="textarea"
+                :rows="3"
+                placeholder="输入 @ 后可选择所有人或成员姓名"
+                @input="handleAnnouncementInput"
+                @click="handleAnnouncementClick"
+                @keyup="handleAnnouncementInput"
+                @focus="handleAnnouncementInput"
+                @blur="scheduleHideMentionMenu"
+              />
+              <div v-if="mentionMenuVisible" class="mention-menu" :style="mentionDropdownStyle" @mousedown.prevent @mouseenter="clearHideMentionTimer">
+                <button
+                  v-for="candidate in mentionCandidates"
+                  :key="candidate.key"
+                  class="mention-menu-item"
+                  type="button"
+                  @click="selectMention(candidate.mentionValue)"
+                >
+                  <span>@{{ candidate.label }}</span>
+                  <small>{{ candidate.type === 'all' ? '通知全部成员' : '通知该成员' }}</small>
+                </button>
+              </div>
+            </div>
             <el-button v-if="canManage" class="section-btn" type="primary" @click="publishAnnouncement">发布公告</el-button>
             <el-timeline>
               <el-timeline-item v-for="item in announcements" :key="item.id" :timestamp="item.createdAt">
@@ -530,6 +670,36 @@ onMounted(loadTeams)
 .mini-card { margin-bottom: 14px; }
 .section-btn { margin-top: 12px; }
 .vote-option { margin-bottom: 8px; }
+.announcement-editor { position: relative; }
+.mention-menu {
+  position: absolute;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(25, 55, 90, 0.16);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+.mention-menu-item {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #17324d;
+}
+.mention-menu-item:hover {
+  background: #eef6ff;
+}
+.mention-menu-item small {
+  color: #7b8ba0;
+}
 .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 16px; }
 .album-grid.small { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 .album-item { border: 1px solid #edf2f7; border-radius: 14px; padding: 8px; }
@@ -539,5 +709,6 @@ onMounted(loadTeams)
 @media (max-width: 900px) {
   .hero, .detail-hero { flex-direction: column; align-items: stretch; }
   .search-row, .search-row.compact { grid-template-columns: 1fr; }
+  .mention-menu { width: 100% !important; left: 0 !important; }
 }
 </style>
