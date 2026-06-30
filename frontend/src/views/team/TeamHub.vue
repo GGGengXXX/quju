@@ -41,6 +41,45 @@ function splitLines(value: string) {
   return value.split(/\n|,/).map(item => item.trim()).filter(Boolean)
 }
 
+function isWindowsLocalPath(value: string) {
+  return /^[A-Za-z]:[\\/]/.test(value)
+}
+
+function isUnixLocalPath(value: string) {
+  return /^\/(Users|home|var|tmp|opt|private)\//.test(value)
+}
+
+function looksLikeHostPath(value: string) {
+  return /^(localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3}|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(:\d+)?(\/.*)?$/.test(value)
+}
+
+function normalizeUrl(raw: string) {
+  const value = raw.trim()
+  if (!value) return ''
+  if (/^(https?:|data:|blob:|file:)/i.test(value)) return value
+  if (value.startsWith('//')) return `${window.location.protocol}${value}`
+  if (isWindowsLocalPath(value)) return `file:///${value.replace(/\\/g, '/')}`
+  if (isUnixLocalPath(value)) return `file://${value}`
+  if (looksLikeHostPath(value)) return `http://${value}`
+  return value
+}
+
+function normalizeUrlList(values: string[]) {
+  return values.map(normalizeUrl).filter(Boolean)
+}
+
+function resetTeamCollections() {
+  members.value = []
+  joinRequests.value = []
+  announcements.value = []
+  votes.value = []
+  files.value = []
+  album.value = []
+  moments.value = []
+  points.value = []
+  activities.value = []
+}
+
 async function loadTeams() {
   loading.value = true
   try {
@@ -52,11 +91,12 @@ async function loadTeams() {
   }
 }
 
-async function openTeam(teamId: number) {
+async function openTeam(team: Pick<TeamSummary, 'id' | 'joined'>) {
+  if (!team.joined) return
   drawerVisible.value = true
   detailsLoading.value = true
   try {
-    selectedTeam.value = await teamApi.getTeam(teamId)
+    selectedTeam.value = await teamApi.getTeam(team.id)
     await refreshDetails()
   } finally {
     detailsLoading.value = false
@@ -65,6 +105,10 @@ async function openTeam(teamId: number) {
 
 async function refreshDetails() {
   if (!selectedTeam.value) return
+  if (!selectedTeam.value.joined) {
+    resetTeamCollections()
+    return
+  }
   members.value = await teamApi.listMembers(selectedTeam.value.id)
   try { joinRequests.value = canManage.value ? await teamApi.listJoinRequests(selectedTeam.value.id) : [] } catch { joinRequests.value = [] }
   try { announcements.value = await teamApi.listAnnouncements(selectedTeam.value.id) } catch { announcements.value = [] }
@@ -90,7 +134,7 @@ async function createTeam() {
   createDialogVisible.value = false
   Object.assign(createForm, { name: '', intro: '', avatar: '', tags: '', joinType: 'PUBLIC', capacity: 100 })
   await loadTeams()
-  await openTeam(team.id)
+  await openTeam(team)
 }
 
 async function joinTeam(teamId: number) {
@@ -170,7 +214,10 @@ async function castVote(vote: TeamVoteItem) {
 
 async function uploadFile() {
   if (!selectedTeam.value) return
-  await teamApi.createFile(selectedTeam.value.id, { ...fileForm })
+  await teamApi.createFile(selectedTeam.value.id, {
+    ...fileForm,
+    fileUrl: normalizeUrl(fileForm.fileUrl),
+  })
   Object.assign(fileForm, { fileName: '', fileUrl: '', fileSize: undefined })
   ElMessage.success('文件已上传')
   await refreshDetails()
@@ -185,7 +232,9 @@ async function deleteFile(fileId: number) {
 
 async function uploadAlbum() {
   if (!selectedTeam.value) return
-  await teamApi.createAlbum(selectedTeam.value.id, splitLines(albumUrls.value))
+  const imageUrls = normalizeUrlList(splitLines(albumUrls.value))
+  if (!imageUrls.length) return
+  await teamApi.createAlbum(selectedTeam.value.id, imageUrls)
   albumUrls.value = ''
   ElMessage.success('照片已上传')
   await refreshDetails()
@@ -200,7 +249,10 @@ async function deletePhoto(photoId: number) {
 
 async function publishMoment() {
   if (!selectedTeam.value) return
-  await teamApi.createMoment(selectedTeam.value.id, { content: momentForm.content || undefined, images: splitLines(momentForm.imagesText) })
+  await teamApi.createMoment(selectedTeam.value.id, {
+    content: momentForm.content || undefined,
+    images: normalizeUrlList(splitLines(momentForm.imagesText)),
+  })
   Object.assign(momentForm, { content: '', imagesText: '' })
   ElMessage.success('动态已发布')
   await refreshDetails()
@@ -253,7 +305,7 @@ onMounted(loadTeams)
             <el-tag v-for="item in team.tags" :key="item" size="small" effect="plain">{{ item }}</el-tag>
           </div>
           <div class="actions">
-            <el-button @click="openTeam(team.id)">查看</el-button>
+            <el-button v-if="team.joined" @click="openTeam(team)">查看</el-button>
             <el-button v-if="!team.joined" type="primary" @click="joinTeam(team.id)">加入</el-button>
             <el-tag v-else type="info">{{ team.myRole || 'MEMBER' }}</el-tag>
           </div>
@@ -337,12 +389,12 @@ onMounted(loadTeams)
           </el-tab-pane>
 
           <el-tab-pane label="公告" name="announcements">
-            <el-input v-if="canManage" v-model="announcementText" type="textarea" :rows="2" placeholder="发布群公告" />
+            <el-input v-if="canManage" v-model="announcementText" type="textarea" :rows="2" placeholder="发布群公告，支持 @所有人 或 @成员昵称" />
             <el-button v-if="canManage" class="section-btn" type="primary" @click="publishAnnouncement">发布公告</el-button>
             <el-timeline>
               <el-timeline-item v-for="item in announcements" :key="item.id" :timestamp="item.createdAt">
                 <strong>{{ item.authorName }}</strong>
-                <p>{{ item.content }}</p>
+                <p class="announcement-text">{{ item.content }}</p>
               </el-timeline-item>
             </el-timeline>
           </el-tab-pane>
@@ -385,7 +437,7 @@ onMounted(loadTeams)
               <el-table-column prop="fileName" label="文件名" />
               <el-table-column prop="uploaderName" label="上传人" width="140" />
               <el-table-column label="链接" min-width="220">
-                <template #default="{ row }"><a :href="row.fileUrl" target="_blank">{{ row.fileUrl }}</a></template>
+                <template #default="{ row }"><a :href="normalizeUrl(row.fileUrl)" target="_blank">{{ normalizeUrl(row.fileUrl) }}</a></template>
               </el-table-column>
               <el-table-column v-if="canManage" label="操作" width="100">
                 <template #default="{ row }"><el-button size="small" type="danger" @click="deleteFile(row.id)">删除</el-button></template>
@@ -398,7 +450,7 @@ onMounted(loadTeams)
             <el-button class="section-btn" type="primary" @click="uploadAlbum">上传图片</el-button>
             <div class="album-grid">
               <div v-for="photo in album" :key="photo.id" class="album-item">
-                <img :src="photo.imageUrl" alt="team-photo" />
+                <img :src="normalizeUrl(photo.imageUrl)" alt="team-photo" />
                 <div class="meta-line">
                   <span>{{ photo.uploaderName }}</span>
                   <el-button v-if="canManage" text type="danger" @click="deletePhoto(photo.id)">删除</el-button>
@@ -423,7 +475,7 @@ onMounted(loadTeams)
               </div>
               <p v-if="moment.content">{{ moment.content }}</p>
               <div class="album-grid small">
-                <img v-for="image in moment.images" :key="image" :src="image" alt="moment" />
+                <img v-for="image in moment.images" :key="image" :src="normalizeUrl(image)" alt="moment" />
               </div>
               <el-button v-if="canManage && !moment.featured" size="small" @click="featureMoment(moment.id)">设为精选</el-button>
             </el-card>
@@ -482,6 +534,7 @@ onMounted(loadTeams)
 .album-grid.small { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 .album-item { border: 1px solid #edf2f7; border-radius: 14px; padding: 8px; }
 .album-item img, .album-grid img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 12px; background: #f3f6f9; }
+.announcement-text { white-space: pre-wrap; }
 .empty-tip { padding: 32px 12px; color: #7f8ea0; text-align: center; }
 @media (max-width: 900px) {
   .hero, .detail-hero { flex-direction: column; align-items: stretch; }
