@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useAuthStore } from '../../stores/auth'
 import { teamApi, type TeamDetail, type TeamSummary, type TeamMemberItem, type TeamJoinRequestItem, type TeamAnnouncementItem, type TeamVoteItem, type TeamFileItem, type TeamAlbumPhotoItem, type TeamMomentItem, type TeamPointItem, type ActivityItem } from '../../api/team'
 
-const auth = useAuthStore()
 const loading = ref(false)
 const keyword = ref('')
 const tag = ref('')
@@ -41,9 +39,25 @@ const mentionStartIndex = ref(-1)
 const mentionDropdownStyle = ref<Record<string, string>>({})
 const hideMentionTimer = ref<number | null>(null)
 const voteForm = reactive({ title: '', optionsText: '', multiChoice: false, deadline: '' })
-const fileForm = reactive({ fileName: '', fileUrl: '', fileSize: undefined as number | undefined })
-const albumUrls = ref('')
-const momentForm = reactive({ content: '', imagesText: '' })
+const fileDialogVisible = ref(false)
+const fileDraft = ref<LocalFileDraft | null>(null)
+const fileUploading = ref(false)
+const albumDrafts = ref<LocalImageDraft[]>([])
+const albumUploading = ref(false)
+const momentForm = reactive({ content: '' })
+const momentDrafts = ref<LocalImageDraft[]>([])
+const momentPublishing = ref(false)
+
+interface LocalImageDraft {
+  id: string
+  file: File
+  previewUrl: string
+}
+
+interface LocalFileDraft {
+  file: File
+  id: string
+}
 
 const mentionCandidates = computed(() => {
   if (!canManage.value) return [] as Array<{ key: string; label: string; mentionValue: string; type: 'all' | 'member' }>
@@ -93,10 +107,6 @@ function normalizeUrl(raw: string) {
   return value
 }
 
-function normalizeUrlList(values: string[]) {
-  return values.map(normalizeUrl).filter(Boolean)
-}
-
 function resetTeamCollections() {
   members.value = []
   joinRequests.value = []
@@ -107,6 +117,54 @@ function resetTeamCollections() {
   moments.value = []
   points.value = []
   activities.value = []
+}
+
+function revokeDrafts(drafts: LocalImageDraft[]) {
+  drafts.forEach(draft => URL.revokeObjectURL(draft.previewUrl))
+}
+
+function replaceDrafts(target: typeof albumDrafts, files: FileList | null) {
+  revokeDrafts(target.value)
+  const nextDrafts = Array.from(files || [])
+    .filter(file => file.type.startsWith('image/'))
+    .map((file, index) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }))
+  target.value = nextDrafts
+}
+
+function handleAlbumSelection(event: Event) {
+  replaceDrafts(albumDrafts, (event.target as HTMLInputElement).files)
+}
+
+function handleMomentSelection(event: Event) {
+  replaceDrafts(momentDrafts, (event.target as HTMLInputElement).files)
+}
+
+function clearAlbumDrafts() {
+  revokeDrafts(albumDrafts.value)
+  albumDrafts.value = []
+}
+
+function clearMomentDrafts() {
+  revokeDrafts(momentDrafts.value)
+  momentDrafts.value = []
+}
+
+function handleFileSelection(event: Event) {
+  const [file] = Array.from((event.target as HTMLInputElement).files || [])
+  fileDraft.value = file ? { file, id: `${file.name}-${file.size}-${file.lastModified}` } : null
+}
+
+function clearFileDraft() {
+  fileDraft.value = null
+}
+
+async function uploadDraftImages(teamId: number, drafts: LocalImageDraft[]) {
+  const uploads = await Promise.all(drafts.map(draft => teamApi.uploadImage(teamId, draft.file)))
+  return uploads.map(item => item.url)
 }
 
 function clearHideMentionTimer() {
@@ -326,13 +384,25 @@ async function castVote(vote: TeamVoteItem) {
 
 async function uploadFile() {
   if (!selectedTeam.value) return
-  await teamApi.createFile(selectedTeam.value.id, {
-    ...fileForm,
-    fileUrl: normalizeUrl(fileForm.fileUrl),
-  })
-  Object.assign(fileForm, { fileName: '', fileUrl: '', fileSize: undefined })
-  ElMessage.success('文件已上传')
-  await refreshDetails()
+  if (!fileDraft.value) {
+    ElMessage.warning('请先选择文件')
+    return
+  }
+  fileUploading.value = true
+  try {
+    const uploaded = await teamApi.uploadFile(selectedTeam.value.id, fileDraft.value.file)
+    await teamApi.createFile(selectedTeam.value.id, {
+      fileName: uploaded.fileName,
+      fileUrl: uploaded.url,
+      fileSize: uploaded.fileSize,
+    })
+    clearFileDraft()
+    fileDialogVisible.value = false
+    ElMessage.success('文件已上传')
+    await refreshDetails()
+  } finally {
+    fileUploading.value = false
+  }
 }
 
 async function deleteFile(fileId: number) {
@@ -344,12 +414,20 @@ async function deleteFile(fileId: number) {
 
 async function uploadAlbum() {
   if (!selectedTeam.value) return
-  const imageUrls = normalizeUrlList(splitLines(albumUrls.value))
-  if (!imageUrls.length) return
-  await teamApi.createAlbum(selectedTeam.value.id, imageUrls)
-  albumUrls.value = ''
-  ElMessage.success('照片已上传')
-  await refreshDetails()
+  if (!albumDrafts.value.length) {
+    ElMessage.warning('请先选择图片')
+    return
+  }
+  albumUploading.value = true
+  try {
+    const imageUrls = await uploadDraftImages(selectedTeam.value.id, albumDrafts.value)
+    await teamApi.createAlbum(selectedTeam.value.id, imageUrls)
+    clearAlbumDrafts()
+    ElMessage.success('照片已上传')
+    await refreshDetails()
+  } finally {
+    albumUploading.value = false
+  }
 }
 
 async function deletePhoto(photoId: number) {
@@ -361,13 +439,24 @@ async function deletePhoto(photoId: number) {
 
 async function publishMoment() {
   if (!selectedTeam.value) return
-  await teamApi.createMoment(selectedTeam.value.id, {
-    content: momentForm.content || undefined,
-    images: normalizeUrlList(splitLines(momentForm.imagesText)),
-  })
-  Object.assign(momentForm, { content: '', imagesText: '' })
-  ElMessage.success('动态已发布')
-  await refreshDetails()
+  if (!momentForm.content.trim() && !momentDrafts.value.length) {
+    ElMessage.warning('请填写动态内容或选择图片')
+    return
+  }
+  momentPublishing.value = true
+  try {
+    const imageUrls = momentDrafts.value.length ? await uploadDraftImages(selectedTeam.value.id, momentDrafts.value) : []
+    await teamApi.createMoment(selectedTeam.value.id, {
+      content: momentForm.content || undefined,
+      images: imageUrls,
+    })
+    Object.assign(momentForm, { content: '' })
+    clearMomentDrafts()
+    ElMessage.success('动态已发布')
+    await refreshDetails()
+  } finally {
+    momentPublishing.value = false
+  }
 }
 
 async function featureMoment(momentId: number) {
@@ -380,6 +469,9 @@ async function featureMoment(momentId: number) {
 onMounted(loadTeams)
 onBeforeUnmount(() => {
   hideMentionMenu()
+  clearFileDraft()
+  clearAlbumDrafts()
+  clearMomentDrafts()
 })
 </script>
 
@@ -567,11 +659,8 @@ onBeforeUnmount(() => {
           </el-tab-pane>
 
           <el-tab-pane label="群文件" name="files">
-            <div class="search-row compact">
-              <el-input v-model="fileForm.fileName" placeholder="文件名" />
-              <el-input v-model="fileForm.fileUrl" placeholder="文件 URL" />
-              <el-input-number v-model="fileForm.fileSize" :min="0" />
-              <el-button type="primary" @click="uploadFile">上传</el-button>
+            <div class="upload-panel">
+              <el-button type="primary" @click="fileDialogVisible = true">上传本地文件</el-button>
             </div>
             <el-table :data="files" stripe>
               <el-table-column prop="fileName" label="文件名" />
@@ -586,8 +675,20 @@ onBeforeUnmount(() => {
           </el-tab-pane>
 
           <el-tab-pane label="相册" name="album">
-            <el-input v-model="albumUrls" type="textarea" :rows="2" placeholder="每行一个图片 URL" />
-            <el-button class="section-btn" type="primary" @click="uploadAlbum">上传图片</el-button>
+            <div class="upload-panel">
+              <label class="upload-trigger">
+                <input class="upload-input" type="file" accept="image/*" multiple @change="handleAlbumSelection" />
+                <span>选择本地图片</span>
+              </label>
+              <el-button class="section-btn" type="primary" :loading="albumUploading" @click="uploadAlbum">上传图片</el-button>
+              <el-button v-if="albumDrafts.length" class="section-btn" @click="clearAlbumDrafts">清空选择</el-button>
+            </div>
+            <div v-if="albumDrafts.length" class="preview-grid">
+              <div v-for="draft in albumDrafts" :key="draft.id" class="preview-item">
+                <img :src="draft.previewUrl" :alt="draft.file.name" />
+                <span>{{ draft.file.name }}</span>
+              </div>
+            </div>
             <div class="album-grid">
               <div v-for="photo in album" :key="photo.id" class="album-item">
                 <img :src="normalizeUrl(photo.imageUrl)" alt="team-photo" />
@@ -602,8 +703,20 @@ onBeforeUnmount(() => {
           <el-tab-pane label="动态" name="moments">
             <el-card class="mini-card">
               <el-input v-model="momentForm.content" type="textarea" :rows="3" placeholder="分享小队动态" />
-              <el-input v-model="momentForm.imagesText" style="margin-top: 12px" type="textarea" :rows="2" placeholder="图片 URL，一行一个" />
-              <el-button class="section-btn" type="primary" @click="publishMoment">发布动态</el-button>
+              <div class="upload-panel" style="margin-top: 12px">
+                <label class="upload-trigger">
+                  <input class="upload-input" type="file" accept="image/*" multiple @change="handleMomentSelection" />
+                  <span>选择动态图片</span>
+                </label>
+                <el-button class="section-btn" type="primary" :loading="momentPublishing" @click="publishMoment">发布动态</el-button>
+                <el-button v-if="momentDrafts.length" class="section-btn" @click="clearMomentDrafts">清空选择</el-button>
+              </div>
+              <div v-if="momentDrafts.length" class="preview-grid small">
+                <div v-for="draft in momentDrafts" :key="draft.id" class="preview-item">
+                  <img :src="draft.previewUrl" :alt="draft.file.name" />
+                  <span>{{ draft.file.name }}</span>
+                </div>
+              </div>
             </el-card>
             <el-card v-for="moment in moments" :key="moment.id" class="mini-card">
               <div class="team-header">
@@ -646,6 +759,25 @@ onBeforeUnmount(() => {
         </el-tabs>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="fileDialogVisible" title="上传群文件" width="520px" @closed="clearFileDraft">
+      <div class="upload-panel">
+        <label class="upload-trigger">
+          <input class="upload-input" type="file" @change="handleFileSelection" />
+          <span>{{ fileDraft ? '重新选择文件' : '选择本地文件' }}</span>
+        </label>
+      </div>
+      <div v-if="fileDraft" class="file-draft-card">
+        <strong>{{ fileDraft.file.name }}</strong>
+        <span>{{ (fileDraft.file.size / 1024 / 1024).toFixed(2) }} MB</span>
+      </div>
+      <div v-else class="empty-tip">支持本地文件上传，上传后会存入 OSS 并展示下载链接。</div>
+      <template #footer>
+        <el-button @click="fileDialogVisible = false">取消</el-button>
+        <el-button v-if="fileDraft" @click="clearFileDraft">清空</el-button>
+        <el-button type="primary" :loading="fileUploading" @click="uploadFile">上传</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -699,6 +831,61 @@ onBeforeUnmount(() => {
 }
 .mention-menu-item small {
   color: #7b8ba0;
+}
+.upload-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.upload-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px dashed #9ab6d6;
+  border-radius: 12px;
+  background: #f7fbff;
+  color: #24507d;
+  cursor: pointer;
+}
+.upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-top: 16px; }
+.preview-grid.small { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.preview-item {
+  border: 1px solid #e4edf5;
+  border-radius: 14px;
+  padding: 8px;
+  background: #fff;
+}
+.preview-item img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #f3f6f9;
+}
+.preview-item span {
+  display: block;
+  margin-top: 8px;
+  color: #5f7288;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+.file-draft-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid #e4edf5;
+  border-radius: 14px;
+  background: #f8fbff;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #29445f;
 }
 .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 16px; }
 .album-grid.small { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }

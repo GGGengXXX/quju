@@ -12,6 +12,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,11 +33,18 @@ public class TeamService {
     private final JdbcTemplate jdbcTemplate;
     private final NamedParameterJdbcTemplate namedJdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final TeamImageStorageService teamImageStorageService;
 
-    public TeamService(JdbcTemplate jdbcTemplate, NamedParameterJdbcTemplate namedJdbcTemplate, ObjectMapper objectMapper) {
+    public TeamService(
+            JdbcTemplate jdbcTemplate,
+            NamedParameterJdbcTemplate namedJdbcTemplate,
+            ObjectMapper objectMapper,
+            TeamImageStorageService teamImageStorageService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.namedJdbcTemplate = namedJdbcTemplate;
         this.objectMapper = objectMapper;
+        this.teamImageStorageService = teamImageStorageService;
     }
 
     public PageResult<TeamSummary> searchTeams(String keyword, String tag, int page, int size, Long viewerId) {
@@ -332,6 +340,11 @@ public class TeamService {
         );
     }
 
+    public TeamFileUploadItem uploadFile(long teamId, long userId, MultipartFile file) {
+        requireMembershipRequired(teamId, userId);
+        return teamImageStorageService.uploadTeamFile(teamId, userId, file);
+    }
+
     @Transactional
     public void deleteFile(long teamId, long fileId, long userId) {
         requireManager(teamId, userId);
@@ -345,6 +358,11 @@ public class TeamService {
                 (rs, rowNum) -> new TeamAlbumPhotoItem(rs.getLong("id"), rs.getLong("uploader_id"), rs.getString("uploader_name"), rs.getString("image_url"), toDateTime(rs, "created_at")),
                 teamId
         );
+    }
+
+    public TeamImageUploadItem uploadImage(long teamId, long userId, MultipartFile file) {
+        requireMembershipRequired(teamId, userId);
+        return teamImageStorageService.uploadTeamImage(teamId, userId, file);
     }
 
     @Transactional

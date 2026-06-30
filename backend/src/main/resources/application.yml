@@ -7,6 +7,10 @@ spring:
     username: ${DB_USERNAME:quju}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:50MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:50MB}
   # 邮件（网易163，账号激活/密码重置）—— 需引入 spring-boot-starter-mail 才生效
   mail:
     host: ${SMTP_HOST:smtp.163.com}
