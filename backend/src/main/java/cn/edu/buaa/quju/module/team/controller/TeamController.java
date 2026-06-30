@@ -5,6 +5,8 @@ import cn.edu.buaa.quju.common.UserContext;
 import cn.edu.buaa.quju.module.team.dto.TeamDtos.*;
 import cn.edu.buaa.quju.module.team.service.TeamService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -117,6 +119,11 @@ public class TeamController {
         return R.ok(teamService.createFile(id, UserContext.require(), request));
     }
 
+    @PostMapping(value = "/{id}/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<TeamFileUploadItem> uploadFile(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return R.ok(teamService.uploadFile(id, UserContext.require(), file));
+    }
+
     @DeleteMapping("/{id}/files/{fileId}")
     public R<Void> deleteFile(@PathVariable Long id, @PathVariable Long fileId) {
         teamService.deleteFile(id, fileId, UserContext.require());
@@ -126,6 +133,11 @@ public class TeamController {
     @GetMapping("/{id}/album")
     public R<java.util.List<TeamAlbumPhotoItem>> listAlbum(@PathVariable Long id) {
         return R.ok(teamService.listAlbum(id, UserContext.require()));
+    }
+
+    @PostMapping(value = "/{id}/images/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<TeamImageUploadItem> uploadImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return R.ok(teamService.uploadImage(id, UserContext.require(), file));
     }
 
     @PostMapping("/{id}/album")

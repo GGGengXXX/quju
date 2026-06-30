@@ -87,6 +87,16 @@ export interface TeamAlbumPhotoItem {
   imageUrl: string
   createdAt?: string
 }
+export interface TeamImageUploadItem {
+  url: string
+  fileName: string
+  fileSize: number
+}
+export interface TeamFileUploadItem {
+  url: string
+  fileName: string
+  fileSize: number
+}
 export interface TeamMomentItem {
   id: number
   authorId: number
@@ -138,8 +148,18 @@ export const teamApi = {
   castVote: (id: number, voteId: number, optionIndexes: number[]) => http.post(`/teams/${id}/votes/${voteId}/cast`, { optionIndexes }),
   listFiles: (id: number) => http.get<any, TeamFileItem[]>(`/teams/${id}/files`),
   createFile: (id: number, data: { fileName: string; fileUrl: string; fileSize?: number }) => http.post<any, TeamFileItem>(`/teams/${id}/files`, data),
+  uploadFile: async (id: number, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<any, TeamFileUploadItem>(`/teams/${id}/files/upload`, formData)
+  },
   deleteFile: (id: number, fileId: number) => http.delete(`/teams/${id}/files/${fileId}`),
   listAlbum: (id: number) => http.get<any, TeamAlbumPhotoItem[]>(`/teams/${id}/album`),
+  uploadImage: async (id: number, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<any, TeamImageUploadItem>(`/teams/${id}/images/upload`, formData)
+  },
   createAlbum: (id: number, imageUrls: string[]) => http.post<any, TeamAlbumPhotoItem[]>(`/teams/${id}/album`, { imageUrls }),
   deleteAlbum: (id: number, photoId: number) => http.delete(`/teams/${id}/album/${photoId}`),
   listMoments: (id: number, params: { page?: number; size?: number }) => http.get<any, PageResult<TeamMomentItem>>(`/teams/${id}/moments`, { params }),

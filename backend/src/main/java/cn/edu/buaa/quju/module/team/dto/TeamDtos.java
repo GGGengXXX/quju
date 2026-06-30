@@ -90,6 +90,10 @@ public final class TeamDtos {
 
     public record TeamAlbumPhotoItem(Long id, Long uploaderId, String uploaderName, String imageUrl, LocalDateTime createdAt) {}
 
+    public record TeamImageUploadItem(String url, String fileName, Long fileSize) {}
+
+    public record TeamFileUploadItem(String url, String fileName, Long fileSize) {}
+
     public record TeamMomentItem(
             Long id,
             Long authorId,
