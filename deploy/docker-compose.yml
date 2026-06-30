@@ -36,7 +36,10 @@ services:
     expose: ["8080"]
 
   frontend:
-    build: ../frontend        # 需 frontend/Dockerfile（npm build → nginx）
+    build:
+      context: ../frontend    # 需 frontend/Dockerfile（npm build → nginx）
+      args:
+        VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}   # 高德地图 Key，构建期注入（取自 deploy/.env）
     image: quju-frontend:latest
     container_name: quju-frontend
     restart: unless-stopped
