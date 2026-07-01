@@ -73,7 +73,7 @@ export interface AdminActivityListVO {
 }
 
 export interface ActivityReviewReq {
-  result: 'PASSED' | 'REJECTED' | 'NEEDS_REVISION'
+  action: 'PASSED' | 'REJECTED' | 'NEEDS_REVISION'
   reason?: string
 }
 
