@@ -10,6 +10,8 @@ import cn.edu.buaa.quju.module.admin.entity.Activity;
 import cn.edu.buaa.quju.module.admin.entity.ModerationAction;
 import cn.edu.buaa.quju.module.admin.mapper.ActivityMapper;
 import cn.edu.buaa.quju.module.admin.mapper.ModerationActionMapper;
+import cn.edu.buaa.quju.module.user.entity.User;
+import cn.edu.buaa.quju.module.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -18,16 +20,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class AdminActivityService {
     private final ActivityMapper activityMapper;
     private final ModerationActionMapper moderationMapper;
+    private final UserMapper userMapper;
 
-    public AdminActivityService(ActivityMapper activityMapper, ModerationActionMapper moderationMapper) {
+    public AdminActivityService(ActivityMapper activityMapper, ModerationActionMapper moderationMapper, UserMapper userMapper) {
         this.activityMapper = activityMapper;
         this.moderationMapper = moderationMapper;
+        this.userMapper = userMapper;
     }
 
     public PageResult<ActivityListVO> listActivities(String status, String keyword, int page, int size) {
@@ -100,9 +105,18 @@ public class AdminActivityService {
     }
 
     private PageResult<ActivityListVO> toPage(IPage<Activity> p, int page, int size) {
-        List<ActivityListVO> list = p.getRecords().stream()
-                .map(a -> new ActivityListVO(a.getId(), a.getCreatorId(), a.getName(),
-                        a.getCategory(), a.getStatus(), a.getStartTime(), a.getCreatedAt()))
+        List<Activity> records = p.getRecords();
+        List<Long> creatorIds = records.stream().map(Activity::getCreatorId).distinct().toList();
+        Map<Long, String> nicknames = Map.of();
+        if (!creatorIds.isEmpty()) {
+            nicknames = userMapper.selectBatchIds(creatorIds).stream()
+                    .collect(Collectors.toMap(User::getId, u -> u.getNickname() != null ? u.getNickname() : ""));
+        }
+        Map<Long, String> finalNicknames = nicknames;
+        List<ActivityListVO> list = records.stream()
+                .map(a -> new ActivityListVO(a.getId(), a.getCreatorId(),
+                        finalNicknames.getOrDefault(a.getCreatorId(), ""),
+                        a.getName(), a.getCategory(), a.getStatus(), a.getStartTime(), a.getCreatedAt()))
                 .collect(Collectors.toList());
         return new PageResult<>(p.getTotal(), page, size, list);
     }

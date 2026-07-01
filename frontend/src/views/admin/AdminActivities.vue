@@ -124,7 +124,11 @@ onMounted(load)
       <el-table-column prop="name" label="活动名称" />
       <el-table-column prop="category" label="分类" width="100" />
       <el-table-column prop="status" label="状态" width="110" />
-      <el-table-column prop="creatorId" label="创建者ID" width="90" />
+      <el-table-column label="创建者" width="120">
+        <template #default="{ row }">
+          {{ row.creatorNickname || row.creatorId }}
+        </template>
+      </el-table-column>
       <el-table-column prop="startTime" label="开始时间" width="170" />
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">

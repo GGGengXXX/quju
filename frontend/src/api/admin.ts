@@ -65,6 +65,7 @@ export interface MerchantReviewReq {
 export interface AdminActivityListVO {
   id: number
   creatorId: number
+  creatorNickname?: string
   name: string
   category?: string
   status: string
