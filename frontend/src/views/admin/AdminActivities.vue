@@ -10,7 +10,7 @@ const tab = ref('all')
 const query = reactive({ status: '', keyword: '', page: 1, size: 10 })
 
 const reviewVisible = ref(false)
-const reviewForm = reactive({ result: '' as 'PASSED' | 'REJECTED' | 'NEEDS_REVISION', reason: '' })
+const reviewForm = reactive({ action: '' as 'PASSED' | 'REJECTED' | 'NEEDS_REVISION', reason: '' })
 const reviewTargetId = ref(0)
 
 const reasonVisible = ref(false)
@@ -41,18 +41,18 @@ function switchTab(t: string) {
 
 function openReview(id: number) {
   reviewTargetId.value = id
-  reviewForm.result = 'PASSED'
+  reviewForm.action = 'PASSED'
   reviewForm.reason = ''
   reviewVisible.value = true
 }
 
 async function submitReview() {
-  if (reviewForm.result !== 'PASSED' && !reviewForm.reason.trim()) {
+  if (reviewForm.action !== 'PASSED' && !reviewForm.reason.trim()) {
     ElMessage.warning('驳回/修改需填写原因')
     return
   }
   await adminApi.reviewActivity(reviewTargetId.value, {
-    result: reviewForm.result,
+    action: reviewForm.action,
     reason: reviewForm.reason || undefined,
   })
   ElMessage.success('审核完成')
@@ -148,13 +148,13 @@ onMounted(load)
     <el-dialog v-model="reviewVisible" title="审核活动" width="450px">
       <el-form label-width="80px">
         <el-form-item label="结果">
-          <el-radio-group v-model="reviewForm.result">
+          <el-radio-group v-model="reviewForm.action">
             <el-radio value="PASSED">通过</el-radio>
             <el-radio value="REJECTED">驳回</el-radio>
             <el-radio value="NEEDS_REVISION">需修改</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item v-if="reviewForm.result !== 'PASSED'" label="原因">
+        <el-form-item v-if="reviewForm.action !== 'PASSED'" label="原因">
           <el-input v-model="reviewForm.reason" type="textarea" :rows="3" placeholder="请输入原因" />
         </el-form-item>
       </el-form>
