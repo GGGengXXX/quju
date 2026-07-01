@@ -50,10 +50,18 @@ public class AdminActivityService {
     public void reviewActivity(long adminId, long activityId, ActivityReviewReq req) {
         Activity a = requireActivity(activityId);
         if (!"PENDING_REVIEW".equals(a.getStatus())) throw new BizException(ErrorCode.CONFLICT);
-        if ("REJECTED".equals(req.action()) && (req.reason() == null || req.reason().isBlank()))
+        if ("REJECTED".equals(req.result()) && (req.reason() == null || req.reason().isBlank()))
             throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
-        a.setStatus("APPROVED".equals(req.action()) ? "PUBLISHED" : "REJECTED");
+        if ("NEEDS_REVISION".equals(req.result()) && (req.reason() == null || req.reason().isBlank()))
+            throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
+        switch (req.result()) {
+            case "PASSED" -> a.setStatus("PUBLISHED");
+            case "REJECTED" -> a.setStatus("REJECTED");
+            case "NEEDS_REVISION" -> a.setStatus("REJECTED");
+            default -> throw new BizException(ErrorCode.BAD_REQUEST);
+        }
         activityMapper.updateById(a);
+        logModeration(adminId, activityId, "REVIEW_" + req.result(), req.reason() != null ? req.reason() : "");
     }
 
     @Transactional

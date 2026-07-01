@@ -131,7 +131,25 @@ const canCancelSignup = computed(() => detail.value?.mySignupStatus === 'REGISTE
 const canConfirmWaitlist = computed(() => detail.value?.mySignupStatus === 'WAITLISTED')
 const canReview = computed(() => !!detail.value && detail.value.phase === 'ENDED' && !!auth.token)
 const canDelete = computed(() => !!detail.value && isOwner.value)
-const canSubmitDraft = computed(() => !!detail.value && isOwner.value && detail.value.status === 'DRAFT')
+const canSubmitDraft = computed(() => !!detail.value && isOwner.value && (detail.value.status === 'DRAFT' || detail.value.status === 'REJECTED'))
+
+const statusMap: Record<string, string> = {
+  DRAFT: '草稿',
+  PENDING_REVIEW: '审核中',
+  PUBLISHED: '已发布',
+  REJECTED: '已驳回',
+  TAKEN_DOWN: '已下架',
+  CANCELLED: '已取消',
+}
+const phaseMap: Record<string, string> = {
+  NOT_STARTED: '未开始',
+  SIGNUP_OPEN: '报名中',
+  SIGNUP_CLOSED: '报名截止',
+  ONGOING: '进行中',
+  ENDED: '已结束',
+}
+function statusLabel(s: string) { return statusMap[s] || s }
+function phaseLabel(s: string) { return phaseMap[s] || s }
 
 async function loadActivities() {
   loading.value = true
@@ -617,13 +635,13 @@ onMounted(async () => {
               <div class="item-main">
                 <div class="item-title-row">
                   <h3>{{ item.name }}</h3>
-                  <el-tag size="small">{{ item.status }}</el-tag>
+                  <el-tag size="small" :type="item.status === 'REJECTED' ? 'danger' : ''">{{ statusLabel(item.status) }}</el-tag>
                 </div>
                 <p class="intro">{{ item.intro || '暂无简介' }}</p>
                 <div class="meta-row">
                   <span>{{ item.category }}</span>
                   <span>{{ item.city || '未填写城市' }}</span>
-                  <span>{{ item.phase }}</span>
+                  <span>{{ phaseLabel(item.phase) }}</span>
                   <span>{{ item.signupCount }}/{{ item.capacity || '∞' }}</span>
                 </div>
                 <div class="tag-row">
@@ -643,7 +661,7 @@ onMounted(async () => {
         <div class="mine-list" v-if="mineActivities.length">
           <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-item" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
-            <span>{{ item.status }} / {{ item.phase }}</span>
+            <span :class="{ 'status-rejected': item.status === 'REJECTED' }">{{ statusLabel(item.status) }} / {{ phaseLabel(item.phase) }}</span>
           </button>
         </div>
         <div v-else class="empty-text">登录后可查看你创建的活动</div>
@@ -666,7 +684,7 @@ onMounted(async () => {
           <button v-for="point in mapPoints" :key="point.id" type="button" class="map-item" @click="openDetail(point.id)">
             <strong>{{ point.name }}</strong>
             <span>{{ point.category }} / {{ point.city || '未填写城市' }}</span>
-            <span>{{ point.status }} / {{ point.phase }}</span>
+            <span>{{ statusLabel(point.status) }} / {{ phaseLabel(point.phase) }}</span>
           </button>
         </div>
       </div>
@@ -676,15 +694,15 @@ onMounted(async () => {
       <template v-if="detail">
         <div class="detail-toolbar">
           <div class="detail-tags">
-            <el-tag>{{ detail.status }}</el-tag>
-            <el-tag type="success">{{ detail.phase }}</el-tag>
+            <el-tag :type="detail.status === 'REJECTED' ? 'danger' : ''">{{ statusLabel(detail.status) }}</el-tag>
+            <el-tag type="success">{{ phaseLabel(detail.phase) }}</el-tag>
             <el-tag v-if="detail.mySignupStatus" type="warning">{{ detail.mySignupStatus }}</el-tag>
           </div>
           <div class="detail-actions">
             <el-button :loading="actionLoading" @click="refreshDetail">刷新</el-button>
             <el-button :loading="actionLoading" @click="cloneCurrent">克隆</el-button>
             <el-button v-if="canSubmitDraft" type="primary" :loading="actionLoading" @click="submitDraft">
-              提交审核
+              {{ detail.status === 'REJECTED' ? '重新提交审核' : '提交审核' }}
             </el-button>
             <el-button v-if="canDelete" type="danger" plain :loading="actionLoading" @click="deleteCurrent">
               {{ detail.status === 'PUBLISHED' ? '取消活动' : '删除活动' }}
@@ -1055,4 +1073,5 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 }
+.status-rejected { color: #f56c6c; font-weight: 600; }
 </style>

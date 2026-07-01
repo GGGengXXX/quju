@@ -31,7 +31,7 @@ public final class AdminDtos {
     // ---- 活动管理 ----
     public record ActivityListVO(Long id, Long creatorId, String name, String category,
                                   String status, LocalDateTime startTime, LocalDateTime createdAt) {}
-    public record ActivityReviewReq(@NotBlank String action, String reason) {}
+    public record ActivityReviewReq(@NotBlank String result, String reason) {}
     public record ReasonReq(String reason) {}
 
     // ---- 小队管理 ----
