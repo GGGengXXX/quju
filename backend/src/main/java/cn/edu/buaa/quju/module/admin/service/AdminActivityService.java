@@ -66,7 +66,13 @@ public class AdminActivityService {
             default -> throw new BizException(ErrorCode.BAD_REQUEST);
         }
         activityMapper.updateById(a);
-        logModeration(adminId, activityId, "REVIEW_" + req.result(), req.reason() != null ? req.reason() : "");
+        String logAction = switch (req.result()) {
+            case "PASSED" -> "REVIEW_PASS";
+            case "REJECTED" -> "REVIEW_REJECT";
+            case "NEEDS_REVISION" -> "REVIEW_REVISE";
+            default -> "REVIEW";
+        };
+        logModeration(adminId, activityId, logAction, req.reason() != null ? req.reason() : "");
     }
 
     @Transactional
