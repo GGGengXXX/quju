@@ -64,6 +64,7 @@ onMounted(async () => {
       </el-button>
     </div>
     <p class="tip">没有账号？<router-link to="/register">去注册</router-link></p>
+    <p class="tip"><router-link to="/admin/login">管理员登录</router-link></p>
   </el-card>
 </template>
 

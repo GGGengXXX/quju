@@ -35,10 +35,12 @@ async function submit() {
       </el-form-item>
       <el-button type="primary" :loading="loading" style="width:100%" @click="submit">登录</el-button>
     </el-form>
+    <p class="tip"><router-link to="/login">返回普通用户登录</router-link></p>
   </el-card>
 </template>
 
 <style scoped>
 .box { max-width: 400px; margin: 80px auto; }
 h2 { text-align: center; margin-bottom: 24px; }
+.tip { text-align: center; margin-top: 12px; }
 </style>

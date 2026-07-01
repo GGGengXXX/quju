@@ -7,7 +7,7 @@ const routes = [
   { path: '/activate', component: () => import('../views/Activate.vue') },
   { path: '/profile', component: () => import('../views/Profile.vue'), meta: { auth: true } },
   { path: '/teams', component: () => import('../views/team/TeamHub.vue'), meta: { auth: true } },
-  { path: '/activities', component: () => import('../views/activity/ActivityDiscover.vue') },
+  { path: '/activities', component: () => import('../views/activity/ActivityDiscover.vue'), meta: { auth: true } },
 
   // 管理员后台
   { path: '/admin/login', component: () => import('../views/admin/AdminLogin.vue') },
