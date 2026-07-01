@@ -8,6 +8,8 @@ const routes = [
   { path: '/profile', component: () => import('../views/Profile.vue'), meta: { auth: true } },
   { path: '/teams', component: () => import('../views/team/TeamHub.vue'), meta: { auth: true } },
   { path: '/activities', component: () => import('../views/activity/ActivityDiscover.vue'), meta: { auth: true } },
+  { path: '/social', component: () => import('../views/social/SocialHub.vue'), meta: { auth: true } },
+  { path: '/social/chat/:id', component: () => import('../views/social/ChatView.vue'), meta: { auth: true } },
 
   // 管理员后台
   { path: '/admin/login', component: () => import('../views/admin/AdminLogin.vue') },
