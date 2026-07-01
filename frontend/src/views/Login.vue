@@ -3,8 +3,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
+import { useAdminAuthStore } from '../stores/adminAuth'
 
 const auth = useAuthStore()
+const adminAuth = useAdminAuthStore()
 const route = useRoute()
 const router = useRouter()
 const form = reactive({ email: '', password: '' })
@@ -39,6 +41,19 @@ async function loginDemo(type: keyof typeof demoAccounts) {
   await submit('/teams')
 }
 
+async function loginAdmin() {
+  loading.value = true
+  try {
+    await adminAuth.login('admin', '123456Aa')
+    ElMessage.success('管理员登录成功')
+    router.push('/admin/dashboard')
+  } catch {
+    // http 拦截器已提示
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(async () => {
   if (!(import.meta as any).env?.DEV) return
   const demo = typeof route.query.demo === 'string' ? route.query.demo : ''
@@ -61,6 +76,9 @@ onMounted(async () => {
       </el-button>
       <el-button text @click="loginDemo('member')">
         {{ demoAccounts.member.label }}
+      </el-button>
+      <el-button text @click="loginAdmin">
+        Admin Demo
       </el-button>
     </div>
     <p class="tip">没有账号？<router-link to="/register">去注册</router-link></p>
