@@ -742,7 +742,11 @@ onBeforeUnmount(() => {
           <el-tab-pane label="积分榜" name="points">
             <el-table :data="points" stripe>
               <el-table-column prop="rank" label="名次" width="80" />
-              <el-table-column prop="nickname" label="成员" />
+              <el-table-column label="成员">
+                <template #default="{ row }">
+                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || row.userId }}</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="points" label="积分" width="100" />
             </el-table>
           </el-tab-pane>
@@ -903,4 +907,6 @@ onBeforeUnmount(() => {
   .search-row, .search-row.compact { grid-template-columns: 1fr; }
   .mention-menu { width: 100% !important; left: 0 !important; }
 }
+.member-link { color: #409eff; cursor: pointer; }
+.member-link:hover { text-decoration: underline; }
 </style>

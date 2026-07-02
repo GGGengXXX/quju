@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
+import { teamApi } from '../../api/team'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,8 +29,12 @@ async function loadPeerInfo() {
       const friend = friends.find((f: FriendVO) => f.userId === peerId)
       if (friend) peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
     } catch { /* ignore */ }
+  } else {
+    try {
+      const team = await teamApi.getTeam(peerId)
+      if (team?.name) peerName.value = team.name
+    } catch { /* ignore */ }
   }
-  // TEAM scope: 可以后续从小队详情获取名称，暂用 ID
 }
 
 async function loadMessages() {

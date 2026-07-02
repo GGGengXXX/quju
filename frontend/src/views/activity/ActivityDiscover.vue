@@ -757,7 +757,7 @@ onMounted(async () => {
                   <h4>报名名单</h4>
                   <div v-if="signups.length" class="mini-list">
                     <div v-for="item in signups" :key="item.signupId" class="mini-row">
-                      <span>{{ item.nickname || item.userId }}</span>
+                      <span class="creator-link" @click="$router.push(`/social/user/${item.userId}`)">{{ item.nickname || item.userId }}</span>
                       <span>{{ item.signupStatus }}</span>
                       <span>{{ item.checkedIn ? '已签到' : '未签到' }}</span>
                     </div>
@@ -768,7 +768,7 @@ onMounted(async () => {
                   <h4>候补队列</h4>
                   <div v-if="waitlist?.list?.length" class="mini-list">
                     <div v-for="item in waitlist.list" :key="item.id" class="mini-row">
-                      <span>#{{ item.position }} {{ item.nickname || item.userId }}</span>
+                      <span class="creator-link" @click="$router.push(`/social/user/${item.userId}`)">#{{ item.position }} {{ item.nickname || item.userId }}</span>
                       <span>{{ item.status }}</span>
                     </div>
                   </div>
@@ -1076,4 +1076,6 @@ onMounted(async () => {
   }
 }
 .status-rejected { color: #f56c6c; font-weight: 600; }
+.creator-link { color: #409eff; cursor: pointer; }
+.creator-link:hover { text-decoration: underline; }
 </style>
