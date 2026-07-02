@@ -33,7 +33,7 @@ async function loadMessages() {
   loading.value = true
   try {
     const res = await socialApi.getMessages({ scope: 'FRIEND', peerId, page: 1, size: 50 })
-    messages.value = res.list.reverse()
+    messages.value = res.list
     await nextTick()
     scrollToBottom()
     socialApi.markRead({ scope: 'FRIEND', peerId })
