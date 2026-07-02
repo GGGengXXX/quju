@@ -46,7 +46,7 @@ onMounted(load)
     <el-card class="section-card">
       <template #header>参加的活动（{{ activities.length }}）</template>
       <div v-if="!activities.length" class="empty">暂无参加的活动</div>
-      <div v-for="act in activities" :key="act.id" class="act-item">
+      <div v-for="act in activities" :key="act.id" class="act-item" @click="router.push('/activities')" style="cursor: pointer">
         <strong>{{ act.name }}</strong>
         <span class="meta">{{ act.category }} · {{ act.status }}</span>
         <span class="meta">{{ act.startTime?.slice(0, 10) }}</span>
