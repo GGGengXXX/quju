@@ -42,6 +42,7 @@ import cn.edu.buaa.quju.module.activity.mapper.ActivitySummaryMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityTagMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityTemplateMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityWaitlistMapper;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.entity.User;
 import cn.edu.buaa.quju.module.user.mapper.UserMapper;
@@ -87,6 +88,7 @@ public class ActivityService {
     private final ActivitySummaryImageMapper summaryImageMapper;
     private final ActivityReviewMapper reviewMapper;
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ActivityService(ActivityDomainMapper activityMapper,
@@ -98,7 +100,8 @@ public class ActivityService {
                            ActivitySummaryMapper summaryMapper,
                            ActivitySummaryImageMapper summaryImageMapper,
                            ActivityReviewMapper reviewMapper,
-                           UserMapper userMapper) {
+                           UserMapper userMapper,
+                           NotificationService notificationService) {
         this.activityMapper = activityMapper;
         this.activityTagMapper = activityTagMapper;
         this.templateMapper = templateMapper;
@@ -109,6 +112,7 @@ public class ActivityService {
         this.summaryImageMapper = summaryImageMapper;
         this.reviewMapper = reviewMapper;
         this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     public List<TemplateVO> listTemplates() {
@@ -338,6 +342,9 @@ public class ActivityService {
             signup.setStatus("REGISTERED");
             signup.setSignupInfo(toJson(req == null ? null : req.signupInfo()));
             signupMapper.insert(signup);
+            // 通知活动创建者有人报名
+            notificationService.send(activity.getCreatorId(), "ACTIVITY_SIGNUP",
+                    "活动「" + activity.getName() + "」有新报名", null, "ACTIVITY", activityId);
             return new SignupResultVO("REGISTERED", null);
         }
 

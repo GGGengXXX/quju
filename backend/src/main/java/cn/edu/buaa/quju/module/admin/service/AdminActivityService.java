@@ -10,6 +10,7 @@ import cn.edu.buaa.quju.module.admin.entity.Activity;
 import cn.edu.buaa.quju.module.admin.entity.ModerationAction;
 import cn.edu.buaa.quju.module.admin.mapper.ActivityMapper;
 import cn.edu.buaa.quju.module.admin.mapper.ModerationActionMapper;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.user.entity.User;
 import cn.edu.buaa.quju.module.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -28,11 +29,13 @@ public class AdminActivityService {
     private final ActivityMapper activityMapper;
     private final ModerationActionMapper moderationMapper;
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
-    public AdminActivityService(ActivityMapper activityMapper, ModerationActionMapper moderationMapper, UserMapper userMapper) {
+    public AdminActivityService(ActivityMapper activityMapper, ModerationActionMapper moderationMapper, UserMapper userMapper, NotificationService notificationService) {
         this.activityMapper = activityMapper;
         this.moderationMapper = moderationMapper;
         this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     public PageResult<ActivityListVO> listActivities(String status, String keyword, int page, int size) {
@@ -73,6 +76,14 @@ public class AdminActivityService {
             default -> "REVIEW";
         };
         logModeration(adminId, activityId, logAction, req.reason() != null ? req.reason() : "");
+        // 通知活动创建者
+        String notifyTitle = switch (req.result()) {
+            case "PASSED" -> "活动「" + a.getName() + "」审核通过";
+            case "REJECTED" -> "活动「" + a.getName() + "」被驳回";
+            case "NEEDS_REVISION" -> "活动「" + a.getName() + "」需要修改";
+            default -> "活动审核结果";
+        };
+        notificationService.send(a.getCreatorId(), "ACTIVITY_REVIEW", notifyTitle, req.reason(), "ACTIVITY", activityId);
     }
 
     @Transactional
