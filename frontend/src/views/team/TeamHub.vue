@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { teamApi, type TeamDetail, type TeamSummary, type TeamMemberItem, type TeamJoinRequestItem, type TeamAnnouncementItem, type TeamVoteItem, type TeamFileItem, type TeamAlbumPhotoItem, type TeamMomentItem, type TeamPointItem, type ActivityItem } from '../../api/team'
 
@@ -466,7 +467,16 @@ async function featureMoment(momentId: number) {
   await refreshDetails()
 }
 
-onMounted(loadTeams)
+const teamRoute = useRoute()
+
+onMounted(async () => {
+  await loadTeams()
+  const detailId = Number(teamRoute.query.detail)
+  if (detailId) {
+    const target = teams.value.find(t => t.id === detailId)
+    if (target) openTeam(target)
+  }
+})
 onBeforeUnmount(() => {
   hideMentionMenu()
   clearFileDraft()

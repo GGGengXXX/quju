@@ -145,6 +145,8 @@ public class TeamService {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         namedJdbcTemplate.update("insert into team_join_request(team_id, user_id, status) values (:teamId, :userId, 'PENDING')",
                 new MapSqlParameterSource().addValue("teamId", teamId).addValue("userId", userId), keyHolder, new String[]{"id"});
+        String teamName = String.valueOf(team.get("name"));
+        notificationService.send(ownerId, "TEAM_JOIN_REQUEST", "有人申请加入小队「" + teamName + "」，请审核", null, "TEAM", teamId);
         return new TeamJoinResult("PENDING", requireGeneratedId(keyHolder));
     }
 

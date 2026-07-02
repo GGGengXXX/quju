@@ -54,8 +54,8 @@ function goActivity(actId: number) {
   router.push(`/activities?detail=${actId}`)
 }
 
-function goTeam() {
-  router.push('/teams')
+function goTeam(teamId: number) {
+  router.push(`/teams?detail=${teamId}`)
 }
 
 onMounted(load)
@@ -94,7 +94,7 @@ onMounted(load)
     <el-card v-if="privacyShow('showTeams')" class="section-card">
       <template #header>加入的小队（{{ teams.length }}）</template>
       <div v-if="!teams.length" class="empty">暂无加入的小队</div>
-      <div v-for="t in teams" :key="t.id" class="item" @click="goTeam">
+      <div v-for="t in teams" :key="t.id" class="item" @click="goTeam(t.id)">
         <strong>{{ t.name }}</strong>
         <span class="meta">{{ t.memberCount || 0 }} 人 · {{ t.status }}</span>
       </div>
