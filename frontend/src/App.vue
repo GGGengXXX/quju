@@ -10,10 +10,21 @@ const auth = useAuthStore()
 const router = useRouter()
 let notificationTimer: number | null = null
 const unreadCount = ref(0)
+let unreadTimer: number | null = null
 
 async function pollUnreadCount() {
   if (!auth.token) { unreadCount.value = 0; return }
   try { unreadCount.value = await notificationApi.unreadCount() } catch { /* ignore */ }
+}
+
+function startUnreadPolling() {
+  pollUnreadCount()
+  unreadTimer = window.setInterval(pollUnreadCount, 30000)
+}
+
+function stopUnreadPolling() {
+  if (unreadTimer) { clearInterval(unreadTimer); unreadTimer = null }
+  unreadCount.value = 0
 }
 let notificationChecking = false
 
@@ -154,15 +165,16 @@ async function startAnnouncementPolling() {
 watch(() => auth.token, (token) => {
   if (token) {
     void startAnnouncementPolling()
-    void pollUnreadCount()
+    startUnreadPolling()
     return
   }
   stopAnnouncementPolling()
-  unreadCount.value = 0
+  stopUnreadPolling()
 }, { immediate: true })
 
 onBeforeUnmount(() => {
   stopAnnouncementPolling()
+  stopUnreadPolling()
 })
 </script>
 
