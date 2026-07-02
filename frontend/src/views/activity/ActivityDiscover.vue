@@ -507,10 +507,13 @@ function currentBounds() {
   }
 }
 
+let skipMapEvent = false
+
 async function loadMapPoints() {
   mapLoading.value = true
   try {
     mapPoints.value = await activityApi.mapPoints(currentBounds())
+    skipMapEvent = true
     renderMarkers()
   } finally {
     mapLoading.value = false
@@ -547,7 +550,6 @@ function renderMarkers() {
       marker.on('click', () => openDetail(point.id))
       return marker
     })
-  if (markers.length) amap.setFitView(markers, false, [40, 40, 40, 40])
 }
 
 async function initMap() {
@@ -560,8 +562,8 @@ async function initMap() {
       center: [query.lng, query.lat],
     })
     mapReady.value = true
-    amap.on('moveend', loadMapPoints)
-    amap.on('zoomend', loadMapPoints)
+    amap.on('moveend', () => { if (skipMapEvent) { skipMapEvent = false; return } loadMapPoints() })
+    amap.on('zoomend', () => { if (skipMapEvent) { skipMapEvent = false; return } loadMapPoints() })
     await loadMapPoints()
   } catch {
     ElMessage.warning('地图脚本加载失败，已保留活动点位列表')
