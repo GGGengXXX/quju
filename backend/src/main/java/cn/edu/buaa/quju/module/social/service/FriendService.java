@@ -81,7 +81,7 @@ public class FriendService {
                         .eq(FriendRequest::getStatus, "PENDING")
                         .orderByDesc(FriendRequest::getCreatedAt));
         List<Long> fromIds = pg.getRecords().stream().map(FriendRequest::getFromUserId).toList();
-        Map<Long, User> users = userMapper.selectBatchIds(fromIds).stream()
+        Map<Long, User> users = fromIds.isEmpty() ? Map.of() : userMapper.selectBatchIds(fromIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
         List<FriendRequestVO> list = pg.getRecords().stream().map(fr -> {
             User u = users.get(fr.getFromUserId());
