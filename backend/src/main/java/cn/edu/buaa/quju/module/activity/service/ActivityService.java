@@ -702,7 +702,7 @@ public class ActivityService {
         List<User> users = userMapper.selectList(new QueryWrapper<User>().in("id", userIds));
         Map<Long, UserBrief> map = new HashMap<>();
         for (User user : users) {
-            map.put(user.getId(), new UserBrief(user.getId(), user.getNickname(), user.getAvatar(), user.getUserType(), user.getStatus()));
+            map.put(user.getId(), new UserBrief(user.getId(), user.getAccountId(), user.getNickname(), user.getAvatar(), user.getUserType(), user.getStatus()));
         }
         return map;
     }

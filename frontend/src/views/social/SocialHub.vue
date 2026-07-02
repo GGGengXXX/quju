@@ -9,6 +9,7 @@ import {
   type FriendRequestVO,
   type FollowVO,
   type BlockVO,
+  type UserBrief,
 } from '../../api/social'
 
 const auth = useAuthStore()
@@ -38,7 +39,9 @@ const remarkForm = reactive({ userId: 0, remark: '', groupTag: '' })
 
 // 添加好友弹窗
 const addVisible = ref(false)
-const addForm = reactive({ toUserId: 0, message: '' })
+const addForm = reactive({ accountId: '', message: '' })
+const searchResult = ref<UserBrief | null>(null)
+const searching = ref(false)
 
 async function loadFriends() {
   friendsLoading.value = true
@@ -135,17 +138,33 @@ async function unblock(userId: number) {
 }
 
 function openAdd() {
-  addForm.toUserId = 0
+  addForm.accountId = ''
   addForm.message = ''
+  searchResult.value = null
   addVisible.value = true
 }
 
-async function submitAdd() {
-  if (!addForm.toUserId) {
-    ElMessage.warning('请输入用户ID')
+async function searchUser() {
+  if (!addForm.accountId.trim()) {
+    ElMessage.warning('请输入趣聚号')
     return
   }
-  await socialApi.sendFriendRequest({ toUserId: addForm.toUserId, source: 'PROFILE', message: addForm.message || undefined })
+  searching.value = true
+  try {
+    searchResult.value = await socialApi.searchUser(addForm.accountId.trim())
+  } catch {
+    searchResult.value = null
+  } finally {
+    searching.value = false
+  }
+}
+
+async function submitAdd() {
+  if (!searchResult.value) {
+    ElMessage.warning('请先搜索用户')
+    return
+  }
+  await socialApi.sendFriendRequest({ toUserId: searchResult.value.id, source: 'PROFILE', message: addForm.message || undefined })
   ElMessage.success('申请已发送')
   addVisible.value = false
 }
@@ -264,10 +283,20 @@ onMounted(loadFriends)
     </el-dialog>
 
     <!-- 添加好友弹窗 -->
-    <el-dialog v-model="addVisible" title="添加好友" width="360px">
+    <el-dialog v-model="addVisible" title="添加好友" width="400px">
       <el-form label-width="72px">
-        <el-form-item label="用户ID">
-          <el-input-number v-model="addForm.toUserId" :min="1" controls-position="right" />
+        <el-form-item label="趣聚号">
+          <div style="display: flex; gap: 8px; width: 100%">
+            <el-input v-model="addForm.accountId" placeholder="输入对方趣聚号" @keyup.enter="searchUser" />
+            <el-button type="primary" :loading="searching" @click="searchUser">搜索</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item v-if="searchResult" label="搜索结果">
+          <div class="search-result">
+            <el-avatar :size="32" :src="searchResult.avatar" />
+            <span>{{ searchResult.nickname || searchResult.accountId }}</span>
+            <el-tag size="small">{{ searchResult.accountId }}</el-tag>
+          </div>
         </el-form-item>
         <el-form-item label="验证消息">
           <el-input v-model="addForm.message" placeholder="选填" />
@@ -275,7 +304,7 @@ onMounted(loadFriends)
       </el-form>
       <template #footer>
         <el-button @click="addVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitAdd">发送申请</el-button>
+        <el-button type="primary" :disabled="!searchResult" @click="submitAdd">发送申请</el-button>
       </template>
     </el-dialog>
   </div>
@@ -294,4 +323,5 @@ onMounted(loadFriends)
 .text strong { font-size: 14px; }
 .sub { font-size: 12px; color: #999; }
 .actions { display: flex; gap: 4px; }
+.search-result { display: flex; align-items: center; gap: 8px; }
 </style>

@@ -3,6 +3,7 @@ package cn.edu.buaa.quju.module.user.controller;
 import cn.edu.buaa.quju.common.R;
 import cn.edu.buaa.quju.common.UserContext;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UpdateProfileReq;
+import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserVO;
 import cn.edu.buaa.quju.module.user.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 用户资料（受保护接口）。 */
@@ -36,7 +38,11 @@ public class UserController {
 
     @GetMapping("/{id}")
     public R<UserVO> getById(@PathVariable Long id) {
-        // 公开接口：可选鉴权（UserContext.get() 取当前用户，null 则匿名）
         return R.ok(userService.getPublicProfile(id));
+    }
+
+    @GetMapping("/search")
+    public R<UserBrief> searchByAccountId(@RequestParam String accountId) {
+        return R.ok(userService.searchByAccountId(accountId));
     }
 }

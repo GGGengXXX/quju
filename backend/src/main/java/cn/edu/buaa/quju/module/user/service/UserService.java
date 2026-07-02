@@ -2,6 +2,7 @@ package cn.edu.buaa.quju.module.user.service;
 
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
+import cn.edu.buaa.quju.module.user.dto.UserDtos;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UpdateProfileReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserVO;
 import cn.edu.buaa.quju.module.user.entity.User;
@@ -38,6 +39,14 @@ public class UserService {
     @Transactional
     public UserVO updateProfile(long userId, UpdateProfileReq req) {
         User u = requireUser(userId);
+        if (req.accountId() != null && !req.accountId().equals(u.getAccountId())) {
+            if (req.accountId().length() < 4 || req.accountId().length() > 32)
+                throw new BizException(ErrorCode.BAD_REQUEST);
+            Long taken = userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                    .eq(User::getAccountId, req.accountId()).ne(User::getId, userId));
+            if (taken != null && taken > 0) throw new BizException(ErrorCode.CONFLICT);
+            u.setAccountId(req.accountId());
+        }
         if (req.nickname() != null && !req.nickname().equals(u.getNickname())) {
             Long taken = userMapper.selectCount(Wrappers.<User>lambdaQuery()
                     .eq(User::getNickname, req.nickname()).ne(User::getId, userId));
@@ -79,7 +88,14 @@ public class UserService {
         List<String> tags = tagMapper.selectList(
                 Wrappers.<UserInterestTag>lambdaQuery().eq(UserInterestTag::getUserId, u.getId()))
                 .stream().map(UserInterestTag::getTag).collect(Collectors.toList());
-        return new UserVO(u.getId(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getUserType(),
+        return new UserVO(u.getId(), u.getAccountId(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getUserType(),
                 u.getStatus(), u.getGender(), u.getBirthday(), u.getSignature(), u.getReputation(), tags);
+    }
+
+    public UserDtos.UserBrief searchByAccountId(String accountId) {
+        User u = userMapper.selectOne(Wrappers.<User>lambdaQuery()
+                .eq(User::getAccountId, accountId).isNull(User::getDeletedAt));
+        if (u == null) throw new BizException(ErrorCode.NOT_FOUND);
+        return new UserDtos.UserBrief(u.getId(), u.getAccountId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus());
     }
 }

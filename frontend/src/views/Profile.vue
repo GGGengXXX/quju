@@ -5,11 +5,12 @@ import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
 
 const auth = useAuthStore()
-const form = reactive({ nickname: '', gender: 'UNKNOWN', signature: '' })
+const form = reactive({ accountId: '', nickname: '', gender: 'UNKNOWN', signature: '' })
 const loading = ref(false)
 
 onMounted(async () => {
   await auth.loadMe()
+  form.accountId = auth.user?.accountId || ''
   form.nickname = auth.user?.nickname || ''
   form.gender = auth.user?.gender || 'UNKNOWN'
   form.signature = auth.user?.signature || ''
@@ -28,13 +29,14 @@ async function save() {
   <el-card class="box" v-if="auth.user">
     <h2>我的资料</h2>
     <el-descriptions :column="1" border>
-      <el-descriptions-item label="ID">{{ auth.user.id }}</el-descriptions-item>
+      <el-descriptions-item label="趣聚号">{{ auth.user.accountId || '未设置' }}</el-descriptions-item>
       <el-descriptions-item label="邮箱">{{ auth.user.email }}</el-descriptions-item>
       <el-descriptions-item label="类型">{{ auth.user.userType }}</el-descriptions-item>
       <el-descriptions-item label="状态">{{ auth.user.status }}</el-descriptions-item>
       <el-descriptions-item label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
     </el-descriptions>
     <el-form label-width="64px" style="margin-top:16px" @submit.prevent>
+      <el-form-item label="趣聚号"><el-input v-model="form.accountId" placeholder="4-32位，字母或数字" /></el-form-item>
       <el-form-item label="昵称"><el-input v-model="form.nickname" /></el-form-item>
       <el-form-item label="性别">
         <el-select v-model="form.gender">
