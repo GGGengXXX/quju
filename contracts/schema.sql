@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   birthday      DATE          DEFAULT NULL,
   signature     VARCHAR(140)  DEFAULT NULL,
   reputation    INT           NOT NULL DEFAULT 100           COMMENT '信誉分(报名校验用)',
+  privacy_settings JSON       DEFAULT NULL                   COMMENT '隐私设置 {showActivities,showTeams}',
   created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at    TIMESTAMP     NULL DEFAULT NULL,

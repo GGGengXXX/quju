@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,6 +58,11 @@ public class UserService {
         if (req.gender() != null) u.setGender(req.gender());
         if (req.birthday() != null) u.setBirthday(req.birthday());
         if (req.signature() != null) u.setSignature(req.signature());
+        if (req.privacySettings() != null) {
+            try {
+                u.setPrivacySettings(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(req.privacySettings()));
+            } catch (Exception ignored) {}
+        }
         userMapper.updateById(u);
 
         if (req.interestTags() != null) {
@@ -88,8 +94,27 @@ public class UserService {
         List<String> tags = tagMapper.selectList(
                 Wrappers.<UserInterestTag>lambdaQuery().eq(UserInterestTag::getUserId, u.getId()))
                 .stream().map(UserInterestTag::getTag).collect(Collectors.toList());
+        Map<String, Boolean> privacy = parsePrivacy(u.getPrivacySettings());
         return new UserVO(u.getId(), u.getAccountId(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getUserType(),
-                u.getStatus(), u.getGender(), u.getBirthday(), u.getSignature(), u.getReputation(), tags);
+                u.getStatus(), u.getGender(), u.getBirthday(), u.getSignature(), u.getReputation(), tags, privacy);
+    }
+
+    Map<String, Boolean> parsePrivacy(String json) {
+        if (json == null || json.isBlank()) return Map.of("showActivities", true, "showTeams", true);
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> map = new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Map.class);
+            return map;
+        } catch (Exception e) {
+            return Map.of("showActivities", true, "showTeams", true);
+        }
+    }
+
+    public boolean isPrivacyAllowed(long userId, String key) {
+        User u = userMapper.selectById(userId);
+        if (u == null) return false;
+        Map<String, Boolean> privacy = parsePrivacy(u.getPrivacySettings());
+        return privacy.getOrDefault(key, true);
     }
 
     public UserDtos.UserBrief searchByAccountId(String accountId) {

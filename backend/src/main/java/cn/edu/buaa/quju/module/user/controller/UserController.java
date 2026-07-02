@@ -8,31 +8,27 @@ import cn.edu.buaa.quju.module.user.dto.UserDtos.UpdateProfileReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserVO;
 import cn.edu.buaa.quju.module.user.service.UserService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
-/** 用户资料（受保护接口）。 */
 @RestController
 @RequestMapping("/v1/users")
 public class UserController {
     private final UserService userService;
     private final ActivityService activityService;
-    public UserController(UserService userService, ActivityService activityService) {
+    private final JdbcTemplate jdbcTemplate;
+
+    public UserController(UserService userService, ActivityService activityService, JdbcTemplate jdbcTemplate) {
         this.userService = userService;
         this.activityService = activityService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @GetMapping("/me")
-    public R<UserVO> me() {
-        return R.ok(userService.getProfile(UserContext.require()));
-    }
+    public R<UserVO> me() { return R.ok(userService.getProfile(UserContext.require())); }
 
     @PutMapping("/me")
     public R<UserVO> update(@RequestBody UpdateProfileReq req) {
@@ -40,9 +36,7 @@ public class UserController {
     }
 
     @GetMapping("/me/qrcode")
-    public R<String> qrcode() {
-        return R.ok(userService.getQrCodeContent(UserContext.require()));
-    }
+    public R<String> qrcode() { return R.ok(userService.getQrCodeContent(UserContext.require())); }
 
     @GetMapping("/{id}")
     public R<UserVO> getById(@PathVariable Long id) {
@@ -51,7 +45,18 @@ public class UserController {
 
     @GetMapping("/{id}/activities")
     public R<List<ActivityVO>> userActivities(@PathVariable Long id) {
+        if (!userService.isPrivacyAllowed(id, "showActivities")) return R.ok(List.of());
         return R.ok(activityService.userJoinedActivities(id));
+    }
+
+    @GetMapping("/{id}/teams")
+    public R<List<Map<String, Object>>> userTeams(@PathVariable Long id) {
+        if (!userService.isPrivacyAllowed(id, "showTeams")) return R.ok(List.of());
+        List<Map<String, Object>> teams = jdbcTemplate.queryForList(
+            "SELECT t.id, t.name, t.avatar, t.status, t.member_count AS memberCount " +
+            "FROM team_member tm JOIN team t ON t.id = tm.team_id " +
+            "WHERE tm.user_id = ? AND t.status = 'ACTIVE' ORDER BY tm.joined_at DESC", id);
+        return R.ok(teams);
     }
 
     @GetMapping("/search")

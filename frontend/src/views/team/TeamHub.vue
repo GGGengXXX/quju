@@ -559,6 +559,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="actions">
+            <el-button v-if="selectedTeam.joined" type="primary" @click="$router.push(`/social/team-chat/${selectedTeam.id}`)">群聊</el-button>
             <el-button v-if="selectedTeam.joined && !isOwner" @click="leaveTeam">退出小队</el-button>
             <el-button v-if="isOwner" type="danger" @click="dissolveTeam">解散小队</el-button>
           </div>
@@ -567,7 +568,11 @@ onBeforeUnmount(() => {
         <el-tabs v-model="activeTab">
           <el-tab-pane label="成员" name="members">
             <el-table :data="members" stripe>
-              <el-table-column prop="nickname" label="成员" />
+              <el-table-column label="成员">
+                <template #default="{ row }">
+                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || row.userId }}</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="role" label="角色" width="120" />
               <el-table-column prop="points" label="积分" width="100" />
               <el-table-column v-if="canManage" label="操作" width="240">
