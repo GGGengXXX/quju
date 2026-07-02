@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
+import { useRoute } from 'vue-router'
 import {
   activityApi,
   type ActivityDetail,
@@ -23,6 +24,7 @@ declare global {
 }
 
 const auth = useAuthStore()
+const currentRoute = useRoute()
 const amapKey = (import.meta as any).env?.VITE_AMAP_KEY as string | undefined
 const loading = ref(false)
 const saving = ref(false)
@@ -581,6 +583,9 @@ onMounted(async () => {
   await Promise.allSettled([loadActivities(), loadTemplates(), loadMine(), loadMapPoints()])
   await nextTick()
   await initMap()
+  // 支持 ?detail=id 参数自动打开活动详情
+  const detailId = Number(currentRoute.query.detail)
+  if (detailId) openDetail(detailId)
 })
 </script>
 
