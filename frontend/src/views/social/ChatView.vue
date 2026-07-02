@@ -3,13 +3,14 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
-import { socialApi, type MessageVO } from '../../api/social'
+import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
 const peerId = Number(route.params.id)
+const peerName = ref(`用户 ${peerId}`)
 const messages = ref<MessageVO[]>([])
 const loading = ref(false)
 const inputText = ref('')
@@ -17,6 +18,16 @@ const sending = ref(false)
 const messagesEnd = ref<HTMLElement | null>(null)
 
 let ws: WebSocket | null = null
+
+async function loadPeerInfo() {
+  try {
+    const friends = await socialApi.getFriends()
+    const friend = friends.find((f: FriendVO) => f.userId === peerId)
+    if (friend) {
+      peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
+    }
+  } catch { /* ignore */ }
+}
 
 async function loadMessages() {
   loading.value = true
@@ -84,6 +95,7 @@ function isMine(msg: MessageVO) {
 }
 
 onMounted(() => {
+  loadPeerInfo()
   loadMessages()
   connectWebSocket()
 })
@@ -98,7 +110,7 @@ onBeforeUnmount(() => {
   <div class="chat-view">
     <div class="chat-header">
       <el-button text @click="router.push('/social')">← 返回</el-button>
-      <span class="peer-name">与用户 {{ peerId }} 的对话</span>
+      <span class="peer-name">与 {{ peerName }} 的对话</span>
     </div>
 
     <div class="chat-messages" v-loading="loading">
