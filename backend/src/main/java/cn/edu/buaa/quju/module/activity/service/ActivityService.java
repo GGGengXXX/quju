@@ -183,6 +183,15 @@ public class ActivityService {
         return new PageResult<>(p.getTotal(), page, size, toActivityVOList(p.getRecords()));
     }
 
+    public List<ActivityVO> userJoinedActivities(long userId) {
+        List<ActivitySignup> signups = signupMapper.selectList(Wrappers.<ActivitySignup>lambdaQuery()
+                .eq(ActivitySignup::getUserId, userId).eq(ActivitySignup::getStatus, "REGISTERED"));
+        if (signups.isEmpty()) return List.of();
+        List<Long> activityIds = signups.stream().map(ActivitySignup::getActivityId).toList();
+        List<Activity> activities = activityMapper.selectBatchIds(activityIds);
+        return toActivityVOList(activities.stream().filter(a -> a.getDeletedAt() == null).toList());
+    }
+
     public List<ActivityPointVO> mapPoints(BigDecimal minLng, BigDecimal maxLng, BigDecimal minLat, BigDecimal maxLat) {
         LambdaQueryWrapper<Activity> qw = Wrappers.<Activity>lambdaQuery()
                 .isNull(Activity::getDeletedAt)

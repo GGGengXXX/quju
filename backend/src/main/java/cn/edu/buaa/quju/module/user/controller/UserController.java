@@ -2,6 +2,8 @@ package cn.edu.buaa.quju.module.user.controller;
 
 import cn.edu.buaa.quju.common.R;
 import cn.edu.buaa.quju.common.UserContext;
+import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.ActivityVO;
+import cn.edu.buaa.quju.module.activity.service.ActivityService;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UpdateProfileReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserVO;
@@ -14,12 +16,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /** 用户资料（受保护接口）。 */
 @RestController
 @RequestMapping("/v1/users")
 public class UserController {
     private final UserService userService;
-    public UserController(UserService userService) { this.userService = userService; }
+    private final ActivityService activityService;
+    public UserController(UserService userService, ActivityService activityService) {
+        this.userService = userService;
+        this.activityService = activityService;
+    }
 
     @GetMapping("/me")
     public R<UserVO> me() {
@@ -39,6 +47,11 @@ public class UserController {
     @GetMapping("/{id}")
     public R<UserVO> getById(@PathVariable Long id) {
         return R.ok(userService.getPublicProfile(id));
+    }
+
+    @GetMapping("/{id}/activities")
+    public R<List<ActivityVO>> userActivities(@PathVariable Long id) {
+        return R.ok(activityService.userJoinedActivities(id));
     }
 
     @GetMapping("/search")

@@ -75,6 +75,13 @@ export const socialApi = {
   searchUser: (accountId: string) =>
     http.get<any, UserBrief>('/users/search', { params: { accountId } }),
 
+  // 用户主页
+  getUserProfile: (userId: number) =>
+    http.get<any, any>(`/users/${userId}`),
+
+  getUserActivities: (userId: number) =>
+    http.get<any, any[]>(`/users/${userId}/activities`),
+
   // 好友申请
   sendFriendRequest: (data: { toUserId: number; source?: string; message?: string }) =>
     http.post<any, void>('/friend-requests', data),

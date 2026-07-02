@@ -7,7 +7,6 @@ import {
   socialApi,
   type FriendVO,
   type FriendRequestVO,
-  type FollowVO,
   type BlockVO,
   type UserBrief,
 } from '../../api/social'
@@ -23,11 +22,6 @@ const friendsLoading = ref(false)
 // 好友申请
 const requests = ref<FriendRequestVO[]>([])
 const requestsLoading = ref(false)
-
-// 关注
-const followTab = ref('FOLLOWING')
-const followList = ref<FollowVO[]>([])
-const followLoading = ref(false)
 
 // 黑名单
 const blocks = ref<BlockVO[]>([])
@@ -62,15 +56,6 @@ async function loadRequests() {
   }
 }
 
-async function loadFollows() {
-  followLoading.value = true
-  try {
-    followList.value = await socialApi.getFollows({ type: followTab.value as 'FOLLOWING' | 'FOLLOWERS' })
-  } finally {
-    followLoading.value = false
-  }
-}
-
 async function loadBlocks() {
   blocksLoading.value = true
   try {
@@ -84,7 +69,6 @@ function onTabChange(t: string) {
   tab.value = t
   if (t === 'friends') loadFriends()
   else if (t === 'requests') loadRequests()
-  else if (t === 'follows') loadFollows()
   else if (t === 'blocks') loadBlocks()
 }
 
@@ -125,10 +109,11 @@ async function deleteFriend(userId: number) {
   loadFriends()
 }
 
-async function unfollow(userId: number) {
-  await socialApi.unfollow(userId)
-  ElMessage.success('已取关')
-  loadFollows()
+async function blockFriend(userId: number) {
+  await ElMessageBox.confirm('确认拉黑？拉黑后好友关系解除', '提示')
+  await socialApi.block(userId)
+  ElMessage.success('已拉黑')
+  loadFriends()
 }
 
 async function unblock(userId: number) {
@@ -173,6 +158,10 @@ function goChat(userId: number) {
   router.push(`/social/chat/${userId}`)
 }
 
+function goProfile(userId: number) {
+  router.push(`/social/user/${userId}`)
+}
+
 onMounted(loadFriends)
 </script>
 
@@ -188,7 +177,7 @@ onMounted(loadFriends)
         <div v-loading="friendsLoading" class="list">
           <div v-if="!friends.length && !friendsLoading" class="empty">暂无好友</div>
           <div v-for="f in friends" :key="f.userId" class="card">
-            <div class="info">
+            <div class="info" @click="goProfile(f.userId)" style="cursor: pointer">
               <el-avatar :size="40" :src="f.avatar" />
               <div class="text">
                 <strong>{{ f.remark || f.nickname || f.userId }}</strong>
@@ -199,6 +188,7 @@ onMounted(loadFriends)
             <div class="actions">
               <el-button text size="small" type="primary" @click="goChat(f.userId)">发消息</el-button>
               <el-button text size="small" @click="openRemark(f)">备注</el-button>
+              <el-button text size="small" type="warning" @click="blockFriend(f.userId)">拉黑</el-button>
               <el-button text size="small" type="danger" @click="deleteFriend(f.userId)">删除</el-button>
             </div>
           </div>
@@ -222,27 +212,6 @@ onMounted(loadFriends)
                 <el-button size="small" type="info" @click="rejectRequest(r.id)">拒绝</el-button>
               </template>
               <el-tag v-else size="small">{{ r.status === 'ACCEPTED' ? '已接受' : '已拒绝' }}</el-tag>
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane label="关注" name="follows">
-        <el-radio-group v-model="followTab" style="margin-bottom: 12px" @change="loadFollows">
-          <el-radio-button value="FOLLOWING">我关注的</el-radio-button>
-          <el-radio-button value="FOLLOWERS">关注我的</el-radio-button>
-        </el-radio-group>
-        <div v-loading="followLoading" class="list">
-          <div v-if="!followList.length && !followLoading" class="empty">暂无数据</div>
-          <div v-for="f in followList" :key="f.userId" class="card">
-            <div class="info">
-              <el-avatar :size="40" :src="f.avatar" />
-              <div class="text">
-                <strong>{{ f.nickname || f.userId }}</strong>
-              </div>
-            </div>
-            <div class="actions">
-              <el-button v-if="followTab === 'FOLLOWING'" text size="small" type="danger" @click="unfollow(f.userId)">取关</el-button>
             </div>
           </div>
         </div>
