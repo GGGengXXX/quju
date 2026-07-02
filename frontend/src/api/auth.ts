@@ -1,7 +1,7 @@
 import http from './http'
 
 export interface UserVO {
-  id: number; email: string; nickname?: string; avatar?: string
+  id: number; accountId?: string; email: string; nickname?: string; avatar?: string
   userType: string; status: string; gender?: string; birthday?: string
   signature?: string; reputation?: number; interestTags?: string[]
 }

@@ -52,6 +52,7 @@ public class AuthService {
         u.setStatus("PENDING_ACTIVATION");
         u.setGender("UNKNOWN");
         u.setReputation(100);
+        u.setAccountId(generateAccountId());
         userMapper.insert(u);
 
         String token = createToken(u.getId(), "ACTIVATION", 24);
@@ -104,6 +105,21 @@ public class AuthService {
 
     // ---- 工具方法 ----
 
+    private String generateAccountId() {
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        for (int i = 0; i < 10; i++) {
+            int len = rng.nextInt(6, 9); // 6-8 位
+            StringBuilder sb = new StringBuilder(len);
+            sb.append(rng.nextInt(1, 10)); // 首位不为0
+            for (int j = 1; j < len; j++) sb.append(rng.nextInt(10));
+            String candidate = sb.toString();
+            Long count = userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getAccountId, candidate));
+            if (count == null || count == 0) return candidate;
+        }
+        // fallback: 用时间戳后8位
+        return String.valueOf(System.currentTimeMillis() % 100000000L);
+    }
+
     private String createToken(Long userId, String type, int expiryHours) {
         EmailToken et = new EmailToken();
         et.setUserId(userId);
@@ -124,6 +140,6 @@ public class AuthService {
     }
 
     private UserBrief toUserBrief(User u) {
-        return new UserBrief(u.getId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus());
+        return new UserBrief(u.getId(), u.getAccountId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus());
     }
 }

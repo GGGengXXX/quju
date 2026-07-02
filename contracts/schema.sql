@@ -14,6 +14,7 @@ SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `user` (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  account_id    VARCHAR(32)   DEFAULT NULL                   COMMENT '趣聚号(唯一，注册自动生成，可修改)',
   email         VARCHAR(128)  NOT NULL,
   password_hash VARCHAR(100)  NOT NULL                       COMMENT 'BCrypt',
   user_type     VARCHAR(16)   NOT NULL                       COMMENT 'INDIVIDUAL|MERCHANT',
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   deleted_at    TIMESTAMP     NULL DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uk_user_email (email),
+  UNIQUE KEY uk_user_account_id (account_id),
   UNIQUE KEY uk_user_nickname (nickname),
   KEY idx_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户(个人/商家)';

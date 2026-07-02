@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private String accountId;
     private String email;
     private String passwordHash;
     private String userType;   // INDIVIDUAL | MERCHANT

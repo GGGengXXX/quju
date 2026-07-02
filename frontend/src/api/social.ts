@@ -61,7 +61,20 @@ export interface PageResult<T> {
 
 // ---- API ----
 
+export interface UserBrief {
+  id: number
+  accountId?: string
+  nickname?: string
+  avatar?: string
+  userType?: string
+  status?: string
+}
+
 export const socialApi = {
+  // 搜索用户
+  searchUser: (accountId: string) =>
+    http.get<any, UserBrief>('/users/search', { params: { accountId } }),
+
   // 好友申请
   sendFriendRequest: (data: { toUserId: number; source?: string; message?: string }) =>
     http.post<any, void>('/friend-requests', data),
