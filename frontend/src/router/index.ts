@@ -10,6 +10,7 @@ const routes = [
   { path: '/activities', component: () => import('../views/activity/ActivityDiscover.vue'), meta: { auth: true } },
   { path: '/social', component: () => import('../views/social/SocialHub.vue'), meta: { auth: true } },
   { path: '/social/chat/:id', component: () => import('../views/social/ChatView.vue'), meta: { auth: true } },
+  { path: '/social/team-chat/:id', component: () => import('../views/social/ChatView.vue'), meta: { auth: true } },
   { path: '/social/user/:id', component: () => import('../views/social/UserProfile.vue'), meta: { auth: true } },
   { path: '/notifications', component: () => import('../views/social/NotificationsView.vue'), meta: { auth: true } },
 

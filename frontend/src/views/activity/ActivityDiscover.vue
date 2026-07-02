@@ -722,7 +722,7 @@ onMounted(async () => {
               <div><strong>分类</strong><p>{{ detail.category }}</p></div>
               <div><strong>城市</strong><p>{{ detail.city || '未填写' }}</p></div>
               <div><strong>地址</strong><p>{{ detail.address || '未填写' }}</p></div>
-              <div><strong>发起人</strong><p>{{ detail.creator?.nickname || '-' }}</p></div>
+              <div><strong>发起人</strong><p class="creator-link" @click="detail.creator?.id && $router.push(`/social/user/${detail.creator.id}`)">{{ detail.creator?.nickname || '-' }}</p></div>
               <div><strong>人数</strong><p>{{ detail.signupCount }} / {{ detail.capacity || '不限' }}</p></div>
               <div><strong>开始时间</strong><p>{{ formatTime(detail.startTime) }}</p></div>
               <div><strong>结束时间</strong><p>{{ formatTime(detail.endTime) }}</p></div>

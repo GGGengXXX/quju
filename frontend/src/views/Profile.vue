@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
 
 const auth = useAuthStore()
-const form = reactive({ accountId: '', nickname: '', gender: 'UNKNOWN', signature: '' })
+const form = reactive({ accountId: '', nickname: '', gender: 'UNKNOWN', signature: '', privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean> })
 const loading = ref(false)
 const uploading = ref(false)
 
@@ -15,6 +15,9 @@ onMounted(async () => {
   form.nickname = auth.user?.nickname || ''
   form.gender = auth.user?.gender || 'UNKNOWN'
   form.signature = auth.user?.signature || ''
+  if ((auth.user as any)?.privacySettings) {
+    form.privacySettings = { showActivities: true, showTeams: true, ...(auth.user as any).privacySettings }
+  }
 })
 
 async function save() {
@@ -60,7 +63,8 @@ async function handleAvatarChange(e: Event) {
       <el-descriptions-item label="状态">{{ auth.user.status }}</el-descriptions-item>
       <el-descriptions-item label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
     </el-descriptions>
-    <el-form label-width="64px" style="margin-top:16px" @submit.prevent>
+
+    <el-form label-width="80px" style="margin-top:16px" @submit.prevent>
       <el-form-item label="趣聚号"><el-input v-model="form.accountId" placeholder="4-32位，字母或数字" /></el-form-item>
       <el-form-item label="昵称"><el-input v-model="form.nickname" /></el-form-item>
       <el-form-item label="性别">
@@ -71,6 +75,15 @@ async function handleAvatarChange(e: Event) {
         </el-select>
       </el-form-item>
       <el-form-item label="签名"><el-input v-model="form.signature" type="textarea" :rows="2" /></el-form-item>
+
+      <el-divider content-position="left">隐私设置</el-divider>
+      <el-form-item label="展示活动">
+        <el-switch v-model="form.privacySettings.showActivities" active-text="公开" inactive-text="隐藏" />
+      </el-form-item>
+      <el-form-item label="展示小队">
+        <el-switch v-model="form.privacySettings.showTeams" active-text="公开" inactive-text="隐藏" />
+      </el-form-item>
+
       <el-button type="primary" :loading="loading" @click="save">保存</el-button>
     </el-form>
   </el-card>

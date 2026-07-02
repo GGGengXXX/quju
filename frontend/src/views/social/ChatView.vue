@@ -9,8 +9,10 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
+const isFriendChat = !route.path.startsWith('/social/team-chat')
+const scope = isFriendChat ? 'FRIEND' : 'TEAM'
 const peerId = Number(route.params.id)
-const peerName = ref(`用户 ${peerId}`)
+const peerName = ref(isFriendChat ? `用户 ${peerId}` : `小队 ${peerId}`)
 const messages = ref<MessageVO[]>([])
 const loading = ref(false)
 const inputText = ref('')
@@ -20,23 +22,24 @@ const messagesEnd = ref<HTMLElement | null>(null)
 let ws: WebSocket | null = null
 
 async function loadPeerInfo() {
-  try {
-    const friends = await socialApi.getFriends()
-    const friend = friends.find((f: FriendVO) => f.userId === peerId)
-    if (friend) {
-      peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
-    }
-  } catch { /* ignore */ }
+  if (isFriendChat) {
+    try {
+      const friends = await socialApi.getFriends()
+      const friend = friends.find((f: FriendVO) => f.userId === peerId)
+      if (friend) peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
+    } catch { /* ignore */ }
+  }
+  // TEAM scope: 可以后续从小队详情获取名称，暂用 ID
 }
 
 async function loadMessages() {
   loading.value = true
   try {
-    const res = await socialApi.getMessages({ scope: 'FRIEND', peerId, page: 1, size: 50 })
+    const res = await socialApi.getMessages({ scope, peerId, page: 1, size: 50 })
     messages.value = res.list
     await nextTick()
     scrollToBottom()
-    socialApi.markRead({ scope: 'FRIEND', peerId })
+    if (isFriendChat) socialApi.markRead({ scope, peerId })
   } finally {
     loading.value = false
   }
@@ -51,7 +54,7 @@ async function send() {
   if (!text) return
   sending.value = true
   try {
-    const msg = await socialApi.sendMessage({ scope: 'FRIEND', peerId, contentType: 'TEXT', content: text })
+    const msg = await socialApi.sendMessage({ scope, peerId, contentType: 'TEXT', content: text })
     messages.value.push(msg)
     inputText.value = ''
     await nextTick()
@@ -81,10 +84,15 @@ function connectWebSocket() {
   ws.onmessage = (event) => {
     try {
       const msg: MessageVO = JSON.parse(event.data)
-      if (msg.scope === 'FRIEND' && (msg.senderId === peerId || msg.receiverId === peerId)) {
-        messages.value.push(msg)
-        nextTick(scrollToBottom)
-        socialApi.markRead({ scope: 'FRIEND', peerId })
+      const match = isFriendChat
+        ? msg.scope === 'FRIEND' && (msg.senderId === peerId || msg.receiverId === peerId)
+        : msg.scope === 'TEAM' && msg.teamId === peerId
+      if (match) {
+        // 避免重复（自己发的消息已经在 send() 中 push 了）
+        if (!messages.value.some(m => m.id === msg.id)) {
+          messages.value.push(msg)
+          nextTick(scrollToBottom)
+        }
       }
     } catch { /* ignore non-json */ }
   }
@@ -109,14 +117,16 @@ onBeforeUnmount(() => {
 <template>
   <div class="chat-view">
     <div class="chat-header">
-      <el-button text @click="router.push('/social')">← 返回</el-button>
-      <span class="peer-name">与 {{ peerName }} 的对话</span>
+      <el-button text @click="router.back()">← 返回</el-button>
+      <span class="peer-name">{{ peerName }}</span>
+      <el-tag v-if="!isFriendChat" size="small" type="success">群聊</el-tag>
     </div>
 
     <div class="chat-messages" v-loading="loading">
       <div v-for="msg in messages" :key="msg.id" :class="['msg-row', isMine(msg) ? 'mine' : 'theirs']">
         <div v-if="msg.isRecalled" class="recalled">消息已撤回</div>
         <div v-else class="bubble" @contextmenu.prevent="isMine(msg) && recall(msg)">
+          <span v-if="!isFriendChat && !isMine(msg)" class="sender-id">用户{{ msg.senderId }}</span>
           <template v-if="msg.contentType === 'IMAGE'">
             <img :src="msg.content" class="msg-img" />
           </template>
@@ -130,12 +140,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="chat-input">
-      <el-input
-        v-model="inputText"
-        placeholder="输入消息..."
-        @keyup.enter="send"
-        :disabled="sending"
-      />
+      <el-input v-model="inputText" placeholder="输入消息..." @keyup.enter="send" :disabled="sending" />
       <el-button type="primary" :loading="sending" @click="send">发送</el-button>
     </div>
   </div>
@@ -154,6 +159,7 @@ onBeforeUnmount(() => {
 .theirs .bubble { background: #f0f0f0; color: #333; border-bottom-left-radius: 4px; }
 .recalled { font-size: 12px; color: #999; font-style: italic; padding: 4px 0; }
 .time { font-size: 10px; opacity: 0.7; margin-left: 8px; }
+.sender-id { font-size: 11px; color: #999; display: block; margin-bottom: 2px; }
 .msg-img { max-width: 200px; border-radius: 8px; display: block; }
 .chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; }
 .chat-input .el-input { flex: 1; }
