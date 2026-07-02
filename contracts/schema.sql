@@ -455,6 +455,20 @@ CREATE TABLE IF NOT EXISTS moderation_action (
   KEY idx_mod_target (target_type, target_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下架/停用/恢复记录';
 
+CREATE TABLE IF NOT EXISTS notification (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id     BIGINT UNSIGNED NOT NULL                       COMMENT '接收人',
+  type        VARCHAR(32)  NOT NULL                          COMMENT 'ACTIVITY_REVIEW|ACTIVITY_SIGNUP|FRIEND_REQUEST|FRIEND_ACCEPT|TEAM_JOIN|SYSTEM',
+  title       VARCHAR(128) NOT NULL,
+  content     VARCHAR(512) DEFAULT NULL,
+  is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+  ref_type    VARCHAR(32)  DEFAULT NULL                      COMMENT '关联实体类型: ACTIVITY|USER|TEAM',
+  ref_id      BIGINT UNSIGNED DEFAULT NULL                   COMMENT '关联实体ID',
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_notification_user (user_id, is_read, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知';
+
 CREATE TABLE IF NOT EXISTS report (
   id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   reporter_id      BIGINT UNSIGNED NOT NULL,

@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { ElNotification } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { teamApi, type TeamAnnouncementItem, type TeamSummary } from './api/team'
+import { notificationApi } from './api/notification'
 import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
 let notificationTimer: number | null = null
+const unreadCount = ref(0)
+
+async function pollUnreadCount() {
+  if (!auth.token) { unreadCount.value = 0; return }
+  try { unreadCount.value = await notificationApi.unreadCount() } catch { /* ignore */ }
+}
 let notificationChecking = false
 
 function logout() {
@@ -147,9 +154,11 @@ async function startAnnouncementPolling() {
 watch(() => auth.token, (token) => {
   if (token) {
     void startAnnouncementPolling()
+    void pollUnreadCount()
     return
   }
   stopAnnouncementPolling()
+  unreadCount.value = 0
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -164,6 +173,9 @@ onBeforeUnmount(() => {
       <span class="spacer" />
       <template v-if="auth.token">
         <el-button text @click="router.push('/social')">社交</el-button>
+        <el-button text @click="router.push('/notifications')">
+          通知<el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99" class="notify-badge" />
+        </el-button>
         <el-button text @click="router.push('/teams')">小队</el-button>
         <el-button text @click="router.push('/profile')">我的</el-button>
         <el-button text @click="logout">退出</el-button>

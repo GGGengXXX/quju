@@ -10,6 +10,7 @@ const routes = [
   { path: '/activities', component: () => import('../views/activity/ActivityDiscover.vue'), meta: { auth: true } },
   { path: '/social', component: () => import('../views/social/SocialHub.vue'), meta: { auth: true } },
   { path: '/social/chat/:id', component: () => import('../views/social/ChatView.vue'), meta: { auth: true } },
+  { path: '/notifications', component: () => import('../views/social/NotificationsView.vue'), meta: { auth: true } },
 
   // 管理员后台
   { path: '/admin/login', component: () => import('../views/admin/AdminLogin.vue') },
