@@ -46,6 +46,12 @@ let locationMap: any = null
 let locationMarker: any = null
 const pickedLocation = reactive({ lng: '116.3521', lat: '39.9835', address: '' })
 
+// 右键菜单
+const contextMenu = reactive({ visible: false, x: 0, y: 0, msg: null as MessageVO | null })
+const showForwardDialog = ref(false)
+const forwardTargets = ref<{ type: string; id: number; name: string }[]>([])
+const forwardMsg = ref<MessageVO | null>(null)
+
 const emojis = ['😀','😂','🥰','😎','🤔','👍','👋','🎉','🔥','❤️','😭','😅','🙏','💪','✨','🥳','😤','🤣','😘','🫡','👀','💯','🤝','🫶','😈','🥲','😊','🤗','😏','🙄']
 const messagesEnd = ref<HTMLElement | null>(null)
 const memberMap = ref<Map<number, TeamMemberItem>>(new Map())
@@ -231,6 +237,49 @@ async function recall(msg: MessageVO) {
   ElMessage.success('已撤回')
 }
 
+function showContextMenu(e: MouseEvent, msg: MessageVO) {
+  e.preventDefault()
+  contextMenu.visible = true
+  contextMenu.x = e.clientX
+  contextMenu.y = e.clientY
+  contextMenu.msg = msg
+}
+
+function hideContextMenu() {
+  contextMenu.visible = false
+}
+
+async function openForwardDialog() {
+  hideContextMenu()
+  forwardMsg.value = contextMenu.msg
+  // 加载好友和小队作为转发目标
+  const targets: { type: string; id: number; name: string }[] = []
+  try {
+    const friends = await socialApi.getFriends()
+    friends.forEach(f => targets.push({ type: 'FRIEND', id: f.userId, name: f.remark || f.nickname || `用户${f.userId}` }))
+  } catch {}
+  try {
+    const me = auth.user?.id
+    if (me) {
+      const teams = await (await import('../../api/http')).default.get<any, any[]>(`/users/${me}/teams`)
+      teams.forEach((t: any) => targets.push({ type: 'TEAM', id: t.id, name: `[群] ${t.name}` }))
+    }
+  } catch {}
+  forwardTargets.value = targets
+  showForwardDialog.value = true
+}
+
+async function doForward(target: { type: string; id: number; name: string }) {
+  if (!forwardMsg.value) return
+  try {
+    await socialApi.forwardMessage(forwardMsg.value.id, { scope: target.type, peerId: target.id })
+    ElMessage.success(`已转发给 ${target.name}`)
+    showForwardDialog.value = false
+  } catch {
+    ElMessage.error('转发失败')
+  }
+}
+
 function connectWebSocket() {
   const token = localStorage.getItem('quju_token')
   if (!token) return
@@ -291,7 +340,7 @@ onBeforeUnmount(() => {
               <el-avatar :size="32" :src="isMine(msg) ? auth.user?.avatar : getMemberAvatar(msg.senderId)" />
               <span class="sender-name">{{ isMine(msg) ? truncName(auth.user?.nickname || '我') : truncName(getMemberName(msg.senderId)) }}</span>
             </div>
-            <div class="bubble" @contextmenu.prevent="isMine(msg) && recall(msg)">
+            <div class="bubble" @contextmenu.prevent="showContextMenu($event, msg)">
               <template v-if="msg.contentType === 'IMAGE'">
                 <img :src="msg.content" class="msg-img" />
               </template>
@@ -338,6 +387,21 @@ onBeforeUnmount(() => {
         <el-button type="primary" @click="confirmLocation">发送位置</el-button>
       </template>
     </el-dialog>
+    <!-- 右键菜单 -->
+    <div v-if="contextMenu.visible" class="context-menu" :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @mouseleave="hideContextMenu">
+      <div v-if="contextMenu.msg && isMine(contextMenu.msg)" class="menu-item" @click="recall(contextMenu.msg!); hideContextMenu()">撤回</div>
+      <div class="menu-item" @click="openForwardDialog">转发</div>
+    </div>
+
+    <!-- 转发对话框 -->
+    <el-dialog v-model="showForwardDialog" title="转发给..." width="400px">
+      <div class="forward-list">
+        <div v-if="!forwardTargets.length" class="empty">暂无可转发对象</div>
+        <div v-for="t in forwardTargets" :key="`${t.type}-${t.id}`" class="forward-item" @click="doForward(t)">
+          {{ t.name }}
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -379,4 +443,11 @@ onBeforeUnmount(() => {
 .location-map { width: 100%; height: 300px; border-radius: 8px; margin-bottom: 12px; }
 .location-form { display: flex; flex-direction: column; gap: 8px; }
 .location-hint { font-size: 12px; color: #999; margin: 0; }
+.context-menu { position: fixed; z-index: 9999; background: #fff; border: 1px solid #eee; border-radius: 6px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 4px 0; min-width: 100px; }
+.menu-item { padding: 8px 16px; cursor: pointer; font-size: 14px; }
+.menu-item:hover { background: #f5f7fa; }
+.forward-list { max-height: 300px; overflow-y: auto; }
+.forward-item { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+.forward-item:hover { background: #ecf5ff; }
+.forward-item:last-child { border-bottom: none; }
 </style>
