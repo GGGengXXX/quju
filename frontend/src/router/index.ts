@@ -37,6 +37,7 @@ const router = createRouter({ history: createWebHistory(), routes })
 router.beforeEach((to) => {
   if (to.meta.auth && !localStorage.getItem('quju_token')) return '/login'
   if (to.meta.adminAuth && !localStorage.getItem('quju_admin_token')) return '/admin/login'
+  if (to.path === '/login' && localStorage.getItem('quju_token')) return '/activities'
 })
 
 export default router
