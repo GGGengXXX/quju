@@ -43,7 +43,7 @@ async function submit(nextPath?: string) {
 async function loginDemo(type: keyof typeof demoAccounts) {
   const account = demoAccounts[type]
   fillDemo(account.email, account.password)
-  await submit(type === 'member' ? resolveNextPath('/activities') : '/teams')
+  await submit(resolveNextPath(type === 'member' ? '/activities' : '/teams'))
 }
 
 async function loginAdmin() {
