@@ -109,6 +109,9 @@ public class FriendService {
         requestMapper.updateById(fr);
         addFriendship(fr.getFromUserId(), fr.getToUserId());
         addFriendship(fr.getToUserId(), fr.getFromUserId());
+        // 成为好友同时建立双向关注
+        ensureFollow(fr.getFromUserId(), fr.getToUserId());
+        ensureFollow(fr.getToUserId(), fr.getFromUserId());
         // 通知申请人
         User acceptor = userMapper.selectById(userId);
         String name = acceptor != null && acceptor.getNickname() != null ? acceptor.getNickname() : "用户";
@@ -279,6 +282,16 @@ public class FriendService {
         fs.setOwnerId(ownerId);
         fs.setFriendId(friendId);
         friendshipMapper.insert(fs);
+    }
+
+    private void ensureFollow(long followerId, long followeeId) {
+        Long exists = followMapper.selectCount(Wrappers.<Follow>lambdaQuery()
+                .eq(Follow::getFollowerId, followerId).eq(Follow::getFolloweeId, followeeId));
+        if (exists != null && exists > 0) return;
+        Follow f = new Follow();
+        f.setFollowerId(followerId);
+        f.setFolloweeId(followeeId);
+        followMapper.insert(f);
     }
 
     private FriendRequest requirePendingRequest(long toUserId, long requestId) {
