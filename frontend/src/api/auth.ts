@@ -8,7 +8,7 @@ export interface UserVO {
 }
 
 export const authApi = {
-  register: (data: { email: string; password: string; userType: string; licenseUrl?: string }) =>
+  register: (data: { email: string; password: string; userType: string; licenseUrl?: string; merchantName?: string }) =>
     http.post('/auth/register', data),
   activate: (token: string) => http.post('/auth/activate', { token }),
   login: (data: { email: string; password: string }) =>
