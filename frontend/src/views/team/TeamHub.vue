@@ -321,6 +321,11 @@ async function leaveTeam() {
   await loadTeams()
 }
 
+function goCreateTeamActivity() {
+  if (!selectedTeam.value) return
+  window.location.href = `/activities?createForTeam=${selectedTeam.value.id}`
+}
+
 async function dissolveTeam() {
   if (!selectedTeam.value) return
   await ElMessageBox.confirm('解散后将无法继续加入，确认继续吗？', '确认解散', { type: 'warning' })
@@ -785,6 +790,7 @@ onBeforeUnmount(() => {
           </el-tab-pane>
 
           <el-tab-pane label="队内活动" name="activities">
+            <el-button v-if="canManage" type="primary" style="margin-bottom: 12px" @click="goCreateTeamActivity">发布队内活动</el-button>
             <el-empty v-if="!activities.length" description="暂无队内活动" />
             <el-card v-for="activity in activities" :key="activity.id" class="mini-card">
               <div class="team-header">

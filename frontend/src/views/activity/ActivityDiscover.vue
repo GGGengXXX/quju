@@ -26,6 +26,7 @@ declare global {
 }
 
 const auth = useAuthStore()
+const currentRoute = useRoute()
 const amapKey = (import.meta as any).env?.VITE_AMAP_KEY as string | undefined
 const categoryOptions = [
   { label: '运动', value: 'SPORTS' },
@@ -779,6 +780,15 @@ onMounted(async () => {
   await nextTick()
   await initMainMap()
   if (!amap) await refreshMapPoints(false)
+  // 支持 ?detail=id 自动打开详情
+  const detailId = Number(currentRoute.query.detail)
+  if (detailId) openDetail(detailId)
+  // 支持 ?createForTeam=id 自动打开创建弹窗（队内活动）
+  const teamId = Number(currentRoute.query.createForTeam)
+  if (teamId) {
+    form.teamId = teamId
+    createVisible.value = true
+  }
 })
 </script>
 
