@@ -97,6 +97,50 @@ function insertEmoji(emoji: string) {
   showEmoji.value = false
 }
 
+function parseLocationLabel(content: string) {
+  const parts = content.split(',')
+  return parts.length >= 3 ? parts.slice(2).join(',') : '查看位置'
+}
+
+function openLocation(content: string) {
+  const parts = content.split(',')
+  if (parts.length >= 2) {
+    const lng = parts[0]
+    const lat = parts[1]
+    window.open(`https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent(parts.slice(2).join(',') || '位置')}`, '_blank')
+  }
+}
+
+async function sendLocation() {
+  if (!navigator.geolocation) {
+    ElMessage.warning('浏览器不支持定位')
+    return
+  }
+  sending.value = true
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lng = pos.coords.longitude.toFixed(6)
+      const lat = pos.coords.latitude.toFixed(6)
+      const content = `${lng},${lat},我的位置`
+      try {
+        const msg = await socialApi.sendMessage({ scope, peerId, contentType: 'LOCATION', content })
+        messages.value.push(msg)
+        await nextTick()
+        scrollToBottom()
+      } catch {
+        ElMessage.error('位置发送失败')
+      } finally {
+        sending.value = false
+      }
+    },
+    () => {
+      ElMessage.warning('无法获取位置，请检查定位权限')
+      sending.value = false
+    },
+    { timeout: 10000 }
+  )
+}
+
 async function sendImage(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
@@ -195,6 +239,12 @@ onBeforeUnmount(() => {
               <template v-if="msg.contentType === 'IMAGE'">
                 <img :src="msg.content" class="msg-img" />
               </template>
+              <template v-else-if="msg.contentType === 'LOCATION'">
+                <div class="location-msg" @click="openLocation(msg.content)">
+                  <span class="location-icon">📍</span>
+                  <span class="location-text">{{ parseLocationLabel(msg.content) }}</span>
+                </div>
+              </template>
               <template v-else>
                 {{ msg.content }}
               </template>
@@ -209,6 +259,7 @@ onBeforeUnmount(() => {
     <div class="chat-input">
       <el-input v-model="inputText" placeholder="输入消息..." @keyup.enter="send" :disabled="sending" />
       <span class="emoji-btn" @click="showEmoji = !showEmoji">😊</span>
+      <span class="img-btn" @click="sendLocation" title="发送位置">📍</span>
       <label class="img-btn">
         <span>📷</span>
         <input type="file" accept="image/*" hidden @change="sendImage" :disabled="sending" />
@@ -252,4 +303,8 @@ onBeforeUnmount(() => {
 .emoji-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 16px; border-top: 1px solid #eee; max-height: 120px; overflow-y: auto; }
 .emoji-item { cursor: pointer; font-size: 22px; padding: 4px; border-radius: 4px; }
 .emoji-item:hover { background: #f0f0f0; }
+.location-msg { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.location-msg:hover { text-decoration: underline; }
+.location-icon { font-size: 18px; }
+.location-text { font-size: 13px; }
 </style>
