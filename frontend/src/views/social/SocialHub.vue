@@ -109,6 +109,7 @@ async function loadMyTeams() {
 function onTabChange(t: string) {
   tab.value = t
   if (t === 'friends') loadFriends()
+  else if (t === 'requests') loadRequests()
   else if (t === 'following') loadFollows()
   else if (t === 'fans') loadFans()
   else if (t === 'blocks') loadBlocks()
@@ -221,7 +222,8 @@ function goProfile(userId: number) {
 }
 
 onMounted(() => {
-  if (tab.value === 'following') loadFollows()
+  if (tab.value === 'requests') loadRequests()
+  else if (tab.value === 'following') loadFollows()
   else if (tab.value === 'fans') loadFans()
   else if (tab.value === 'blocks') loadBlocks()
   else if (tab.value === 'teams') loadMyTeams()
@@ -254,6 +256,28 @@ onMounted(() => {
               <el-button text size="small" @click="openRemark(f)">备注</el-button>
               <el-button text size="small" type="warning" @click="blockFriend(f.userId)">拉黑</el-button>
               <el-button text size="small" type="danger" @click="deleteFriend(f.userId)">删除</el-button>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="好友申请" name="requests">
+        <div v-loading="requestsLoading" class="list">
+          <div v-if="!requests.length && !requestsLoading" class="empty">暂无好友申请</div>
+          <div v-for="r in requests" :key="r.id" class="card">
+            <div class="info" style="cursor: pointer" @click="goProfile(r.fromUserId)">
+              <el-avatar :size="40" :src="r.fromAvatar" />
+              <div class="text">
+                <strong class="link-name">{{ r.fromNickname || r.fromUserId }}</strong>
+                <span class="sub">{{ r.message || '请求加为好友' }}</span>
+              </div>
+            </div>
+            <div class="actions">
+              <template v-if="r.status === 'PENDING'">
+                <el-button size="small" type="success" @click="acceptRequest(r.id)">接受</el-button>
+                <el-button size="small" type="info" @click="rejectRequest(r.id)">拒绝</el-button>
+              </template>
+              <el-tag v-else size="small">{{ r.status === 'ACCEPTED' ? '已接受' : '已拒绝' }}</el-tag>
             </div>
           </div>
         </div>
