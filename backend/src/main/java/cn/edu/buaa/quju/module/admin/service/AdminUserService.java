@@ -137,7 +137,8 @@ public class AdminUserService {
         IPage<MerchantProfile> p = merchantMapper.selectPage(new Page<>(page, size), q);
         List<MerchantAppVO> list = p.getRecords().stream()
                 .map(m -> new MerchantAppVO(m.getId(), m.getUserId(), m.getMerchantName(),
-                        m.getLicenseUrl(), m.getAuditStatus(), m.getAuditReason(), m.getCreatedAt()))
+                        m.getNickname(), m.getFocusFields(), m.getLicenseUrl(),
+                        m.getAuditStatus(), m.getAuditReason(), m.getCreatedAt()))
                 .collect(Collectors.toList());
         return new PageResult<>(p.getTotal(), page, size, list);
     }

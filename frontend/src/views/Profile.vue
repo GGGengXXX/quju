@@ -16,10 +16,11 @@ const form = reactive({
   signature: '',
   privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean>,
 })
-const merchantForm = reactive({ merchantName: '', nickname: '', focusFields: '' })
+const merchantForm = reactive({ merchantName: '', nickname: '', focusFields: '', licenseUrl: '' })
 const merchant = ref<MerchantVO | null>(null)
 const loading = ref(false)
 const uploading = ref(false)
+const licenseUploading = ref(false)
 
 const auditStatusLabel: Record<string, string> = {
   PENDING: '审核中', APPROVED: '已通过', REJECTED: '已驳回',
@@ -41,6 +42,7 @@ onMounted(async () => {
       merchantForm.merchantName = merchant.value?.merchantName || ''
       merchantForm.nickname = merchant.value?.nickname || ''
       merchantForm.focusFields = merchant.value?.focusFields || ''
+      merchantForm.licenseUrl = merchant.value?.licenseUrl || ''
     } catch { /* 尚无商家资料时忽略 */ }
   }
 })
@@ -72,12 +74,30 @@ async function saveMerchant() {
       merchantName: merchantForm.merchantName,
       nickname: merchantForm.nickname || undefined,
       focusFields: merchantForm.focusFields || undefined,
+      licenseUrl: merchantForm.licenseUrl || undefined,
     })
     ElMessage.success('已保存')
   } catch {
     // handled by interceptor
   } finally {
     loading.value = false
+  }
+}
+
+async function handleLicenseChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  licenseUploading.value = true
+  try {
+    const res = await authApi.uploadLicense(file)
+    merchantForm.licenseUrl = (res as any)?.url || res
+    ElMessage.success('营业执照已上传，保存后将重新提交审核')
+  } catch (err: any) {
+    ElMessage.error('上传失败: ' + (err?.message || '未知错误'))
+  } finally {
+    licenseUploading.value = false
+    input.value = ''
   }
 }
 
@@ -133,8 +153,15 @@ async function handleAvatarChange(e: Event) {
       <el-form-item label="商家昵称"><el-input v-model="merchantForm.nickname" placeholder="对外展示的昵称" /></el-form-item>
       <el-form-item label="关注领域"><el-input v-model="merchantForm.focusFields" type="textarea" :rows="2" placeholder="如：运动健身、户外徒步、桌游聚会" /></el-form-item>
       <el-form-item label="营业执照">
-        <el-link v-if="merchant?.licenseUrl" :href="merchant.licenseUrl" target="_blank" type="primary">查看已上传凭证</el-link>
-        <span v-else class="muted">无</span>
+        <div class="license-upload">
+          <el-image v-if="merchantForm.licenseUrl" :src="merchantForm.licenseUrl" fit="cover" class="license-preview"
+            :preview-src-list="[merchantForm.licenseUrl]" preview-teleported />
+          <span v-else class="muted">未上传</span>
+          <label class="avatar-btn">
+            <span>{{ licenseUploading ? '上传中...' : (merchantForm.licenseUrl ? '重新选择图片' : '选择图片') }}</span>
+            <input type="file" accept="image/*" hidden @change="handleLicenseChange" :disabled="licenseUploading" />
+          </label>
+        </div>
       </el-form-item>
       <el-button type="primary" :loading="loading" @click="saveMerchant">保存</el-button>
     </el-form>
@@ -175,4 +202,6 @@ async function handleAvatarChange(e: Event) {
 .avatar-btn:hover { text-decoration: underline; }
 .muted { color: #999; }
 .reject-reason { color: #f56c6c; margin-left: 6px; }
+.license-upload { display: flex; align-items: center; gap: 12px; }
+.license-preview { width: 80px; height: 80px; border-radius: 6px; border: 1px solid #eee; }
 </style>
