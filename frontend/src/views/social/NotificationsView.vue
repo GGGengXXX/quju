@@ -58,6 +58,9 @@ function navigate(item: NotificationItem) {
     case 'TEAM_JOIN_REQUEST':
       router.push(`/teams?detail=${refId}`)
       break
+    case 'TEAM_MESSAGE':
+      router.push(`/social/team-chat/${refId}`)
+      break
     default:
       if (refType === 'ACTIVITY') router.push(`/activities?detail=${refId}`)
       else if (refType === 'USER') router.push(`/social/user/${refId}`)
@@ -85,6 +88,7 @@ const typeLabel: Record<string, string> = {
   FRIEND_MESSAGE: '好友消息',
   TEAM_JOIN: '小队加入',
   TEAM_JOIN_REQUEST: '小队申请',
+  TEAM_MESSAGE: '小队消息',
   SYSTEM: '系统通知',
 }
 
