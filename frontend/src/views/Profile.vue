@@ -34,10 +34,13 @@ async function handleAvatarChange(e: Event) {
   if (!file) return
   uploading.value = true
   try {
-    const { url } = await authApi.uploadImage(file)
-    auth.user = await authApi.updateMe({ avatar: url })
+    const res = await authApi.uploadImage(file)
+    const url = res?.url || res
+    auth.user = await authApi.updateMe({ avatar: url as string })
     ElMessage.success('头像已更新')
-  } catch { /* 已提示 */ } finally {
+  } catch (err: any) {
+    ElMessage.error('上传失败: ' + (err?.message || '未知错误'))
+  } finally {
     uploading.value = false
     input.value = ''
   }
