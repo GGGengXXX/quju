@@ -90,8 +90,8 @@ onMounted(load)
         </div>
         <div class="profile-actions">
           <el-button v-if="isFriend" type="primary" size="small" @click="router.push(`/social/chat/${userId}`)">发消息</el-button>
-          <el-button v-else type="success" size="small" :loading="addingFriend" @click="addFriend">添加好友</el-button>
-          <el-button :type="following ? 'info' : 'warning'" size="small" plain @click="toggleFollow">{{ following ? '取消关注' : '关注' }}</el-button>
+          <el-button :type="following ? 'info' : 'warning'" size="small" plain @click="toggleFollow">{{ following ? '已关注' : '关注' }}</el-button>
+          <el-tag v-if="isFriend" size="small" type="success">互关好友</el-tag>
         </div>
       </div>
     </el-card>
