@@ -246,7 +246,7 @@ onMounted(() => {
             <div class="info" @click="goProfile(f.userId)" style="cursor: pointer">
               <el-avatar :size="40" :src="f.avatar" />
               <div class="text">
-                <strong>{{ f.remark || f.nickname || f.userId }}</strong>
+                <strong>{{ f.remark || f.nickname || "未知用户" }}</strong>
                 <span v-if="f.remark && f.nickname" class="sub">{{ f.nickname }}</span>
                 <span class="sub">{{ f.groupTag || '' }}</span>
               </div>
@@ -268,7 +268,7 @@ onMounted(() => {
             <div class="info" style="cursor: pointer" @click="goProfile(r.fromUserId)">
               <el-avatar :size="40" :src="r.fromAvatar" />
               <div class="text">
-                <strong class="link-name">{{ r.fromNickname || r.fromUserId }}</strong>
+                <strong class="link-name">{{ r.fromNickname || "未知用户" }}</strong>
                 <span class="sub">{{ r.message || '请求加为好友' }}</span>
               </div>
             </div>
@@ -290,7 +290,7 @@ onMounted(() => {
             <div class="info" style="cursor: pointer" @click="goProfile(f.userId)">
               <el-avatar :size="40" :src="f.avatar" />
               <div class="text">
-                <strong class="link-name">{{ f.nickname || f.userId }}</strong>
+                <strong class="link-name">{{ f.nickname || "未知用户" }}</strong>
               </div>
             </div>
             <div class="actions">
@@ -307,7 +307,7 @@ onMounted(() => {
             <div class="info" style="cursor: pointer" @click="goProfile(f.userId)">
               <el-avatar :size="40" :src="f.avatar" />
               <div class="text">
-                <strong class="link-name">{{ f.nickname || f.userId }}</strong>
+                <strong class="link-name">{{ f.nickname || "未知用户" }}</strong>
               </div>
             </div>
             <div class="actions">
@@ -324,7 +324,7 @@ onMounted(() => {
             <div class="info">
               <el-avatar :size="40" :src="b.avatar" />
               <div class="text">
-                <strong>{{ b.nickname || b.userId }}</strong>
+                <strong>{{ b.nickname || "未知用户" }}</strong>
               </div>
             </div>
             <div class="actions">
