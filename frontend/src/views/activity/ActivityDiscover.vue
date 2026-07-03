@@ -835,7 +835,7 @@ onMounted(async () => {
     </section>
 
     <section class="layout-grid" :class="{ 'no-map': !showMapPanel }">
-      <section v-if="showMapPanel" class="panel map-panel">
+      <section v-show="showMapPanel" class="panel map-panel">
         <div class="section-head">
           <h3>地图模式</h3>
           <div class="section-meta">
@@ -1213,8 +1213,8 @@ onMounted(async () => {
   grid-template-columns: 1fr;
 }
 
-.layout-grid.no-map .list-panel {
-  grid-column: span 1;
+.layout-grid.no-map .map-panel {
+  display: none;
 }
 
 .toolbar-top,

@@ -339,7 +339,6 @@ onMounted(() => {
           <div v-if="!myTeams.length && !teamsLoading" class="empty">暂未加入小队</div>
           <div v-for="t in myTeams" :key="t.id" class="card">
             <div class="info" style="cursor: pointer" @click="router.push(`/teams?detail=${t.id}`)">
-              <el-avatar :size="40" :src="t.avatar" />
               <div class="text">
                 <strong>{{ t.name }}</strong>
                 <span class="sub">{{ t.memberCount || 0 }} 人</span>
