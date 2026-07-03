@@ -48,7 +48,7 @@ public final class UserDtos {
     public record MerchantApplyReq(@NotBlank String merchantName, String nickname,
                                    String focusFields, @NotBlank String licenseUrl) {}
 
-    public record MerchantUpdateReq(String merchantName, String nickname, String focusFields) {}
+    public record MerchantUpdateReq(String merchantName, String nickname, String focusFields, String licenseUrl) {}
 
     public record MerchantVO(Long id, Long userId, String merchantName, String nickname,
                               String focusFields, String licenseUrl,

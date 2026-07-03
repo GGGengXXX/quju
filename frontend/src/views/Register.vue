@@ -7,6 +7,24 @@ import { authApi } from '../api/auth'
 const router = useRouter()
 const form = reactive({ email: '', password: '', userType: 'INDIVIDUAL', licenseUrl: '', merchantName: '' })
 const loading = ref(false)
+const uploading = ref(false)
+
+async function handleLicenseChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploading.value = true
+  try {
+    const res = await authApi.uploadLicense(file)
+    form.licenseUrl = (res as any)?.url || res
+    ElMessage.success('营业执照已上传')
+  } catch (err: any) {
+    ElMessage.error('上传失败: ' + (err?.message || '未知错误'))
+  } finally {
+    uploading.value = false
+    input.value = ''
+  }
+}
 
 async function submit() {
   if (form.userType === 'MERCHANT') {
@@ -41,7 +59,16 @@ async function submit() {
         </el-radio-group>
       </el-form-item>
       <el-form-item v-if="form.userType === 'MERCHANT'" label="商家名称"><el-input v-model="form.merchantName" placeholder="营业执照上的商家名称" /></el-form-item>
-      <el-form-item v-if="form.userType === 'MERCHANT'" label="营业执照"><el-input v-model="form.licenseUrl" placeholder="凭证图片 URL" /></el-form-item>
+      <el-form-item v-if="form.userType === 'MERCHANT'" label="营业执照">
+        <div class="license-upload">
+          <el-image v-if="form.licenseUrl" :src="form.licenseUrl" fit="cover" class="license-preview"
+            :preview-src-list="[form.licenseUrl]" preview-teleported />
+          <label class="upload-btn">
+            <span>{{ uploading ? '上传中...' : (form.licenseUrl ? '重新选择图片' : '选择图片') }}</span>
+            <input type="file" accept="image/*" hidden @change="handleLicenseChange" :disabled="uploading" />
+          </label>
+        </div>
+      </el-form-item>
       <el-alert v-if="form.userType === 'MERCHANT'" type="info" :closable="false" show-icon style="margin-bottom:12px"
         title="商家账号需在邮箱激活后由平台后台审核，通过后获得商家身份" />
       <el-button type="primary" :loading="loading" style="width:100%" @click="submit">注册</el-button>
@@ -50,4 +77,11 @@ async function submit() {
   </el-card>
 </template>
 
-<style scoped>.box{max-width:460px;margin:50px auto}.tip{text-align:center;margin-top:12px}</style>
+<style scoped>
+.box{max-width:460px;margin:50px auto}
+.tip{text-align:center;margin-top:12px}
+.license-upload{display:flex;align-items:center;gap:12px}
+.license-preview{width:80px;height:80px;border-radius:6px;border:1px solid #eee}
+.upload-btn{color:#409eff;cursor:pointer;font-size:14px}
+.upload-btn:hover{text-decoration:underline}
+</style>

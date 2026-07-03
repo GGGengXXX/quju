@@ -72,6 +72,7 @@ public class MerchantService {
             mp.setMerchantName(req.merchantName());
             mp.setNickname(req.nickname());
             mp.setFocusFields(req.focusFields());
+            mp.setLicenseUrl(req.licenseUrl());
             mp.setAuditStatus("PENDING");
             merchantMapper.insert(mp);
             return toVO(mp);
@@ -79,6 +80,12 @@ public class MerchantService {
         if (req.merchantName() != null) mp.setMerchantName(req.merchantName());
         if (req.nickname() != null) mp.setNickname(req.nickname());
         if (req.focusFields() != null) mp.setFocusFields(req.focusFields());
+        // 更换营业执照需重新审核
+        if (req.licenseUrl() != null && !req.licenseUrl().equals(mp.getLicenseUrl())) {
+            mp.setLicenseUrl(req.licenseUrl());
+            mp.setAuditStatus("PENDING");
+            mp.setAuditReason(null);
+        }
         merchantMapper.updateById(mp);
         return toVO(mp);
     }
