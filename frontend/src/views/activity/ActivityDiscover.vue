@@ -853,6 +853,7 @@ onMounted(async () => {
             <button v-for="item in activities" :key="String(item.id)" type="button" class="activity-card" @click="openDetail(item.id as number)">
               <div class="title-row">
                 <h4>{{ item.name }}</h4>
+                <el-tag v-if="item.creator?.userType === 'MERCHANT'" size="small" type="warning" effect="dark">商家</el-tag>
                 <el-tag size="small">{{ item.status }}</el-tag>
               </div>
               <p class="intro">{{ item.intro || '暂无简介' }}</p>
@@ -958,9 +959,14 @@ onMounted(async () => {
           <div>
             <div class="title-row">
               <h2>{{ detail.name }}</h2>
+              <el-tag v-if="detail.creator?.userType === 'MERCHANT'" type="warning" effect="dark">商家</el-tag>
               <el-tag>{{ detail.status }}</el-tag>
               <el-tag type="info">{{ detail.phase }}</el-tag>
             </div>
+            <p class="creator-line" v-if="detail.creator">
+              主办方：{{ detail.creator.nickname || ('用户#' + detail.creator.id) }}
+              <span v-if="detail.creator.userType === 'MERCHANT'" class="merchant-badge">· 商家</span>
+            </p>
             <p>{{ detail.intro || '暂无简介' }}</p>
             <div class="tag-row">
               <el-tag v-for="tag in detail.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
@@ -1318,6 +1324,15 @@ onMounted(async () => {
 .hint {
   color: #4b5563;
   line-height: 1.6;
+}
+.creator-line {
+  color: #6b7280;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+.creator-line .merchant-badge {
+  color: #d48806;
+  font-weight: 600;
 }
 
 .muted {

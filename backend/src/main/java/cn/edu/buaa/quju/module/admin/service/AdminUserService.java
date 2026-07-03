@@ -159,11 +159,15 @@ public class AdminUserService {
         mp.setAuditAdminId(adminId);
         merchantMapper.updateById(mp);
 
-        // 商家身份由后台审核结果授予/收回：通过 -> MERCHANT，驳回 -> 保持个人身份
-        User applicant = userMapper.selectById(mp.getUserId());
-        if (applicant != null && applicant.getDeletedAt() == null) {
-            applicant.setUserType(approve ? "MERCHANT" : "INDIVIDUAL");
-            userMapper.updateById(applicant);
+        // 审核通过才授予商家身份（兼容个人用户经 /merchants/apply 升级）；
+        // 驳回不改动 userType：商家注册者可重新提交，个人升级被拒则保持 INDIVIDUAL。
+        if (approve) {
+            User applicant = userMapper.selectById(mp.getUserId());
+            if (applicant != null && applicant.getDeletedAt() == null
+                    && !"MERCHANT".equals(applicant.getUserType())) {
+                applicant.setUserType("MERCHANT");
+                userMapper.updateById(applicant);
+            }
         }
     }
 }

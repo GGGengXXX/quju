@@ -517,6 +517,7 @@ components:
         password: { type: string, minLength: 8, maxLength: 64 }
         userType: { $ref: '#/components/schemas/UserType' }
         licenseUrl: { type: string, description: 'userType=MERCHANT 时必填(营业执照)' }
+        merchantName: { type: string, description: 'userType=MERCHANT 时必填(商家名称)' }
     LoginRequest:
       type: object
       required: [email, password]
