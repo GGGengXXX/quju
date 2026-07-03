@@ -13,7 +13,6 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -62,7 +61,7 @@ public class AdminUserController {
         return R.ok(userService.listMerchantApplications(status, page, size));
     }
 
-    @PutMapping("/merchant-applications/{id}")
+    @PostMapping("/merchant-applications/{id}")
     public R<Void> reviewMerchant(@PathVariable Long id, @RequestBody @Valid MerchantReviewReq req) {
         userService.reviewMerchant(AdminContext.require(), id, req);
         return R.<Void>ok(null);
