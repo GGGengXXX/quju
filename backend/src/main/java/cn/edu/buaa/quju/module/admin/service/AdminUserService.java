@@ -6,9 +6,15 @@ import cn.edu.buaa.quju.module.admin.dto.AdminDtos.BanReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.MerchantAppVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.MerchantReviewReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
+import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserActivityBriefVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserDetailVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserListVO;
+import cn.edu.buaa.quju.module.admin.dto.AdminDtos.UserTeamBriefVO;
+import cn.edu.buaa.quju.module.admin.entity.Activity;
+import cn.edu.buaa.quju.module.admin.entity.Team;
 import cn.edu.buaa.quju.module.admin.entity.UserBan;
+import cn.edu.buaa.quju.module.admin.mapper.ActivityMapper;
+import cn.edu.buaa.quju.module.admin.mapper.TeamMapper;
 import cn.edu.buaa.quju.module.admin.mapper.UserBanMapper;
 import cn.edu.buaa.quju.module.user.entity.MerchantProfile;
 import cn.edu.buaa.quju.module.user.entity.User;
@@ -30,12 +36,17 @@ public class AdminUserService {
     private final UserMapper userMapper;
     private final UserBanMapper banMapper;
     private final MerchantProfileMapper merchantMapper;
+    private final ActivityMapper activityMapper;
+    private final TeamMapper teamMapper;
 
     public AdminUserService(UserMapper userMapper, UserBanMapper banMapper,
-                            MerchantProfileMapper merchantMapper) {
+                            MerchantProfileMapper merchantMapper,
+                            ActivityMapper activityMapper, TeamMapper teamMapper) {
         this.userMapper = userMapper;
         this.banMapper = banMapper;
         this.merchantMapper = merchantMapper;
+        this.activityMapper = activityMapper;
+        this.teamMapper = teamMapper;
     }
 
     public PageResult<UserListVO> listUsers(String keyword, String userType, int page, int size) {
@@ -55,9 +66,32 @@ public class AdminUserService {
     public UserDetailVO getUserDetail(long userId) {
         User u = userMapper.selectById(userId);
         if (u == null || u.getDeletedAt() != null) throw new BizException(ErrorCode.NOT_FOUND);
+
+        // 其发布的活动（最近 50 条）
+        List<UserActivityBriefVO> activities = activityMapper.selectList(
+                Wrappers.<Activity>lambdaQuery()
+                        .eq(Activity::getCreatorId, userId)
+                        .isNull(Activity::getDeletedAt)
+                        .orderByDesc(Activity::getCreatedAt)
+                        .last("limit 50"))
+                .stream()
+                .map(a -> new UserActivityBriefVO(a.getId(), a.getName(), a.getStatus(), a.getStartTime()))
+                .collect(Collectors.toList());
+
+        // 其创建的小队（作为队长）
+        List<UserTeamBriefVO> teams = teamMapper.selectList(
+                Wrappers.<Team>lambdaQuery()
+                        .eq(Team::getOwnerId, userId)
+                        .isNull(Team::getDeletedAt)
+                        .orderByDesc(Team::getCreatedAt))
+                .stream()
+                .map(t -> new UserTeamBriefVO(t.getId(), t.getName(), t.getStatus(), t.getMemberCount()))
+                .collect(Collectors.toList());
+
         return new UserDetailVO(u.getId(), u.getEmail(), u.getNickname(), u.getAvatar(),
                 u.getUserType(), u.getStatus(), u.getGender(), u.getBirthday(),
-                u.getSignature(), u.getReputation(), u.getCreatedAt(), u.getUpdatedAt());
+                u.getSignature(), u.getReputation(), u.getCreatedAt(), u.getUpdatedAt(),
+                activities, teams);
     }
 
     @Transactional
@@ -112,11 +146,24 @@ public class AdminUserService {
     public void reviewMerchant(long adminId, long merchantId, MerchantReviewReq req) {
         MerchantProfile mp = merchantMapper.selectById(merchantId);
         if (mp == null) throw new BizException(ErrorCode.NOT_FOUND);
-        if ("REJECTED".equals(req.action()) && (req.reason() == null || req.reason().isBlank()))
+        // 契约 action 枚举为 APPROVE / REJECT
+        String action = req.action() == null ? "" : req.action().trim().toUpperCase();
+        boolean approve = "APPROVE".equals(action);
+        boolean reject = "REJECT".equals(action);
+        if (!approve && !reject) throw new BizException(ErrorCode.BAD_REQUEST, "审核动作非法");
+        if (reject && (req.reason() == null || req.reason().isBlank()))
             throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
-        mp.setAuditStatus("APPROVED".equals(req.action()) ? "APPROVED" : "REJECTED");
+
+        mp.setAuditStatus(approve ? "APPROVED" : "REJECTED");
         mp.setAuditReason(req.reason());
         mp.setAuditAdminId(adminId);
         merchantMapper.updateById(mp);
+
+        // 商家身份由后台审核结果授予/收回：通过 -> MERCHANT，驳回 -> 保持个人身份
+        User applicant = userMapper.selectById(mp.getUserId());
+        if (applicant != null && applicant.getDeletedAt() == null) {
+            applicant.setUserType(approve ? "MERCHANT" : "INDIVIDUAL");
+            userMapper.updateById(applicant);
+        }
     }
 }

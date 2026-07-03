@@ -21,7 +21,13 @@ public final class AdminDtos {
     public record UserDetailVO(Long id, String email, String nickname, String avatar,
                                 String userType, String status, String gender, LocalDate birthday,
                                 String signature, Integer reputation,
-                                LocalDateTime createdAt, LocalDateTime updatedAt) {}
+                                LocalDateTime createdAt, LocalDateTime updatedAt,
+                                java.util.List<UserActivityBriefVO> activities,
+                                java.util.List<UserTeamBriefVO> teams) {}
+    /** 用户发布的活动（后台用户详情内嵌） */
+    public record UserActivityBriefVO(Long id, String name, String status, LocalDateTime startTime) {}
+    /** 用户创建的小队（后台用户详情内嵌） */
+    public record UserTeamBriefVO(Long id, String name, String status, Integer memberCount) {}
 
     // ---- 商家审核 ----
     public record MerchantReviewReq(@NotBlank String action, String reason) {}
