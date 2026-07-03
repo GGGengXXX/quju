@@ -10,7 +10,6 @@ const auth = useAuthStore()
 const router = useRouter()
 let notificationTimer: number | null = null
 const unreadCount = ref(0)
-let unreadTimer: number | null = null
 
 async function pollUnreadCount() {
   if (!auth.token) { unreadCount.value = 0; return }
@@ -19,13 +18,22 @@ async function pollUnreadCount() {
 
 function startUnreadPolling() {
   pollUnreadCount()
-  unreadTimer = window.setInterval(pollUnreadCount, 30000)
 }
 
 function stopUnreadPolling() {
-  if (unreadTimer) { clearInterval(unreadTimer); unreadTimer = null }
   unreadCount.value = 0
 }
+
+function goNotifications() {
+  router.push('/notifications')
+}
+
+// 监听路由变化，从通知页离开时刷新未读数
+watch(() => router.currentRoute.value.path, (newPath, oldPath) => {
+  if (oldPath === '/notifications' && newPath !== '/notifications') {
+    pollUnreadCount()
+  }
+})
 let notificationChecking = false
 
 function logout() {
@@ -185,7 +193,7 @@ onBeforeUnmount(() => {
       <span class="spacer" />
       <template v-if="auth.token">
         <el-button text @click="router.push('/social')">社交</el-button>
-        <el-button text @click="router.push('/notifications')">
+        <el-button text @click="goNotifications">
           通知<el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99" class="notify-badge" />
         </el-button>
         <el-button text @click="router.push('/teams')">小队</el-button>
