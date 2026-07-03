@@ -10,8 +10,10 @@ import cn.edu.buaa.quju.module.user.dto.UserDtos.PasswordResetRequestReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.RegisterReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.entity.EmailToken;
+import cn.edu.buaa.quju.module.user.entity.MerchantProfile;
 import cn.edu.buaa.quju.module.user.entity.User;
 import cn.edu.buaa.quju.module.user.mapper.EmailTokenMapper;
+import cn.edu.buaa.quju.module.user.mapper.MerchantProfileMapper;
 import cn.edu.buaa.quju.module.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -26,14 +28,16 @@ public class AuthService {
     private final UserMapper userMapper;
     private final EmailTokenMapper tokenMapper;
     private final EmailService emailService;
+    private final MerchantProfileMapper merchantMapper;
     private final JwtUtil jwt;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public AuthService(UserMapper userMapper, EmailTokenMapper tokenMapper,
-                       EmailService emailService, JwtUtil jwt) {
+                       EmailService emailService, MerchantProfileMapper merchantMapper, JwtUtil jwt) {
         this.userMapper = userMapper;
         this.tokenMapper = tokenMapper;
         this.emailService = emailService;
+        this.merchantMapper = merchantMapper;
         this.jwt = jwt;
     }
 
@@ -42,8 +46,11 @@ public class AuthService {
         Long exists = userMapper.selectCount(Wrappers.<User>lambdaQuery()
                 .eq(User::getEmail, req.email()).isNull(User::getDeletedAt));
         if (exists != null && exists > 0) throw new BizException(ErrorCode.EMAIL_ALREADY_REGISTERED);
-        if ("MERCHANT".equals(req.userType()) && (req.licenseUrl() == null || req.licenseUrl().isBlank()))
+        boolean isMerchant = "MERCHANT".equals(req.userType());
+        if (isMerchant && (req.licenseUrl() == null || req.licenseUrl().isBlank()))
             throw new BizException(ErrorCode.MERCHANT_LICENSE_REQUIRED);
+        if (isMerchant && (req.merchantName() == null || req.merchantName().isBlank()))
+            throw new BizException(ErrorCode.MERCHANT_NAME_REQUIRED);
 
         User u = new User();
         u.setEmail(req.email());
@@ -54,6 +61,17 @@ public class AuthService {
         u.setReputation(100);
         u.setAccountId(generateAccountId());
         userMapper.insert(u);
+
+        // 商家注册：落库营业执照并建档，进入后台审核队列（PENDING）。
+        // 认证态由 merchant_profile.audit_status 表达；后台通过后确认商家身份（见 AdminUserService#reviewMerchant）。
+        if (isMerchant) {
+            MerchantProfile mp = new MerchantProfile();
+            mp.setUserId(u.getId());
+            mp.setMerchantName(req.merchantName());
+            mp.setLicenseUrl(req.licenseUrl());
+            mp.setAuditStatus("PENDING");
+            merchantMapper.insert(mp);
+        }
 
         String token = createToken(u.getId(), "ACTIVATION", 24);
         emailService.sendActivation(u.getEmail(), token);
