@@ -32,7 +32,10 @@ async function loadPeerInfo() {
     try {
       const friends = await socialApi.getFriends()
       const friend = friends.find((f: FriendVO) => f.userId === peerId)
-      if (friend) peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
+      if (friend) {
+        peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
+        memberMap.value.set(peerId, { userId: peerId, nickname: friend.nickname, avatar: friend.avatar } as TeamMemberItem)
+      }
     } catch { /* ignore */ }
   } else {
     try {
@@ -41,6 +44,10 @@ async function loadPeerInfo() {
       const members = await teamApi.listMembers(peerId)
       members.forEach(m => memberMap.value.set(m.userId, m))
     } catch { /* ignore */ }
+  }
+  // 把自己也加到 memberMap（方便统一取头像昵称）
+  if (auth.user) {
+    memberMap.value.set(auth.user.id, { userId: auth.user.id, nickname: auth.user.nickname, avatar: auth.user.avatar } as TeamMemberItem)
   }
 }
 
