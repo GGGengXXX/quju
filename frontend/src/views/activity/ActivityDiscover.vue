@@ -1008,7 +1008,7 @@ onMounted(async () => {
               <el-tag type="info">{{ detail.phase }}</el-tag>
             </div>
             <p class="creator-line" v-if="detail.creator">
-              主办方：{{ detail.creator.nickname || ('用户#' + detail.creator.id) }}
+              主办方：{{ detail.creator.nickname || '未知用户' }}
               <span v-if="detail.creator.userType === 'MERCHANT'" class="merchant-badge">· 商家</span>
             </p>
             <p>{{ detail.intro || '暂无简介' }}</p>
@@ -1142,7 +1142,7 @@ onMounted(async () => {
               <div v-else class="review-list">
                 <div v-for="review in reviews" :key="review.id" class="review-card">
                   <div class="title-row">
-                    <strong>{{ review.nickname || `用户#${review.userId}` }}</strong>
+                    <strong>{{ review.nickname || "未知用户" }}</strong>
                     <span>{{ formatTime(review.createdAt) }}</span>
                   </div>
                   <el-rate :model-value="review.rating" disabled />
@@ -1162,7 +1162,7 @@ onMounted(async () => {
                 <el-empty v-if="!signups.length" description="暂无报名" />
                 <div v-else class="table-list">
                   <div v-for="item in signups" :key="item.signupId" class="table-row">
-                    <span>{{ item.nickname || `用户#${item.userId}` }}</span>
+                    <span>{{ item.nickname || "未知用户" }}</span>
                     <span>{{ item.signupStatus }}</span>
                     <span>{{ item.checkedIn ? '已签到' : '未签到' }}</span>
                   </div>
@@ -1176,7 +1176,7 @@ onMounted(async () => {
                 <el-empty v-if="!waitlist?.list?.length" description="暂无候补" />
                 <div v-else class="table-list">
                   <div v-for="item in waitlist.list" :key="item.id" class="table-row">
-                    <span>{{ item.nickname || `用户#${item.userId}` }}</span>
+                    <span>{{ item.nickname || "未知用户" }}</span>
                     <span>排位 {{ item.position }}</span>
                     <span>{{ item.status }}</span>
                   </div>

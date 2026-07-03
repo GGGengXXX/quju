@@ -599,7 +599,7 @@ onBeforeUnmount(() => {
             <el-table :data="members" stripe>
               <el-table-column label="成员">
                 <template #default="{ row }">
-                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || row.userId }}</span>
+                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || "未知用户" }}</span>
                 </template>
               </el-table-column>
               <el-table-column prop="role" label="角色" width="120" />
@@ -782,7 +782,7 @@ onBeforeUnmount(() => {
               <el-table-column prop="rank" label="名次" width="80" />
               <el-table-column label="成员">
                 <template #default="{ row }">
-                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || row.userId }}</span>
+                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || "未知用户" }}</span>
                 </template>
               </el-table-column>
               <el-table-column prop="points" label="积分" width="100" />

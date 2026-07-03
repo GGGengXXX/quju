@@ -70,7 +70,7 @@ async function loadPeerInfo() {
       const friends = await socialApi.getFriends()
       const friend = friends.find((f: FriendVO) => f.userId === peerId)
       if (friend) {
-        peerName.value = friend.remark || friend.nickname || `用户 ${peerId}`
+        peerName.value = friend.remark || friend.nickname || "未知用户"
         memberMap.value.set(peerId, { userId: peerId, nickname: friend.nickname, avatar: friend.avatar } as TeamMemberItem)
       }
     } catch { /* ignore */ }
@@ -90,7 +90,7 @@ async function loadPeerInfo() {
 
 function getMemberName(senderId: number) {
   const m = memberMap.value.get(senderId)
-  return m?.nickname || `用户${senderId}`
+  return m?.nickname || "未知用户"
 }
 
 function getMemberAvatar(senderId: number) {
@@ -290,7 +290,7 @@ async function openForwardDialog() {
   const targets: { type: string; id: number; name: string }[] = []
   try {
     const friends = await socialApi.getFriends()
-    friends.forEach(f => targets.push({ type: 'FRIEND', id: f.userId, name: f.remark || f.nickname || `用户${f.userId}` }))
+    friends.forEach(f => targets.push({ type: 'FRIEND', id: f.userId, name: f.remark || f.nickname || "未知用户" }))
   } catch {}
   try {
     const me = auth.user?.id
@@ -388,7 +388,10 @@ onBeforeUnmount(() => {
                 {{ msg.content }}
               </template>
             </div>
-            <span class="msg-time">{{ msg.createdAt?.slice(11, 16) }}</span>
+            <span class="msg-time">
+              {{ msg.createdAt?.slice(11, 16) }}
+              <span v-if="isMine(msg) && isFriendChat" class="read-status" :class="{ read: msg.isRead }">{{ msg.isRead ? '已读' : '未读' }}</span>
+            </span>
           </div>
         </template>
       </div>
@@ -414,7 +417,7 @@ onBeforeUnmount(() => {
       <div class="at-menu-item at-all" @click="selectAtAll">@所有人</div>
       <div v-for="m in atMenuMembers" :key="m.userId" class="at-menu-item" @click="selectAtMember(m)">
         <el-avatar :size="24" :src="m.avatar" />
-        <span>{{ m.nickname || m.userId }}</span>
+        <span>{{ m.nickname || "未知用户" }}</span>
       </div>
     </div>
 
@@ -465,6 +468,8 @@ onBeforeUnmount(() => {
 .sender-name { font-size: 13px; color: #555; font-weight: 500; }
 .msg-time { font-size: 11px; color: #bbb; margin-top: 2px; }
 .mine .msg-time { text-align: right; }
+.read-status { margin-left: 6px; font-size: 10px; color: #ccc; }
+.read-status.read { color: #67c23a; }
 .bubble { display: inline-block; padding: 10px 14px; border-radius: 12px; font-size: 14px; word-break: break-word; line-height: 1.5; }
 .mine .bubble { background: #409eff; color: #fff; border-top-right-radius: 4px; }
 .theirs .bubble { background: #f0f0f0; color: #333; border-top-left-radius: 4px; }
