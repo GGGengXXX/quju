@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, inject, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { notificationApi, type NotificationItem } from '../../api/notification'
 
 const router = useRouter()
+const refreshUnread = inject<() => void>('refreshUnread', () => {})
 const list = ref<NotificationItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
 const expandedId = ref<number | null>(null)
-
-// 暴露给父组件（App.vue 可通过 provide/inject 或直接刷新）
-const emit = defineEmits<{ (e: 'unreadChange'): void }>()
 
 async function load() {
   loading.value = true
@@ -36,7 +34,7 @@ async function toggleExpand(item: NotificationItem) {
     try {
       await notificationApi.markRead(item.id)
       item.isRead = true
-      emit('unreadChange')
+      refreshUnread()
     } catch { /* ignore */ }
   }
 }
@@ -70,7 +68,7 @@ function navigate(item: NotificationItem) {
 async function markAllRead() {
   await notificationApi.markAllRead()
   list.value.forEach(n => { n.isRead = true })
-  emit('unreadChange')
+  refreshUnread()
   ElMessage.success('已全部标记已读')
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount, provide, ref, watch } from 'vue'
 import { ElNotification } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { teamApi, type TeamAnnouncementItem, type TeamSummary } from './api/team'
@@ -23,6 +23,8 @@ function startUnreadPolling() {
 function stopUnreadPolling() {
   unreadCount.value = 0
 }
+
+provide('refreshUnread', pollUnreadCount)
 
 function goNotifications() {
   router.push('/notifications')
