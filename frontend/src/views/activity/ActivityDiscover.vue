@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import QRCode from 'qrcode'
 import { useAuthStore } from '../../stores/auth'
 import { merchantApi } from '../../api/merchant'
+import http from '../../api/http'
 import {
   activityApi,
   type ActivityDetail,
@@ -53,6 +54,7 @@ const saving = ref(false)
 const actionLoading = ref(false)
 const activities = ref<ActivityItem[]>([])
 const mineActivities = ref<ActivityItem[]>([])
+const joinedActivities = ref<any[]>([])
 const templates = ref<TemplateItem[]>([])
 const mapPoints = ref<ActivityPoint[]>([])
 const detail = ref<ActivityDetail | null>(null)
@@ -208,10 +210,17 @@ async function loadActivities() {
 async function loadMine() {
   if (!auth.token) {
     mineActivities.value = []
+    joinedActivities.value = []
     return
   }
   const data = await activityApi.mine({ page: 1, size: 6 })
   mineActivities.value = data.list
+  // 加载我报名的活动
+  if (auth.user?.id) {
+    try {
+      joinedActivities.value = await http.get<any, any[]>(`/users/${auth.user.id}/activities`)
+    } catch { joinedActivities.value = [] }
+  }
 }
 
 async function loadTemplates() {
@@ -915,6 +924,21 @@ onMounted(async () => {
         <el-empty v-if="!mineActivities.length" description="还没有活动" />
         <div v-else class="mine-list">
           <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
+            <strong>{{ item.name }}</strong>
+            <span>{{ item.status }} / {{ item.phase }}</span>
+            <span>{{ formatTime(item.startTime) }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel mine-panel" v-if="auth.token">
+        <div class="section-head">
+          <h3>我报名的活动</h3>
+          <span class="muted">{{ joinedActivities.length }} 条</span>
+        </div>
+        <el-empty v-if="!joinedActivities.length" description="暂未报名活动" />
+        <div v-else class="mine-list">
+          <button v-for="item in joinedActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
             <span>{{ item.status }} / {{ item.phase }}</span>
             <span>{{ formatTime(item.startTime) }}</span>
