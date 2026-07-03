@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import QRCode from 'qrcode'
 import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
 import { merchantApi, type MerchantVO } from '../api/merchant'
 
 const auth = useAuthStore()
 const isMerchant = computed(() => auth.user?.userType === 'MERCHANT')
+const qrDataUrl = ref('')
 
 const form = reactive({
   accountId: '',
@@ -44,6 +46,11 @@ onMounted(async () => {
       merchantForm.focusFields = merchant.value?.focusFields || ''
       merchantForm.licenseUrl = merchant.value?.licenseUrl || ''
     } catch { /* 尚无商家资料时忽略 */ }
+  }
+  // 生成个人二维码
+  if (auth.user?.id) {
+    const url = `${window.location.origin}/social/user/${auth.user.id}`
+    qrDataUrl.value = await QRCode.toDataURL(url, { width: 200 })
   }
 })
 
@@ -130,6 +137,10 @@ async function handleAvatarChange(e: Event) {
         <span>{{ uploading ? '上传中...' : '更换头像' }}</span>
         <input type="file" accept="image/*" hidden @change="handleAvatarChange" :disabled="uploading" />
       </label>
+      <div v-if="qrDataUrl" class="qr-section">
+        <img :src="qrDataUrl" alt="我的二维码" class="qr-img" />
+        <span class="qr-hint">扫码访问我的主页</span>
+      </div>
     </div>
 
     <el-descriptions :column="1" border style="margin-top: 16px">
@@ -200,6 +211,9 @@ async function handleAvatarChange(e: Event) {
 .avatar-section { display: flex; align-items: center; gap: 16px; }
 .avatar-btn { color: #409eff; cursor: pointer; font-size: 14px; }
 .avatar-btn:hover { text-decoration: underline; }
+.qr-section { display: flex; flex-direction: column; align-items: center; margin-left: auto; }
+.qr-img { width: 100px; height: 100px; border-radius: 6px; }
+.qr-hint { font-size: 11px; color: #999; margin-top: 4px; }
 .muted { color: #999; }
 .reject-reason { color: #f56c6c; margin-left: 6px; }
 .license-upload { display: flex; align-items: center; gap: 12px; }
