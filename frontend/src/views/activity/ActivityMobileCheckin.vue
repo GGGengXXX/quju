@@ -165,7 +165,7 @@ async function submitCheckin() {
   }
   submitting.value = true
   try {
-    await activityApi.publicCheckin(detail.value.id, { ...checkinForm })
+    await activityApi.checkin(detail.value.id, { ...checkinForm })
     ElMessage.success('签到成功')
     await loadDetail()
   } finally {
@@ -210,7 +210,7 @@ onMounted(async () => {
           <el-input v-model="checkinForm.code" placeholder="签到码" readonly />
           <div class="location-row">
             <el-button :loading="locating" @click="useCurrentLocation">读取当前位置</el-button>
-            <span class="location-tip">无需登录。若浏览器未弹权限，请在系统或浏览器设置中允许定位。</span>
+            <span class="location-tip">若浏览器未弹权限，请在系统或浏览器设置中允许定位。</span>
           </div>
           <div class="coord-grid">
             <el-input-number v-model="checkinForm.lng" :precision="6" :step="0.0001" placeholder="经度" />
