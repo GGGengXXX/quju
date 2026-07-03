@@ -7,7 +7,25 @@ import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
 import { teamApi, type TeamMemberItem } from '../../api/team'
 import { authApi } from '../../api/auth'
 
-declare global { interface Window { AMap?: any } }
+declare global { interface Window { AMap?: any; __qujuAmapLoading__?: Promise<any> } }
+
+const amapKey = (import.meta as any).env?.VITE_AMAP_KEY as string | undefined
+
+async function ensureAmap() {
+  if (window.AMap) return window.AMap
+  if (!amapKey) return null
+  if (!window.__qujuAmapLoading__) {
+    window.__qujuAmapLoading__ = new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${amapKey}`
+      script.async = true
+      script.onload = () => resolve(window.AMap)
+      script.onerror = reject
+      document.head.appendChild(script)
+    })
+  }
+  return window.__qujuAmapLoading__
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -123,19 +141,20 @@ async function sendLocation() {
   pickedLocation.address = ''
   await nextTick()
   if (!locationPickerRef.value) return
-  if (!window.AMap) {
-    ElMessage.warning('地图未加载')
+  const AMap = await ensureAmap()
+  if (!AMap) {
+    ElMessage.warning('地图 Key 未配置')
     showLocationPicker.value = false
     return
   }
   if (!locationMap) {
-    locationMap = new window.AMap.Map(locationPickerRef.value, { zoom: 14, center: [116.3521, 39.9835] })
+    locationMap = new AMap.Map(locationPickerRef.value, { zoom: 14, center: [116.3521, 39.9835] })
     locationMap.on('click', (e: any) => {
       pickedLocation.lng = e.lnglat.getLng().toFixed(6)
       pickedLocation.lat = e.lnglat.getLat().toFixed(6)
       if (locationMarker) locationMarker.setPosition(e.lnglat)
       else {
-        locationMarker = new window.AMap.Marker({ map: locationMap, position: e.lnglat })
+        locationMarker = new AMap.Marker({ map: locationMap, position: e.lnglat })
       }
     })
   }
