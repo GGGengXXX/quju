@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
 import { teamApi, type TeamMemberItem } from '../../api/team'
 import { authApi } from '../../api/auth'
+
+declare global { interface Window { AMap?: any } }
 
 const route = useRoute()
 const router = useRouter()
@@ -20,6 +22,11 @@ const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
 const showEmoji = ref(false)
+const showLocationPicker = ref(false)
+const locationPickerRef = ref<HTMLElement | null>(null)
+let locationMap: any = null
+let locationMarker: any = null
+const pickedLocation = reactive({ lng: '116.3521', lat: '39.9835', address: '' })
 
 const emojis = ['😀','😂','🥰','😎','🤔','👍','👋','🎉','🔥','❤️','😭','😅','🙏','💪','✨','🥳','😤','🤣','😘','🫡','👀','💯','🤝','🫶','😈','🥲','😊','🤗','😏','🙄']
 const messagesEnd = ref<HTMLElement | null>(null)
@@ -112,39 +119,37 @@ function openLocation(content: string) {
 }
 
 async function sendLocation() {
-  let lng = ''
-  let lat = ''
-  let address = ''
-
-  // 先尝试浏览器定位
-  const pos = await new Promise<GeolocationPosition | null>((resolve) => {
-    if (!navigator.geolocation) { resolve(null); return }
-    navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), { timeout: 5000 })
-  })
-
-  if (pos) {
-    lng = pos.coords.longitude.toFixed(6)
-    lat = pos.coords.latitude.toFixed(6)
+  showLocationPicker.value = true
+  pickedLocation.address = ''
+  await nextTick()
+  if (!locationPickerRef.value) return
+  if (!window.AMap) {
+    ElMessage.warning('地图未加载')
+    showLocationPicker.value = false
+    return
   }
-
-  // 弹出输入框让用户确认/填写地址
-  try {
-    const { value } = await ElMessageBox.prompt(
-      lng ? `已定位到 (${lng}, ${lat})，请输入地址描述：` : '无法自动定位，请手动输入地址：',
-      '发送位置',
-      { confirmButtonText: '发送', cancelButtonText: '取消', inputPlaceholder: '如：北航主楼' }
-    )
-    address = value || '我的位置'
-  } catch { return }
-
-  if (!lng) {
-    lng = '116.3521'
-    lat = '39.9835'
+  if (!locationMap) {
+    locationMap = new window.AMap.Map(locationPickerRef.value, { zoom: 14, center: [116.3521, 39.9835] })
+    locationMap.on('click', (e: any) => {
+      pickedLocation.lng = e.lnglat.getLng().toFixed(6)
+      pickedLocation.lat = e.lnglat.getLat().toFixed(6)
+      if (locationMarker) locationMarker.setPosition(e.lnglat)
+      else {
+        locationMarker = new window.AMap.Marker({ map: locationMap, position: e.lnglat })
+      }
+    })
   }
+}
 
+async function confirmLocation() {
+  if (!pickedLocation.address.trim()) {
+    ElMessage.warning('请输入位置描述')
+    return
+  }
+  showLocationPicker.value = false
   sending.value = true
   try {
-    const content = `${lng},${lat},${address}`
+    const content = `${pickedLocation.lng},${pickedLocation.lat},${pickedLocation.address}`
     const msg = await socialApi.sendMessage({ scope, peerId, contentType: 'LOCATION', content })
     messages.value.push(msg)
     await nextTick()
@@ -154,6 +159,10 @@ async function sendLocation() {
   } finally {
     sending.value = false
   }
+}
+
+function cancelLocation() {
+  showLocationPicker.value = false
 }
 
 async function sendImage(e: Event) {
@@ -284,6 +293,19 @@ onBeforeUnmount(() => {
     <div v-if="showEmoji" class="emoji-panel">
       <span v-for="e in emojis" :key="e" class="emoji-item" @click="insertEmoji(e)">{{ e }}</span>
     </div>
+
+    <!-- 地图选点弹窗 -->
+    <el-dialog v-model="showLocationPicker" title="选择位置" width="500px" @close="cancelLocation">
+      <div ref="locationPickerRef" class="location-map"></div>
+      <div class="location-form">
+        <p class="location-hint">点击地图选择位置，坐标：{{ pickedLocation.lng }}, {{ pickedLocation.lat }}</p>
+        <el-input v-model="pickedLocation.address" placeholder="输入位置描述（如：北航主楼）" />
+      </div>
+      <template #footer>
+        <el-button @click="cancelLocation">取消</el-button>
+        <el-button type="primary" @click="confirmLocation">发送位置</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -322,4 +344,7 @@ onBeforeUnmount(() => {
 .location-msg:hover { text-decoration: underline; }
 .location-icon { font-size: 18px; }
 .location-text { font-size: 13px; }
+.location-map { width: 100%; height: 300px; border-radius: 8px; margin-bottom: 12px; }
+.location-form { display: flex; flex-direction: column; gap: 8px; }
+.location-hint { font-size: 12px; color: #999; margin: 0; }
 </style>
