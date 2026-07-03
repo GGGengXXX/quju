@@ -46,8 +46,10 @@ public class OssService {
             ObjectMetadata meta = new ObjectMetadata();
             meta.setContentType(contentType);
             meta.setContentLength(file.getSize());
+            meta.setObjectAcl(com.aliyun.oss.model.CannedAccessControlList.PublicRead);
             PutObjectRequest req = new PutObjectRequest(bucket, objectKey, is, meta);
             oss.putObject(req);
+            oss.setObjectAcl(bucket, objectKey, com.aliyun.oss.model.CannedAccessControlList.PublicRead);
         } catch (Exception e) {
             throw new BizException(ErrorCode.INTERNAL_ERROR);
         } finally {
