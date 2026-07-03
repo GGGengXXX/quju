@@ -112,33 +112,48 @@ function openLocation(content: string) {
 }
 
 async function sendLocation() {
-  if (!navigator.geolocation) {
-    ElMessage.warning('浏览器不支持定位')
-    return
+  let lng = ''
+  let lat = ''
+  let address = ''
+
+  // 先尝试浏览器定位
+  const pos = await new Promise<GeolocationPosition | null>((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return }
+    navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), { timeout: 5000 })
+  })
+
+  if (pos) {
+    lng = pos.coords.longitude.toFixed(6)
+    lat = pos.coords.latitude.toFixed(6)
   }
+
+  // 弹出输入框让用户确认/填写地址
+  try {
+    const { value } = await ElMessageBox.prompt(
+      lng ? `已定位到 (${lng}, ${lat})，请输入地址描述：` : '无法自动定位，请手动输入地址：',
+      '发送位置',
+      { confirmButtonText: '发送', cancelButtonText: '取消', inputPlaceholder: '如：北航主楼' }
+    )
+    address = value || '我的位置'
+  } catch { return }
+
+  if (!lng) {
+    lng = '116.3521'
+    lat = '39.9835'
+  }
+
   sending.value = true
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const lng = pos.coords.longitude.toFixed(6)
-      const lat = pos.coords.latitude.toFixed(6)
-      const content = `${lng},${lat},我的位置`
-      try {
-        const msg = await socialApi.sendMessage({ scope, peerId, contentType: 'LOCATION', content })
-        messages.value.push(msg)
-        await nextTick()
-        scrollToBottom()
-      } catch {
-        ElMessage.error('位置发送失败')
-      } finally {
-        sending.value = false
-      }
-    },
-    () => {
-      ElMessage.warning('无法获取位置，请检查定位权限')
-      sending.value = false
-    },
-    { timeout: 10000 }
-  )
+  try {
+    const content = `${lng},${lat},${address}`
+    const msg = await socialApi.sendMessage({ scope, peerId, contentType: 'LOCATION', content })
+    messages.value.push(msg)
+    await nextTick()
+    scrollToBottom()
+  } catch {
+    ElMessage.error('位置发送失败')
+  } finally {
+    sending.value = false
+  }
 }
 
 async function sendImage(e: Event) {
