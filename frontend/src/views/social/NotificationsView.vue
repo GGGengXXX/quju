@@ -56,6 +56,9 @@ function navigate(item: NotificationItem) {
     case 'FRIEND_MESSAGE':
       router.push(`/social/chat/${refId}`)
       break
+    case 'NEW_FOLLOWER':
+      router.push(`/social/user/${refId}`)
+      break
     case 'TEAM_JOIN':
     case 'TEAM_JOIN_REQUEST':
       router.push(`/teams?detail=${refId}`)
@@ -88,6 +91,7 @@ const typeLabel: Record<string, string> = {
   FRIEND_REQUEST: '好友申请',
   FRIEND_ACCEPT: '好友通过',
   FRIEND_MESSAGE: '好友消息',
+  NEW_FOLLOWER: '新粉丝',
   TEAM_JOIN: '小队加入',
   TEAM_JOIN_REQUEST: '小队申请',
   TEAM_MESSAGE: '小队消息',

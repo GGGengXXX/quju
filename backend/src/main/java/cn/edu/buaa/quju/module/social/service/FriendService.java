@@ -179,6 +179,12 @@ public class FriendService {
         f.setFolloweeId(followeeId);
         followMapper.insert(f);
 
+        // 通知被关注的人
+        User follower = userMapper.selectById(followerId);
+        String name = follower != null && follower.getNickname() != null ? follower.getNickname() : "用户";
+        notificationService.send(followeeId, "NEW_FOLLOWER",
+                name + " 关注了你", null, "USER", followerId);
+
         // 互关检查：若对方也关注了我，升级为好友
         Long mutual = followMapper.selectCount(Wrappers.<Follow>lambdaQuery()
                 .eq(Follow::getFollowerId, followeeId).eq(Follow::getFolloweeId, followerId));

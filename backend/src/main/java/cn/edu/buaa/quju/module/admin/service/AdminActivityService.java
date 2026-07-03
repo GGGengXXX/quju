@@ -2,6 +2,8 @@ package cn.edu.buaa.quju.module.admin.service;
 
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
+import cn.edu.buaa.quju.module.activity.entity.ActivityAuditLog;
+import cn.edu.buaa.quju.module.activity.mapper.ActivityAuditLogMapper;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityListVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityReviewReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
@@ -28,12 +30,18 @@ import java.util.stream.Collectors;
 public class AdminActivityService {
     private final ActivityMapper activityMapper;
     private final ModerationActionMapper moderationMapper;
+    private final ActivityAuditLogMapper activityAuditLogMapper;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
 
-    public AdminActivityService(ActivityMapper activityMapper, ModerationActionMapper moderationMapper, UserMapper userMapper, NotificationService notificationService) {
+    public AdminActivityService(ActivityMapper activityMapper,
+                                ModerationActionMapper moderationMapper,
+                                ActivityAuditLogMapper activityAuditLogMapper,
+                                UserMapper userMapper,
+                                NotificationService notificationService) {
         this.activityMapper = activityMapper;
         this.moderationMapper = moderationMapper;
+        this.activityAuditLogMapper = activityAuditLogMapper;
         this.userMapper = userMapper;
         this.notificationService = notificationService;
     }
@@ -58,27 +66,35 @@ public class AdminActivityService {
     public void reviewActivity(long adminId, long activityId, ActivityReviewReq req) {
         Activity a = requireActivity(activityId);
         if (!"PENDING_REVIEW".equals(a.getStatus())) throw new BizException(ErrorCode.CONFLICT);
-        if ("REJECTED".equals(req.result()) && (req.reason() == null || req.reason().isBlank()))
+        String action = req.result() == null ? "" : req.result().trim().toUpperCase();
+        if (List.of("REJECTED", "NEEDS_REVISION").contains(action) && (req.reason() == null || req.reason().isBlank())) {
             throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
-        if ("NEEDS_REVISION".equals(req.result()) && (req.reason() == null || req.reason().isBlank()))
-            throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
-        switch (req.result()) {
-            case "PASSED" -> a.setStatus("PUBLISHED");
-            case "REJECTED" -> a.setStatus("REJECTED");
-            case "NEEDS_REVISION" -> a.setStatus("REJECTED");
-            default -> throw new BizException(ErrorCode.BAD_REQUEST);
+        }
+        switch (action) {
+            case "PASSED", "APPROVED" -> a.setStatus("PUBLISHED");
+            case "REJECTED", "NEEDS_REVISION" -> a.setStatus("REJECTED");
+            default -> throw new BizException(ErrorCode.BAD_REQUEST, "审核动作非法");
         }
         activityMapper.updateById(a);
-        String logAction = switch (req.result()) {
-            case "PASSED" -> "REVIEW_PASS";
+
+        ActivityAuditLog log = new ActivityAuditLog();
+        log.setActivityId(activityId);
+        log.setAuditType("MANUAL");
+        log.setResult("PASSED".equals(action) || "APPROVED".equals(action) ? "PASSED" : action);
+        log.setReason(req.reason());
+        log.setAuditorAdminId(adminId);
+        activityAuditLogMapper.insert(log);
+
+        String logAction = switch (action) {
+            case "PASSED", "APPROVED" -> "REVIEW_PASS";
             case "REJECTED" -> "REVIEW_REJECT";
             case "NEEDS_REVISION" -> "REVIEW_REVISE";
             default -> "REVIEW";
         };
         logModeration(adminId, activityId, logAction, req.reason() != null ? req.reason() : "");
-        // 通知活动创建者
-        String notifyTitle = switch (req.result()) {
-            case "PASSED" -> "活动「" + a.getName() + "」审核通过";
+
+        String notifyTitle = switch (action) {
+            case "PASSED", "APPROVED" -> "活动「" + a.getName() + "」审核通过";
             case "REJECTED" -> "活动「" + a.getName() + "」被驳回";
             case "NEEDS_REVISION" -> "活动「" + a.getName() + "」需要修改";
             default -> "活动审核结果";

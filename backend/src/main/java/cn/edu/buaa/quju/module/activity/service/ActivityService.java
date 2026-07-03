@@ -25,6 +25,7 @@ import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.TemplateVO;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.WaitlistPageVO;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.WaitlistVO;
 import cn.edu.buaa.quju.module.activity.entity.Activity;
+import cn.edu.buaa.quju.module.activity.entity.ActivityAuditLog;
 import cn.edu.buaa.quju.module.activity.entity.ActivityCheckin;
 import cn.edu.buaa.quju.module.activity.entity.ActivityReview;
 import cn.edu.buaa.quju.module.activity.entity.ActivitySignup;
@@ -34,6 +35,7 @@ import cn.edu.buaa.quju.module.activity.entity.ActivityTag;
 import cn.edu.buaa.quju.module.activity.entity.ActivityTemplate;
 import cn.edu.buaa.quju.module.activity.entity.ActivityWaitlist;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityCheckinMapper;
+import cn.edu.buaa.quju.module.activity.mapper.ActivityAuditLogMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityDomainMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityReviewMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivitySignupMapper;
@@ -46,6 +48,7 @@ import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.entity.User;
 import cn.edu.buaa.quju.module.user.mapper.UserMapper;
+import cn.edu.buaa.quju.module.user.service.EmailService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -53,11 +56,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -88,6 +94,10 @@ public class ActivityService {
     private final ActivitySummaryImageMapper summaryImageMapper;
     private final ActivityReviewMapper reviewMapper;
     private final UserMapper userMapper;
+    private final ActivityAuditLogMapper activityAuditLogMapper;
+    private final ActivityAiService activityAiService;
+    private final ActivityImageStorageService activityImageStorageService;
+    private final EmailService emailService;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -101,6 +111,10 @@ public class ActivityService {
                            ActivitySummaryImageMapper summaryImageMapper,
                            ActivityReviewMapper reviewMapper,
                            UserMapper userMapper,
+                           ActivityAuditLogMapper activityAuditLogMapper,
+                           ActivityAiService activityAiService,
+                           ActivityImageStorageService activityImageStorageService,
+                           EmailService emailService,
                            NotificationService notificationService) {
         this.activityMapper = activityMapper;
         this.activityTagMapper = activityTagMapper;
@@ -112,6 +126,10 @@ public class ActivityService {
         this.summaryImageMapper = summaryImageMapper;
         this.reviewMapper = reviewMapper;
         this.userMapper = userMapper;
+        this.activityAuditLogMapper = activityAuditLogMapper;
+        this.activityAiService = activityAiService;
+        this.activityImageStorageService = activityImageStorageService;
+        this.emailService = emailService;
         this.notificationService = notificationService;
     }
 
@@ -140,9 +158,6 @@ public class ActivityService {
                     .or()
                     .eq(Activity::getCreatorId, currentUserId));
         }
-        if (keyword != null && !keyword.isBlank()) {
-            qw.and(w -> w.like(Activity::getName, keyword).or().like(Activity::getIntro, keyword));
-        }
         if (status != null && !status.isBlank()) qw.eq(Activity::getStatus, status);
         if (city != null && !city.isBlank()) qw.eq(Activity::getCity, city);
         if (startFrom != null) qw.ge(Activity::getStartTime, startFrom);
@@ -154,6 +169,15 @@ public class ActivityService {
         if (!categoryList.isEmpty()) qw.in(Activity::getCategory, categoryList);
 
         List<Activity> activities = activityMapper.selectList(qw);
+        Map<Long, List<String>> tagsByActivity = getTags(activities.stream().map(Activity::getId).toList());
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim().toLowerCase();
+            activities = activities.stream().filter(activity -> tagsByActivity.getOrDefault(activity.getId(), List.of())
+                    .stream().map(String::toLowerCase).anyMatch(tag -> tag.contains(normalizedKeyword))
+                    || containsIgnoreCase(activity.getName(), normalizedKeyword)
+                    || containsIgnoreCase(activity.getIntro(), normalizedKeyword))
+                    .toList();
+        }
         boolean nearbyMode = "NEARBY".equalsIgnoreCase(tab) || (lng != null && lat != null && distanceKm != null);
         BigDecimal effectiveDistance = distanceKm == null ? new BigDecimal("10") : distanceKm;
         Map<Long, BigDecimal> distanceMap = new HashMap<>();
@@ -214,21 +238,33 @@ public class ActivityService {
         UserBrief creator = loadUserBriefs(List.of(userId)).get(userId);
         String normalizedCategory = normalizeCategory(req == null ? null : req.category());
         String theme = req == null || req.theme() == null || req.theme().isBlank() ? categoryLabel(normalizedCategory) + "主题活动" : req.theme().trim();
+        ActivityAiService.AiPlanResult plan = activityAiService.generatePlan(theme, normalizedCategory);
+        LocalDateTime defaultStart = LocalDateTime.now().plusDays(7).withHour(19).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime defaultEnd = defaultStart.plusHours(2);
+        LocalDateTime defaultDeadline = defaultStart.minusDays(2).withHour(18).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime plannedStart = parseAiDateTime(plan.startTime(), defaultStart);
+        if (!plannedStart.isAfter(LocalDateTime.now().plusDays(1))) plannedStart = defaultStart;
+        LocalDateTime plannedEnd = parseAiDateTime(plan.endTime(), plannedStart.plusHours(2));
+        if (!plannedEnd.isAfter(plannedStart)) plannedEnd = plannedStart.plusHours(2);
+        LocalDateTime plannedDeadline = parseAiDateTime(plan.signupDeadline(), defaultDeadline);
+        if (!plannedDeadline.isBefore(plannedStart) || !plannedDeadline.isAfter(LocalDateTime.now())) {
+            plannedDeadline = defaultDeadline;
+        }
         Activity activity = new Activity();
         activity.setCreatorId(userId);
-        activity.setName(theme + " · AI 初稿");
-        activity.setIntro(buildAiIntro(theme, normalizedCategory));
-        activity.setCategory(normalizedCategory);
-        activity.setCity("待确认城市");
-        activity.setAddress("待补充地点");
-        activity.setCapacity(defaultCapacityForCategory(normalizedCategory));
-        activity.setFee(defaultFeeForCategory(normalizedCategory));
+        activity.setName(plan.name());
+        activity.setIntro(plan.intro());
+        activity.setCategory(normalizeCategory(plan.category()));
+        activity.setCity(plan.city());
+        activity.setAddress(plan.address());
+        activity.setCapacity(plan.capacity());
+        activity.setFee(plan.fee() == null ? BigDecimal.ZERO : plan.fee());
         activity.setStatus("DRAFT");
-        activity.setStartTime(LocalDateTime.now().plusDays(7));
-        activity.setEndTime(LocalDateTime.now().plusDays(7).plusHours(2));
-        activity.setSignupDeadline(LocalDateTime.now().plusDays(5));
+        activity.setStartTime(plannedStart);
+        activity.setEndTime(plannedEnd);
+        activity.setSignupDeadline(plannedDeadline);
         return new ActivityVO(null, activity.getName(), activity.getIntro(), activity.getCategory(),
-                suggestTags(theme, normalizedCategory), null, activity.getStartTime(), activity.getEndTime(),
+                plan.tags(), null, activity.getStartTime(), activity.getEndTime(),
                 activity.getSignupDeadline(), activity.getCity(), activity.getAddress(), null, null,
                 activity.getCapacity(), activity.getFee(), activity.getStatus(), calcPhase(activity), 0, creator, null);
     }
@@ -245,7 +281,8 @@ public class ActivityService {
                 tags.getOrDefault(id, Collections.emptyList()), activity.getCoverImage(), activity.getStartTime(), activity.getEndTime(),
                 activity.getSignupDeadline(), activity.getCity(), activity.getAddress(), activity.getLng(), activity.getLat(),
                 activity.getCapacity(), activity.getFee(), activity.getStatus(), calcPhase(activity), signupCounts.getOrDefault(id, 0),
-                creator, activity.getTeamId(), mySignupStatus, waitlistCounts.getOrDefault(id, 0));
+                creator, activity.getTeamId(), mySignupStatus, waitlistCounts.getOrDefault(id, 0),
+                exposeCheckinCode(activity, mySignupStatus, UserContext.get()));
     }
 
     @Transactional
@@ -254,10 +291,13 @@ public class ActivityService {
         Activity activity = new Activity();
         fillActivity(activity, req);
         activity.setCreatorId(userId);
-        activity.setStatus(Boolean.TRUE.equals(req.submit()) ? "PENDING_REVIEW" : "DRAFT");
+        activity.setStatus("DRAFT");
         activity.setIsAiGenerated(Boolean.FALSE);
         activityMapper.insert(activity);
         replaceTags(activity.getId(), req.tags());
+        if (Boolean.TRUE.equals(req.submit())) {
+            applySubmissionDecision(activity);
+        }
         return toActivityVO(activity, getTags(List.of(activity.getId())), loadCreators(List.of(activity)), getSignupCounts(List.of(activity.getId())));
     }
 
@@ -267,9 +307,11 @@ public class ActivityService {
         Activity activity = getActivityOrThrow(id);
         ensureOwner(activity, userId);
         fillActivity(activity, req);
-        if (Boolean.TRUE.equals(req.submit())) activity.setStatus("PENDING_REVIEW");
         activityMapper.updateById(activity);
         replaceTags(id, req.tags());
+        if (Boolean.TRUE.equals(req.submit())) {
+            applySubmissionDecision(activity);
+        }
         return toActivityVO(activity, getTags(List.of(id)), loadCreators(List.of(activity)), getSignupCounts(List.of(id)));
     }
 
@@ -291,8 +333,7 @@ public class ActivityService {
         long userId = UserContext.require();
         Activity activity = getActivityOrThrow(id);
         ensureOwner(activity, userId);
-        activity.setStatus("PENDING_REVIEW");
-        activityMapper.updateById(activity);
+        applySubmissionDecision(activity);
     }
 
     @Transactional
@@ -329,7 +370,7 @@ public class ActivityService {
         long userId = UserContext.require();
         Activity activity = getActivityOrThrow(activityId);
         ensureSignupOpen(activity);
-        ensureSignupChecks(userId);
+        ensureSignupChecks(userId, req);
         ActivitySignup activeSignup = signupMapper.selectOne(Wrappers.<ActivitySignup>lambdaQuery()
                 .eq(ActivitySignup::getActivityId, activityId)
                 .eq(ActivitySignup::getUserId, userId)
@@ -349,7 +390,7 @@ public class ActivityService {
             signup.setActivityId(activityId);
             signup.setUserId(userId);
             signup.setStatus("REGISTERED");
-            signup.setSignupInfo(toJson(req == null ? null : req.signupInfo()));
+            signup.setSignupInfo(toJson(createSignupPayload(req)));
             signupMapper.insert(signup);
             // 通知活动创建者有人报名
             notificationService.send(activity.getCreatorId(), "ACTIVITY_SIGNUP",
@@ -442,6 +483,7 @@ public class ActivityService {
         signup.setActivityId(activityId);
         signup.setUserId(userId);
         signup.setStatus("REGISTERED");
+        signup.setSignupInfo(toJson(createSignupPayload(null)));
         signupMapper.insert(signup);
         wait.setStatus("PROMOTED");
         waitlistMapper.updateById(wait);
@@ -451,6 +493,7 @@ public class ActivityService {
     public CheckinCodeVO generateCheckinCode(long activityId) {
         Activity activity = getActivityOrThrow(activityId);
         ensureOwner(activity, UserContext.require());
+        backfillSignupCheckinTokens(activityId);
         String code = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         activity.setCheckinCode(code);
         activityMapper.updateById(activity);
@@ -459,34 +502,12 @@ public class ActivityService {
 
     @Transactional
     public void checkin(long activityId, CheckinReq req) {
-        long userId = UserContext.require();
-        Activity activity = getActivityOrThrow(activityId);
-        ActivitySignup signup = signupMapper.selectOne(Wrappers.<ActivitySignup>lambdaQuery()
-                .eq(ActivitySignup::getActivityId, activityId)
-                .eq(ActivitySignup::getUserId, userId)
-                .eq(ActivitySignup::getStatus, "REGISTERED")
-                .last("LIMIT 1"));
-        if (signup == null) throw new BizException(ErrorCode.NOT_SIGNED_UP);
-        if (activity.getCheckinCode() == null || !activity.getCheckinCode().equals(req.code())) {
-            throw new BizException(ErrorCode.CHECKIN_CODE_INVALID);
-        }
-        if (activity.getLng() != null && activity.getLat() != null && req.lng() != null && req.lat() != null) {
-            BigDecimal distance = distanceKm(activity.getLat(), activity.getLng(), req.lat(), req.lng());
-            if (distance.compareTo(CHECKIN_RADIUS_KM) > 0) {
-                throw new BizException(ErrorCode.CHECKIN_LOCATION_TOO_FAR);
-            }
-        }
-        ActivityCheckin existing = checkinMapper.selectOne(Wrappers.<ActivityCheckin>lambdaQuery()
-                .eq(ActivityCheckin::getActivityId, activityId)
-                .eq(ActivityCheckin::getUserId, userId)
-                .last("LIMIT 1"));
-        if (existing != null) throw new BizException(ErrorCode.CONFLICT, "已签到");
-        ActivityCheckin checkin = new ActivityCheckin();
-        checkin.setActivityId(activityId);
-        checkin.setUserId(userId);
-        checkin.setLng(req.lng());
-        checkin.setLat(req.lat());
-        checkinMapper.insert(checkin);
+        performCheckin(activityId, req, UserContext.require());
+    }
+
+    @Transactional
+    public void publicCheckin(long activityId, CheckinReq req) {
+        performCheckin(activityId, req, null);
     }
 
     public SummaryVO getSummary(long activityId) {
@@ -506,6 +527,7 @@ public class ActivityService {
         Activity activity = getActivityOrThrow(activityId);
         long userId = UserContext.require();
         ensureOwner(activity, userId);
+        ensureActivityEnded(activity);
         ActivitySummary summary = summaryMapper.selectOne(Wrappers.<ActivitySummary>lambdaQuery()
                 .eq(ActivitySummary::getActivityId, activityId)
                 .last("LIMIT 1"));
@@ -528,6 +550,7 @@ public class ActivityService {
     public List<SummaryImageVO> uploadSummaryImages(long activityId, SummaryImageUploadReq req) {
         Activity activity = getActivityOrThrow(activityId);
         ensureOwner(activity, UserContext.require());
+        ensureActivityEnded(activity);
         List<String> urls = req.imageUrls().stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
@@ -540,7 +563,7 @@ public class ActivityService {
             ActivitySummaryImage image = new ActivitySummaryImage();
             image.setActivityId(activityId);
             image.setImageUrl(url);
-            image.setAiCategory(inferImageCategory(url, i++));
+            image.setAiCategory(inferImageCategory(url, i++, null));
             image.setConfirmed(Boolean.FALSE);
             summaryImageMapper.insert(image);
             result.add(toSummaryImageVO(image));
@@ -549,9 +572,26 @@ public class ActivityService {
     }
 
     @Transactional
+    public SummaryImageVO uploadSummaryImageFile(long activityId, MultipartFile file) {
+        Activity activity = getActivityOrThrow(activityId);
+        long userId = UserContext.require();
+        ensureOwner(activity, userId);
+        ensureActivityEnded(activity);
+        ActivityImageStorageService.UploadResult upload = activityImageStorageService.uploadSummaryImage(activityId, userId, file);
+        ActivitySummaryImage image = new ActivitySummaryImage();
+        image.setActivityId(activityId);
+        image.setImageUrl(upload.url());
+        image.setAiCategory(activityAiService.classifyImage(upload.fileName(), upload.url()));
+        image.setConfirmed(Boolean.FALSE);
+        summaryImageMapper.insert(image);
+        return toSummaryImageVO(image);
+    }
+
+    @Transactional
     public SummaryImageVO updateSummaryImage(long activityId, long imageId, SummaryImageUpdateReq req) {
         Activity activity = getActivityOrThrow(activityId);
         ensureOwner(activity, UserContext.require());
+        ensureActivityEnded(activity);
         ActivitySummaryImage image = summaryImageMapper.selectById(imageId);
         if (image == null || !Objects.equals(image.getActivityId(), activityId)) {
             throw new BizException(ErrorCode.NOT_FOUND);
@@ -560,6 +600,18 @@ public class ActivityService {
         image.setConfirmed(Boolean.TRUE);
         summaryImageMapper.updateById(image);
         return toSummaryImageVO(image);
+    }
+
+    @Transactional
+    public void deleteSummaryImage(long activityId, long imageId) {
+        Activity activity = getActivityOrThrow(activityId);
+        ensureOwner(activity, UserContext.require());
+        ActivitySummaryImage image = summaryImageMapper.selectById(imageId);
+        if (image == null || !Objects.equals(image.getActivityId(), activityId)) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+        summaryImageMapper.deleteById(imageId);
+        activityImageStorageService.deleteImageByUrl(image.getImageUrl());
     }
 
     public PageResult<ReviewVO> listReviews(long activityId, int page, int size) {
@@ -640,10 +692,20 @@ public class ActivityService {
         }
     }
 
-    private void ensureSignupChecks(long userId) {
+    private void ensureSignupChecks(long userId, SignupReq req) {
         User user = userMapper.selectById(userId);
         if (user == null || user.getReputation() == null || user.getReputation() < 60) {
-            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED);
+            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "信誉分低于报名要求");
+        }
+        if (user.getBirthday() == null) {
+            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "请先完善生日信息后再报名");
+        }
+        int age = calcAge(user.getBirthday());
+        if (age < 16) {
+            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "当前活动仅支持 16 岁及以上用户报名");
+        }
+        if (req == null || !Boolean.TRUE.equals(req.safetyConfirmed())) {
+            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "请先确认安全须知");
         }
     }
 
@@ -789,6 +851,11 @@ public class ActivityService {
         next.setNotifiedAt(LocalDateTime.now());
         next.setConfirmDeadline(LocalDateTime.now().plusHours(1));
         waitlistMapper.updateById(next);
+        User user = userMapper.selectById(next.getUserId());
+        if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+            emailService.send(user.getEmail(), "【趣聚】候补名额已释放",
+                    "你报名的活动已有空位，请在 1 小时内登录趣聚确认报名。活动ID: " + activityId);
+        }
     }
 
     private String calcPhase(Activity a) {
@@ -823,7 +890,9 @@ public class ActivityService {
                 image.getConfirmedCategory(), image.getConfirmed());
     }
 
-    private String inferImageCategory(String url, int index) {
+    private String inferImageCategory(String url, int index, String originalName) {
+        String aiCategory = activityAiService.classifyImage(originalName, url);
+        if (aiCategory != null && !aiCategory.isBlank()) return aiCategory;
         String lower = url == null ? "" : url.toLowerCase();
         if (lower.contains("group") || lower.contains("team") || lower.contains("heying")) return "GROUP_PHOTO";
         if (lower.contains("venue") || lower.contains("site")) return "VENUE";
@@ -836,6 +905,233 @@ public class ActivityService {
             case 3 -> "MATERIAL";
             default -> "RESULT";
         };
+    }
+
+    private void ensureActivityEnded(Activity activity) {
+        if (activity.getEndTime() == null || LocalDateTime.now().isBefore(activity.getEndTime())) {
+            throw new BizException(ErrorCode.CONFLICT, "活动结束后才能发布总结");
+        }
+    }
+
+    private void applySubmissionDecision(Activity activity) {
+        ActivityAiService.AuditDecision decision = activityAiService.auditActivity(buildAuditPayload(activity));
+        if ((activity.getCapacity() != null && activity.getCapacity() > 50) || "TO_MANUAL".equals(decision.result())) {
+            activity.setStatus("PENDING_REVIEW");
+            activityMapper.updateById(activity);
+            logAudit(activity.getId(), "AI", "TO_MANUAL", decision.reason(), null);
+            return;
+        }
+        if ("REJECTED".equals(decision.result())) {
+            activity.setStatus("REJECTED");
+            activityMapper.updateById(activity);
+            logAudit(activity.getId(), "AI", "REJECTED", decision.reason(), null);
+            return;
+        }
+        activity.setStatus("PUBLISHED");
+        activityMapper.updateById(activity);
+        logAudit(activity.getId(), "AI", "PASSED", decision.reason(), null);
+    }
+
+    private void logAudit(Long activityId, String auditType, String result, String reason, Long adminId) {
+        ActivityAuditLog log = new ActivityAuditLog();
+        log.setActivityId(activityId);
+        log.setAuditType(auditType);
+        log.setResult(result);
+        log.setReason(reason);
+        log.setAuditorAdminId(adminId);
+        activityAuditLogMapper.insert(log);
+    }
+
+    private String buildAuditPayload(Activity activity) {
+        return "标题:" + blank(activity.getName())
+                + "; 简介:" + blank(activity.getIntro())
+                + "; 分类:" + blank(activity.getCategory())
+                + "; 城市:" + blank(activity.getCity())
+                + "; 地址:" + blank(activity.getAddress())
+                + "; 人数:" + activity.getCapacity()
+                + "; 费用:" + activity.getFee()
+                + "; 标签:" + String.join(",", getTags(List.of(activity.getId())).getOrDefault(activity.getId(), List.of()));
+    }
+
+    private LocalDateTime parseAiDateTime(String value, LocalDateTime fallback) {
+        if (value == null || value.isBlank()) return fallback;
+        try {
+            return LocalDateTime.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            return fallback;
+        }
+    }
+
+    private void performCheckin(long activityId, CheckinReq req, Long actorUserId) {
+        Activity activity = getActivityOrThrow(activityId);
+        Long targetUserId = resolveCheckinTargetUserId(activity, req == null ? null : req.code(), actorUserId);
+        if (targetUserId == null) {
+            throw new BizException(ErrorCode.CHECKIN_CODE_INVALID);
+        }
+        ActivitySignup signup = findRegisteredSignup(activityId, targetUserId);
+        if (signup == null) throw new BizException(ErrorCode.NOT_SIGNED_UP);
+        if (activity.getLng() != null && activity.getLat() != null) {
+            if (req.lng() == null || req.lat() == null) {
+                throw new BizException(ErrorCode.BAD_REQUEST, "签到需要获取当前位置");
+            }
+            BigDecimal distance = distanceKm(activity.getLat(), activity.getLng(), req.lat(), req.lng());
+            if (distance.compareTo(CHECKIN_RADIUS_KM) > 0) {
+                throw new BizException(ErrorCode.CHECKIN_LOCATION_TOO_FAR);
+            }
+        }
+        ActivityCheckin existing = checkinMapper.selectOne(Wrappers.<ActivityCheckin>lambdaQuery()
+                .eq(ActivityCheckin::getActivityId, activityId)
+                .eq(ActivityCheckin::getUserId, targetUserId)
+                .last("LIMIT 1"));
+        if (existing != null) throw new BizException(ErrorCode.CONFLICT, "已签到");
+        ActivityCheckin checkin = new ActivityCheckin();
+        checkin.setActivityId(activityId);
+        checkin.setUserId(targetUserId);
+        checkin.setLng(req.lng());
+        checkin.setLat(req.lat());
+        checkinMapper.insert(checkin);
+    }
+
+    private String exposeCheckinCode(Activity activity, String mySignupStatus, Long viewerId) {
+        if (activity.getCheckinCode() == null || viewerId == null) return null;
+        if (Objects.equals(activity.getCreatorId(), viewerId)) {
+            return activity.getCheckinCode();
+        }
+        if (!"REGISTERED".equals(mySignupStatus)) return null;
+        ActivitySignup signup = findRegisteredSignup(activity.getId(), viewerId);
+        String signupToken = ensureSignupCheckinToken(signup);
+        if (signupToken == null || signupToken.isBlank()) return null;
+        return buildUniqueCheckinCode(activity.getId(), activity.getCheckinCode(), signupToken);
+    }
+
+    private ActivitySignup findRegisteredSignup(long activityId, long userId) {
+        return signupMapper.selectOne(Wrappers.<ActivitySignup>lambdaQuery()
+                .eq(ActivitySignup::getActivityId, activityId)
+                .eq(ActivitySignup::getUserId, userId)
+                .eq(ActivitySignup::getStatus, "REGISTERED")
+                .last("LIMIT 1"));
+    }
+
+    private Long resolveCheckinTargetUserId(Activity activity, String code, Long actorUserId) {
+        if (code == null || code.isBlank() || activity.getCheckinCode() == null) return null;
+        String trimmed = code.trim();
+        if (activity.getCheckinCode().equals(trimmed)) {
+            if (actorUserId == null) return null;
+            ActivitySignup actorSignup = findRegisteredSignup(activity.getId(), actorUserId);
+            return actorSignup == null ? null : actorUserId;
+        }
+        ParsedCheckinCode parsed = parseCheckinCode(trimmed);
+        if (parsed == null) return null;
+        if (parsed.activityId() != activity.getId()) return null;
+        if (!Objects.equals(parsed.sessionToken(), activity.getCheckinCode())) return null;
+        ActivitySignup signup = findSignupByCheckinToken(activity.getId(), parsed.signupToken());
+        return signup == null ? null : signup.getUserId();
+    }
+
+    private ActivitySignup findSignupByCheckinToken(long activityId, String signupToken) {
+        if (signupToken == null || signupToken.isBlank()) return null;
+        List<ActivitySignup> signups = signupMapper.selectList(Wrappers.<ActivitySignup>lambdaQuery()
+                .eq(ActivitySignup::getActivityId, activityId)
+                .eq(ActivitySignup::getStatus, "REGISTERED"));
+        for (ActivitySignup signup : signups) {
+            if (signupToken.equals(extractSignupCheckinToken(signup))) {
+                return signup;
+            }
+        }
+        return null;
+    }
+
+    private String extractSignupCheckinToken(ActivitySignup signup) {
+        if (signup == null || signup.getSignupInfo() == null || signup.getSignupInfo().isBlank()) return null;
+        try {
+            Map<?, ?> payload = objectMapper.readValue(signup.getSignupInfo(), Map.class);
+            Object token = payload.get("checkinToken");
+            return token == null ? null : token.toString();
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
+    private String buildUniqueCheckinCode(long activityId, String sessionToken, String signupToken) {
+        return "quju-checkin:" + activityId + ":" + sessionToken + ":" + signupToken;
+    }
+    private void backfillSignupCheckinTokens(long activityId) {
+        List<ActivitySignup> signups = signupMapper.selectList(Wrappers.<ActivitySignup>lambdaQuery()
+                .eq(ActivitySignup::getActivityId, activityId)
+                .eq(ActivitySignup::getStatus, "REGISTERED"));
+        for (ActivitySignup signup : signups) {
+            ensureSignupCheckinToken(signup);
+        }
+    }
+
+    private String ensureSignupCheckinToken(ActivitySignup signup) {
+        if (signup == null) return null;
+        String existingToken = extractSignupCheckinToken(signup);
+        if (existingToken != null && !existingToken.isBlank()) return existingToken;
+        Map<String, Object> payload = createSignupPayload(parseSignupInfo(signup.getSignupInfo()));
+        String token = String.valueOf(payload.get("checkinToken"));
+        signup.setSignupInfo(toJson(payload));
+        signupMapper.updateById(signup);
+        return token;
+    }
+
+    private SignupReq parseSignupInfo(String rawSignupInfo) {
+        if (rawSignupInfo == null || rawSignupInfo.isBlank()) {
+            return new SignupReq(new HashMap<>(), true);
+        }
+        try {
+            Map<String, Object> payload = objectMapper.readValue(rawSignupInfo, Map.class);
+            Object safetyConfirmed = payload.get("safetyConfirmed");
+            return new SignupReq(payload, safetyConfirmed == null || Boolean.parseBoolean(String.valueOf(safetyConfirmed)));
+        } catch (JsonProcessingException e) {
+            return new SignupReq(new HashMap<>(), true);
+        }
+    }
+
+
+    private ParsedCheckinCode parseCheckinCode(String raw) {
+        if (raw == null) return null;
+        String[] parts = raw.trim().split(":");
+        if (parts.length != 4) return null;
+        if (!"quju-checkin".equals(parts[0])) return null;
+        try {
+            return new ParsedCheckinCode(Long.parseLong(parts[1]), parts[2], parts[3]);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private record ParsedCheckinCode(long activityId, String sessionToken, String signupToken) {}
+
+    private int calcAge(LocalDate birthday) {
+        return birthday == null ? 0 : java.time.Period.between(birthday, LocalDate.now()).getYears();
+    }
+
+    private Map<String, Object> mergeSignupInfo(SignupReq req) {
+        Map<String, Object> source = req == null || req.signupInfo() == null ? new HashMap<>() : new HashMap<>(req.signupInfo());
+        source.put("safetyConfirmed", true);
+        return source;
+    }
+
+    private Map<String, Object> createSignupPayload(SignupReq req) {
+        Map<String, Object> payload = mergeSignupInfo(req);
+        Object existingToken = payload.get("checkinToken");
+        if (!(existingToken instanceof String token) || token.isBlank()) {
+            payload.put("checkinToken", createCheckinToken());
+        }
+        return payload;
+    }
+
+    private String createCheckinToken() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private boolean containsIgnoreCase(String text, String keyword) {
+        return text != null && keyword != null && text.toLowerCase().contains(keyword.toLowerCase());
+    }
+
+    private String blank(String value) {
+        return value == null ? "" : value;
     }
 
     private String normalizeImageCategory(String category) {

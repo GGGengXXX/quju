@@ -24,7 +24,9 @@ import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.WaitlistPageVO;
 import cn.edu.buaa.quju.module.activity.service.ActivityService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -156,6 +158,12 @@ public class ActivityController {
         return R.ok(null);
     }
 
+    @PostMapping("/public/activities/{id}/checkin")
+    public R<Void> publicCheckin(@PathVariable long id, @RequestBody @Valid CheckinReq req) {
+        activityService.publicCheckin(id, req);
+        return R.ok(null);
+    }
+
     @GetMapping("/activities/{id}/summary")
     public R<SummaryVO> summary(@PathVariable long id) {
         return R.ok(activityService.getSummary(id));
@@ -172,6 +180,12 @@ public class ActivityController {
         return R.ok(activityService.uploadSummaryImages(id, req));
     }
 
+    @PostMapping(value = "/activities/{id}/summary/images/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<SummaryImageVO> uploadSummaryImageFile(@PathVariable long id,
+                                                    @RequestPart("file") MultipartFile file) {
+        return R.ok(activityService.uploadSummaryImageFile(id, file));
+    }
+
     @PutMapping("/activities/{id}/summary/images/{imageId}")
     public R<SummaryImageVO> updateSummaryImage(@PathVariable long id,
                                                 @PathVariable long imageId,
@@ -179,10 +193,17 @@ public class ActivityController {
         return R.ok(activityService.updateSummaryImage(id, imageId, req));
     }
 
+    @DeleteMapping("/activities/{id}/summary/images/{imageId}")
+    public R<Void> deleteSummaryImage(@PathVariable long id,
+                                      @PathVariable long imageId) {
+        activityService.deleteSummaryImage(id, imageId);
+        return R.ok(null);
+    }
+
     @GetMapping("/activities/{id}/reviews")
     public R<PageResult<ReviewVO>> reviews(@PathVariable long id,
-                                                 @RequestParam(defaultValue = "1") int page,
-                                                 @RequestParam(defaultValue = "10") int size) {
+                                           @RequestParam(defaultValue = "1") int page,
+                                           @RequestParam(defaultValue = "10") int size) {
         return R.ok(activityService.listReviews(id, page, size));
     }
 

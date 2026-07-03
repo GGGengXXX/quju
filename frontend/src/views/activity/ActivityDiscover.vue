@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import QRCode from 'qrcode'
 import { useAuthStore } from '../../stores/auth'
-import { useRoute } from 'vue-router'
 import {
   activityApi,
   type ActivityDetail,
@@ -11,6 +12,7 @@ import {
   type ActivityUpsertReq,
   type ReviewItem,
   type SignupManageItem,
+  type SummaryImageItem,
   type SummaryItem,
   type TemplateItem,
   type WaitlistPage,
@@ -24,33 +26,7 @@ declare global {
 }
 
 const auth = useAuthStore()
-const currentRoute = useRoute()
 const amapKey = (import.meta as any).env?.VITE_AMAP_KEY as string | undefined
-const loading = ref(false)
-const saving = ref(false)
-const actionLoading = ref(false)
-const mapLoading = ref(false)
-const mapReady = ref(false)
-const activities = ref<ActivityItem[]>([])
-const mineActivities = ref<ActivityItem[]>([])
-const templates = ref<TemplateItem[]>([])
-const mapPoints = ref<ActivityPoint[]>([])
-const total = ref(0)
-const detail = ref<ActivityDetail | null>(null)
-const detailVisible = ref(false)
-const createVisible = ref(false)
-const detailTab = ref('overview')
-const summary = ref<SummaryItem | null>(null)
-const reviews = ref<ReviewItem[]>([])
-const signups = ref<SignupManageItem[]>([])
-const waitlist = ref<WaitlistPage | null>(null)
-const generatedCode = ref('')
-const mapRef = ref<HTMLDivElement | null>(null)
-const aiTheme = ref('')
-
-let amap: any = null
-let markers: any[] = []
-
 const categoryOptions = [
   { label: '运动', value: 'SPORTS' },
   { label: '徒步', value: 'HIKING' },
@@ -60,6 +36,44 @@ const categoryOptions = [
   { label: '城市漫步', value: 'CITY_WALK' },
   { label: '其他', value: 'OTHER' },
 ]
+const summaryCategoryOptions = [
+  { label: '合影', value: 'GROUP_PHOTO' },
+  { label: '场地', value: 'VENUE' },
+  { label: '过程', value: 'PROCESS' },
+  { label: '物资', value: 'MATERIAL' },
+  { label: '成果', value: 'RESULT' },
+]
+
+const loading = ref(false)
+const mapLoading = ref(false)
+const saving = ref(false)
+const actionLoading = ref(false)
+const activities = ref<ActivityItem[]>([])
+const mineActivities = ref<ActivityItem[]>([])
+const templates = ref<TemplateItem[]>([])
+const mapPoints = ref<ActivityPoint[]>([])
+const detail = ref<ActivityDetail | null>(null)
+const summary = ref<SummaryItem | null>(null)
+const reviews = ref<ReviewItem[]>([])
+const signups = ref<SignupManageItem[]>([])
+const waitlist = ref<WaitlistPage | null>(null)
+const total = ref(0)
+const detailVisible = ref(false)
+const createVisible = ref(false)
+const detailTab = ref('overview')
+const aiTheme = ref('')
+const tagText = ref('')
+const generatedCode = ref('')
+const checkinQrDataUrl = ref('')
+const summaryFiles = ref<File[]>([])
+const mapRef = ref<HTMLDivElement | null>(null)
+const pickerMapRef = ref<HTMLDivElement | null>(null)
+
+let amap: any = null
+let pickerMap: any = null
+let pickerMarker: any = null
+let mapMarkers: any[] = []
+let mapRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
 const query = reactive({
   tab: 'RECOMMEND',
@@ -70,8 +84,8 @@ const query = reactive({
   feeMax: undefined as number | undefined,
   startFrom: '',
   startTo: '',
-  lng: 116.3521,
-  lat: 39.9835,
+  lng: 116.397428,
+  lat: 39.90923,
   distanceKm: 5,
   page: 1,
   size: 10,
@@ -82,10 +96,10 @@ const form = reactive<ActivityUpsertReq>({
   intro: '',
   category: 'OTHER',
   tags: [],
-  city: '',
+  city: '北京',
   address: '',
-  lng: 116.3521,
-  lat: 39.9835,
+  lng: 116.397428,
+  lat: 39.90923,
   capacity: 20,
   fee: 0,
   submit: false,
@@ -93,7 +107,6 @@ const form = reactive<ActivityUpsertReq>({
 
 const summaryForm = reactive({
   content: '',
-  imageUrlsText: '',
 })
 
 const reviewForm = reactive({
@@ -103,11 +116,9 @@ const reviewForm = reactive({
 
 const checkinForm = reactive({
   code: '',
-  lng: 116.3521 as number | undefined,
-  lat: 39.9835 as number | undefined,
+  lng: undefined as number | undefined,
+  lat: undefined as number | undefined,
 })
-
-const tagText = ref('')
 
 const tagPreview = computed(() =>
   tagText.value
@@ -116,42 +127,55 @@ const tagPreview = computed(() =>
     .filter(Boolean)
 )
 
-const imageUrlList = computed(() =>
-  summaryForm.imageUrlsText
-    .split(/[\n,，]/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-)
-
-const isOwner = computed(() => {
-  if (!detail.value || !auth.user) return false
-  return auth.user.id === detail.value.creator?.id
-})
-
+const isOwner = computed(() => !!detail.value && !!auth.user && detail.value.creator?.id === auth.user.id)
 const canSignup = computed(() => !!detail.value && detail.value.status === 'PUBLISHED' && !detail.value.mySignupStatus)
 const canCancelSignup = computed(() => detail.value?.mySignupStatus === 'REGISTERED')
 const canConfirmWaitlist = computed(() => detail.value?.mySignupStatus === 'WAITLISTED')
 const canReview = computed(() => !!detail.value && detail.value.phase === 'ENDED' && !!auth.token)
-const canDelete = computed(() => !!detail.value && isOwner.value)
-const canSubmitDraft = computed(() => !!detail.value && isOwner.value && (detail.value.status === 'DRAFT' || detail.value.status === 'REJECTED'))
+const canManageSummary = computed(() => !!detail.value && isOwner.value && detail.value.phase === 'ENDED')
+const visibleCheckinCode = computed(() => detail.value?.checkinCode || generatedCode.value || '')
 
-const statusMap: Record<string, string> = {
-  DRAFT: '草稿',
-  PENDING_REVIEW: '审核中',
-  PUBLISHED: '已发布',
-  REJECTED: '已驳回',
-  TAKEN_DOWN: '已下架',
-  CANCELLED: '已取消',
+function formatTime(value?: string) {
+  return value ? value.replace('T', ' ') : '未设置'
 }
-const phaseMap: Record<string, string> = {
-  NOT_STARTED: '未开始',
-  SIGNUP_OPEN: '报名中',
-  SIGNUP_CLOSED: '报名截止',
-  ONGOING: '进行中',
-  ENDED: '已结束',
+
+function categoryLabel(value?: string) {
+  return categoryOptions.find((item) => item.value === value)?.label || value || '未分类'
 }
-function statusLabel(s: string) { return statusMap[s] || s }
-function phaseLabel(s: string) { return phaseMap[s] || s }
+
+function imageCategoryLabel(value?: string | null) {
+  return summaryCategoryOptions.find((item) => item.value === value)?.label || value || '-'
+}
+
+function resetCreateForm() {
+  form.name = ''
+  form.intro = ''
+  form.category = 'OTHER'
+  form.tags = []
+  form.city = '北京'
+  form.address = ''
+  form.lng = query.lng
+  form.lat = query.lat
+  form.capacity = 20
+  form.fee = 0
+  form.coverImage = ''
+  form.startTime = ''
+  form.endTime = ''
+  form.signupDeadline = ''
+  form.submit = false
+  tagText.value = ''
+  aiTheme.value = ''
+}
+
+async function ensureCurrentUser() {
+  if (auth.token && !auth.user) {
+    try {
+      await auth.loadMe()
+    } catch {
+      // ignore
+    }
+  }
+}
 
 async function loadActivities() {
   loading.value = true
@@ -191,9 +215,9 @@ async function loadTemplates() {
   templates.value = await activityApi.templates()
 }
 
-async function loadSummary(id: number) {
+async function loadSummary(activityId: number) {
   try {
-    summary.value = await activityApi.getSummary(id)
+    summary.value = await activityApi.getSummary(activityId)
     summaryForm.content = summary.value.content || ''
   } catch {
     summary.value = null
@@ -201,47 +225,52 @@ async function loadSummary(id: number) {
   }
 }
 
-async function loadReviews(id: number) {
-  const data = await activityApi.reviews(id, { page: 1, size: 20 })
+async function loadReviews(activityId: number) {
+  const data = await activityApi.reviews(activityId, { page: 1, size: 20 })
   reviews.value = data.list
 }
 
-async function loadOwnerData(id: number) {
+async function loadOwnerData(activityId: number) {
   if (!isOwner.value) {
     signups.value = []
     waitlist.value = null
     return
   }
   const [signupData, waitData] = await Promise.all([
-    activityApi.signups(id, { page: 1, size: 20 }),
-    activityApi.waitlist(id),
+    activityApi.signups(activityId, { page: 1, size: 50 }),
+    activityApi.waitlist(activityId),
   ])
   signups.value = signupData.list
   waitlist.value = waitData
 }
 
-async function openDetail(id: number) {
+async function openDetail(
+  id: number,
+  options: { tab?: string; presetCheckinCode?: string; preserveGeneratedCode?: boolean } = {}
+) {
   detail.value = await activityApi.detail(id)
   detailVisible.value = true
-  detailTab.value = 'overview'
-  generatedCode.value = ''
-  checkinForm.code = ''
-  if (detail.value.lng != null) checkinForm.lng = detail.value.lng
-  if (detail.value.lat != null) checkinForm.lat = detail.value.lat
+  detailTab.value = options.tab === 'checkin' ? 'checkin' : 'overview'
+  generatedCode.value = options.preserveGeneratedCode ? generatedCode.value : ''
+  checkinForm.code = options.presetCheckinCode || detail.value.checkinCode || ''
+  checkinForm.lng = detail.value.lng ?? undefined
+  checkinForm.lat = detail.value.lat ?? undefined
   await Promise.allSettled([
     loadSummary(id),
     loadReviews(id),
     loadOwnerData(id),
   ])
-  if (mapReady.value && detail.value.lng != null && detail.value.lat != null) {
-    amap.setCenter([detail.value.lng, detail.value.lat])
-  }
+  await updateCheckinQrCode()
 }
 
 async function refreshDetail() {
-  if (!detail.value) return
-  await openDetail(detail.value.id as number)
-  await Promise.allSettled([loadActivities(), loadMine(), loadMapPoints()])
+  if (!detail.value?.id) return
+  await openDetail(detail.value.id, {
+    tab: detailTab.value,
+    presetCheckinCode: checkinForm.code || undefined,
+    preserveGeneratedCode: true,
+  })
+  await Promise.allSettled([loadActivities(), loadMine(), refreshMapPoints(false)])
 }
 
 function fillFromTemplate(template: TemplateItem) {
@@ -251,23 +280,23 @@ function fillFromTemplate(template: TemplateItem) {
 }
 
 function applyAiPlan(plan: ActivityItem) {
-  form.name = plan.name.replace(/ · AI 初稿$/, '')
+  form.name = plan.name
   form.intro = plan.intro || ''
   form.category = plan.category
   form.capacity = plan.capacity || 20
   form.fee = plan.fee || 0
-  form.city = plan.city || ''
+  form.city = plan.city || '北京'
   form.address = plan.address || ''
   form.startTime = plan.startTime || ''
   form.endTime = plan.endTime || ''
   form.signupDeadline = plan.signupDeadline || ''
   tagText.value = plan.tags.join(', ')
-  ElMessage.success('AI 初稿已填入表单，可继续修改后保存')
+  ElMessage.success('AI 已生成活动草稿，可继续修改后保存')
 }
 
 async function generateAiPlan() {
   if (!aiTheme.value.trim()) {
-    ElMessage.warning('先输入活动主题')
+    ElMessage.warning('请先输入活动主题')
     return
   }
   actionLoading.value = true
@@ -279,35 +308,16 @@ async function generateAiPlan() {
   }
 }
 
-function resetForm() {
-  form.name = ''
-  form.intro = ''
-  form.category = 'OTHER'
-  form.tags = []
-  form.city = ''
-  form.address = ''
-  form.lng = 116.3521
-  form.lat = 39.9835
-  form.capacity = 20
-  form.fee = 0
-  form.startTime = ''
-  form.endTime = ''
-  form.signupDeadline = ''
-  form.submit = false
-  tagText.value = ''
-  aiTheme.value = ''
-}
-
 async function submitCreate(submit: boolean) {
   saving.value = true
   try {
     form.tags = tagPreview.value
     form.submit = submit
     await activityApi.create({ ...form })
-    ElMessage.success(submit ? '活动已提交审核' : '草稿已保存')
+    ElMessage.success(submit ? '活动已提交，系统会先进行 AI 审核' : '活动草稿已保存')
     createVisible.value = false
-    resetForm()
-    await Promise.allSettled([loadActivities(), loadMine(), loadMapPoints()])
+    resetCreateForm()
+    await Promise.allSettled([loadActivities(), loadMine(), refreshMapPoints(false)])
   } finally {
     saving.value = false
   }
@@ -315,10 +325,22 @@ async function submitCreate(submit: boolean) {
 
 async function signupCurrent() {
   if (!detail.value) return
+  try {
+    await ElMessageBox.confirm('报名后将校验信誉分（至少 60）、年龄（至少 16 岁），并默认你已确认线下活动安全须知。是否继续？', '确认报名', {
+      confirmButtonText: '确认报名',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
   actionLoading.value = true
   try {
-    const data = await activityApi.signup(detail.value.id as number)
-    ElMessage.success(data.status === 'WAITLISTED' ? `已进入候补，当前排位 ${data.waitlistPosition}` : '报名成功')
+    const data = await activityApi.signup(detail.value.id as number, {
+      signupInfo: { source: 'activity-page' },
+      safetyConfirmed: true,
+    })
+    ElMessage.success(data.status === 'WAITLISTED' ? `报名成功，已进入候补，当前排位 ${data.waitlistPosition}` : '报名成功')
     await refreshDetail()
   } finally {
     actionLoading.value = false
@@ -330,7 +352,7 @@ async function cancelSignup() {
   actionLoading.value = true
   try {
     await activityApi.cancelSignup(detail.value.id as number)
-    ElMessage.success('已取消报名')
+    ElMessage.success('已取消报名，若有候补将自动顺延')
     await refreshDetail()
   } finally {
     actionLoading.value = false
@@ -342,7 +364,7 @@ async function confirmWaitlist() {
   actionLoading.value = true
   try {
     await activityApi.confirmWaitlist(detail.value.id as number)
-    ElMessage.success('候补确认成功')
+    ElMessage.success('候补转正成功')
     await refreshDetail()
   } finally {
     actionLoading.value = false
@@ -354,7 +376,7 @@ async function cloneCurrent() {
   actionLoading.value = true
   try {
     await activityApi.clone(detail.value.id as number)
-    ElMessage.success('已克隆为新草稿')
+    ElMessage.success('已克隆为你的新草稿')
     await Promise.allSettled([loadActivities(), loadMine()])
   } finally {
     actionLoading.value = false
@@ -366,9 +388,9 @@ async function deleteCurrent() {
   actionLoading.value = true
   try {
     await activityApi.remove(detail.value.id as number)
-    ElMessage.success(detail.value.status === 'PUBLISHED' ? '活动已取消' : '活动已删除')
+    ElMessage.success(detail.value.status === 'PUBLISHED' ? '活动已取消' : '草稿已删除')
     detailVisible.value = false
-    await Promise.allSettled([loadActivities(), loadMine(), loadMapPoints()])
+    await Promise.allSettled([loadActivities(), loadMine(), refreshMapPoints(false)])
   } finally {
     actionLoading.value = false
   }
@@ -393,15 +415,117 @@ async function createCheckinCode() {
     const data = await activityApi.generateCheckinCode(detail.value.id as number)
     generatedCode.value = data.code
     checkinForm.code = data.code
-    ElMessage.success('签到码已生成')
-    await loadOwnerData(detail.value.id as number)
+    await updateCheckinQrCode()
+    ElMessage.success('签到轮次已开启，已报名成员现在会看到各自独立的签到二维码')
+    await refreshDetail()
   } finally {
     actionLoading.value = false
   }
 }
 
+function resolveLocationFailureMessage(reason?: string) {
+  if (typeof window !== 'undefined' && !window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    return '当前页面使用的是 HTTP IP 地址，Chrome 会直接拒绝定位；这不是权限按钮问题，需要改成 HTTPS 入口'
+  }
+  if (reason) return reason
+  return '定位失败，请检查浏览器定位权限'
+}
+
+async function requestBrowserLocation() {
+  if (!navigator.geolocation) {
+    throw new Error('当前浏览器不支持定位')
+  }
+  return new Promise<{ lng: number; lat: number }>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lng: Number(position.coords.longitude.toFixed(6)),
+          lat: Number(position.coords.latitude.toFixed(6)),
+        })
+      },
+      (error) => {
+        if (error?.code === 1) reject(new Error('定位权限被拒绝'))
+        else if (error?.code === 2) reject(new Error('定位服务暂时不可用'))
+        else if (error?.code === 3) reject(new Error('定位超时'))
+        else reject(new Error(error?.message || '浏览器定位失败'))
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    )
+  })
+}
+
+async function requestAmapLocation() {
+  const AMap = await ensureAmap()
+  if (!AMap) {
+    throw new Error('地图定位插件不可用')
+  }
+  return new Promise<{ lng: number; lat: number }>((resolve, reject) => {
+    AMap.plugin('AMap.Geolocation', () => {
+      const geolocation = new AMap.Geolocation({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        convert: true,
+        showButton: false,
+        GeoLocationFirst: true,
+      })
+      geolocation.getCurrentPosition((status: string, result: any) => {
+        if (status === 'complete' && result?.position) {
+          resolve({
+            lng: Number(Number(result.position.lng).toFixed(6)),
+            lat: Number(Number(result.position.lat).toFixed(6)),
+          })
+          return
+        }
+        reject(new Error(result?.message || result?.info || '高德定位失败'))
+      })
+    })
+  })
+}
+
+async function useCurrentLocation(target: 'query' | 'form' | 'checkin') {
+  let locationResult: { lng: number; lat: number } | null = null
+  let lastError = ''
+  try {
+    locationResult = await requestBrowserLocation()
+  } catch (error: any) {
+    lastError = error?.message || ''
+    try {
+      locationResult = await requestAmapLocation()
+    } catch (fallbackError: any) {
+      lastError = fallbackError?.message || lastError
+    }
+  }
+  if (!locationResult) {
+    ElMessage.warning(resolveLocationFailureMessage(lastError))
+    return
+  }
+  const { lng, lat } = locationResult
+  if (target === 'query') {
+    query.lng = lng
+    query.lat = lat
+    query.tab = 'NEARBY'
+    if (amap) amap.setCenter([lng, lat])
+  } else if (target === 'form') {
+    form.lng = lng
+    form.lat = lat
+    setPickerMarker(lng, lat)
+  } else {
+    checkinForm.lng = lng
+    checkinForm.lat = lat
+  }
+  ElMessage.success('已读取当前位置')
+}
+
 async function submitCheckin() {
   if (!detail.value) return
+  if (!checkinForm.code) {
+    ElMessage.warning('请输入或使用展示的签到码')
+    return
+  }
   actionLoading.value = true
   try {
     await activityApi.checkin(detail.value.id as number, { ...checkinForm })
@@ -420,36 +544,52 @@ async function saveSummary(publish: boolean) {
       content: summaryForm.content,
       publish,
     })
-    ElMessage.success(publish ? '总结已发布' : '总结草稿已保存')
+    ElMessage.success(publish ? '活动总结已发布' : '总结草稿已保存')
     await loadSummary(detail.value.id as number)
   } finally {
     actionLoading.value = false
   }
 }
 
-async function uploadImages() {
-  if (!detail.value || !imageUrlList.value.length) return
+function onSummaryFilesChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  summaryFiles.value = files
+}
+
+async function uploadSelectedSummaryFiles() {
+  if (!detail.value || !summaryFiles.value.length) return
   actionLoading.value = true
   try {
-    await activityApi.uploadSummaryImages(detail.value.id as number, imageUrlList.value)
-    summaryForm.imageUrlsText = ''
-    ElMessage.success('总结图片已上传')
+    for (const file of summaryFiles.value) {
+      await activityApi.uploadSummaryImageFile(detail.value.id as number, file)
+    }
+    summaryFiles.value = []
+    ElMessage.success('总结图片上传完成，可继续追加上传')
     await loadSummary(detail.value.id as number)
   } finally {
     actionLoading.value = false
   }
 }
 
-function onImageCategoryChange(imageId: number, value: string | number | boolean) {
-  return confirmImage(imageId, String(value))
-}
-
-async function confirmImage(imageId: number, category: string) {
+async function confirmImage(image: SummaryImageItem, category: string) {
   if (!detail.value) return
   actionLoading.value = true
   try {
-    await activityApi.updateSummaryImage(detail.value.id as number, imageId, category)
+    await activityApi.updateSummaryImage(detail.value.id as number, image.id, category)
     ElMessage.success('图片分类已确认')
+    await loadSummary(detail.value.id as number)
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function deleteImage(image: SummaryImageItem) {
+  if (!detail.value) return
+  actionLoading.value = true
+  try {
+    await activityApi.deleteSummaryImage(detail.value.id as number, image.id)
+    ElMessage.success('图片已删除')
     await loadSummary(detail.value.id as number)
   } finally {
     actionLoading.value = false
@@ -465,24 +605,31 @@ async function submitReview() {
       content: reviewForm.content,
     })
     ElMessage.success('评价已提交')
+    reviewForm.content = ''
     await loadReviews(detail.value.id as number)
   } finally {
     actionLoading.value = false
   }
 }
 
-function formatTime(value?: string) {
-  if (!value) return '未填写'
-  return value.replace('T', ' ')
+const checkinPublicOrigin = ((import.meta as any).env?.VITE_PUBLIC_ORIGIN as string | undefined)?.replace(/\/$/, '') || ''
+
+function buildCheckinEntryUrl(code: string) {
+  if (!detail.value?.id || typeof window === 'undefined') return code
+  const origin = checkinPublicOrigin || window.location.origin
+  const url = new URL(`${origin}/activities/checkin`)
+  url.searchParams.set('activityId', String(detail.value.id))
+  url.searchParams.set('checkinCode', code)
+  return url.toString()
 }
 
-function useDemoNearby() {
-  query.tab = 'NEARBY'
-  query.lng = 116.3521
-  query.lat = 39.9835
-  query.distanceKm = 5
-  loadActivities()
-  loadMapPoints()
+async function updateCheckinQrCode() {
+  const code = visibleCheckinCode.value
+  if (!code) {
+    checkinQrDataUrl.value = ''
+    return
+  }
+  checkinQrDataUrl.value = await QRCode.toDataURL(buildCheckinEntryUrl(code))
 }
 
 function currentBounds() {
@@ -499,27 +646,30 @@ function currentBounds() {
       }
     }
   }
-  const centerLng = query.lng || 116.3974
-  const centerLat = query.lat || 39.9093
   return {
-    minLng: centerLng - 0.18,
-    maxLng: centerLng + 0.18,
-    minLat: centerLat - 0.12,
-    maxLat: centerLat + 0.12,
+    minLng: query.lng - 0.25,
+    maxLng: query.lng + 0.25,
+    minLat: query.lat - 0.18,
+    maxLat: query.lat + 0.18,
   }
 }
 
-let skipMapEvent = false
-
-async function loadMapPoints() {
+async function refreshMapPoints(resetCenter: boolean) {
   mapLoading.value = true
   try {
+    if (resetCenter && amap) amap.setCenter([query.lng, query.lat])
     mapPoints.value = await activityApi.mapPoints(currentBounds())
-    skipMapEvent = true
-    renderMarkers()
+    renderMapMarkers()
   } finally {
     mapLoading.value = false
   }
+}
+
+function scheduleMapRefresh() {
+  if (mapRefreshTimer) clearTimeout(mapRefreshTimer)
+  mapRefreshTimer = setTimeout(() => {
+    refreshMapPoints(false)
+  }, 250)
 }
 
 async function ensureAmap() {
@@ -538,10 +688,10 @@ async function ensureAmap() {
   return window.__qujuAmapLoading__
 }
 
-function renderMarkers() {
+function renderMapMarkers() {
   if (!amap || !window.AMap) return
-  markers.forEach((marker) => marker.setMap(null))
-  markers = mapPoints.value
+  mapMarkers.forEach((marker) => marker.setMap(null))
+  mapMarkers = mapPoints.value
     .filter((point) => point.lng != null && point.lat != null)
     .map((point) => {
       const marker = new window.AMap.Marker({
@@ -554,8 +704,8 @@ function renderMarkers() {
     })
 }
 
-async function initMap() {
-  if (!mapRef.value || mapReady.value || !amapKey) return
+async function initMainMap() {
+  if (!mapRef.value || amap || !amapKey) return
   try {
     const AMap = await ensureAmap()
     if (!AMap || !mapRef.value) return
@@ -563,338 +713,428 @@ async function initMap() {
       zoom: 11,
       center: [query.lng, query.lat],
     })
-    mapReady.value = true
-    amap.on('moveend', () => { if (skipMapEvent) { skipMapEvent = false; return } loadMapPoints() })
-    amap.on('zoomend', () => { if (skipMapEvent) { skipMapEvent = false; return } loadMapPoints() })
-    await loadMapPoints()
+    amap.on('moveend', scheduleMapRefresh)
+    amap.on('zoomend', scheduleMapRefresh)
+    await refreshMapPoints(false)
   } catch {
-    ElMessage.warning('地图脚本加载失败，已保留活动点位列表')
+    ElMessage.warning('地图脚本加载失败，已保留列表模式')
   }
 }
 
-onMounted(async () => {
-  if (auth.token && !auth.user) {
-    try {
-      await auth.loadMe()
-    } catch {
-      // 鉴权失败已由拦截器处理。
-    }
+function setPickerMarker(lng?: number, lat?: number) {
+  if (!pickerMap || !window.AMap || lng == null || lat == null) return
+  if (!pickerMarker) {
+    pickerMarker = new window.AMap.Marker({
+      map: pickerMap,
+      position: [lng, lat],
+      draggable: true,
+    })
+    pickerMarker.on('dragend', (event: any) => {
+      form.lng = Number(event.lnglat.lng.toFixed(6))
+      form.lat = Number(event.lnglat.lat.toFixed(6))
+    })
+  } else {
+    pickerMarker.setPosition([lng, lat])
   }
-  await Promise.allSettled([loadActivities(), loadTemplates(), loadMine(), loadMapPoints()])
+  pickerMap.setCenter([lng, lat])
+}
+
+async function initPickerMap() {
+  if (!pickerMapRef.value || pickerMap || !amapKey) return
+  const AMap = await ensureAmap()
+  if (!AMap || !pickerMapRef.value) return
+  pickerMap = new AMap.Map(pickerMapRef.value, {
+    zoom: 13,
+    center: [form.lng || query.lng, form.lat || query.lat],
+  })
+  pickerMap.on('click', (event: any) => {
+    form.lng = Number(event.lnglat.lng.toFixed(6))
+    form.lat = Number(event.lnglat.lat.toFixed(6))
+    setPickerMarker(form.lng, form.lat)
+  })
+  setPickerMarker(form.lng, form.lat)
+}
+
+watch(createVisible, async (visible) => {
+  if (!visible) return
   await nextTick()
-  await initMap()
-  // 支持 ?detail=id 参数自动打开活动详情
-  const detailId = Number(currentRoute.query.detail)
-  if (detailId) openDetail(detailId)
+  await initPickerMap()
+  setPickerMarker(form.lng, form.lat)
+})
+
+watch(visibleCheckinCode, () => {
+  updateCheckinQrCode()
+})
+
+watch(
+  () => [form.lng, form.lat],
+  ([lng, lat]) => {
+    if (typeof lng === 'number' && typeof lat === 'number') setPickerMarker(lng, lat)
+  }
+)
+
+onMounted(async () => {
+  await ensureCurrentUser()
+  await Promise.allSettled([loadActivities(), loadTemplates(), loadMine()])
+  await nextTick()
+  await initMainMap()
+  if (!amap) await refreshMapPoints(false)
 })
 </script>
 
 <template>
   <div class="activity-page">
-    <section class="toolbar panel">
-      <div class="tab-row">
+    <section class="page-toolbar panel">
+      <div class="toolbar-top">
         <el-radio-group v-model="query.tab" size="large" @change="loadActivities">
           <el-radio-button label="RECOMMEND">推荐</el-radio-button>
           <el-radio-button label="LATEST">最新</el-radio-button>
           <el-radio-button label="NEARBY">附近</el-radio-button>
         </el-radio-group>
         <div class="toolbar-actions">
-          <el-button @click="useDemoNearby">用示例坐标</el-button>
-          <el-button type="primary" @click="createVisible = true">新建活动</el-button>
+          <el-button @click="useCurrentLocation('query')">使用我的位置</el-button>
+          <el-button type="primary" @click="createVisible = true">创建活动</el-button>
         </div>
       </div>
 
-      <div class="search-grid">
-        <el-input v-model="query.keyword" placeholder="搜索活动标题或简介" clearable />
-        <el-select v-model="query.categories" multiple collapse-tags collapse-tags-tooltip placeholder="分类筛选">
+      <div class="toolbar-grid">
+        <el-input v-model="query.keyword" clearable placeholder="搜索标题、简介或标签" />
+        <el-select v-model="query.categories" multiple collapse-tags collapse-tags-tooltip placeholder="活动分类">
           <el-option v-for="option in categoryOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
-        <el-input v-model="query.city" placeholder="城市" clearable />
+        <el-input v-model="query.city" clearable placeholder="城市" />
         <el-input-number v-model="query.feeMin" :min="0" :step="10" placeholder="最低费用" />
         <el-input-number v-model="query.feeMax" :min="0" :step="10" placeholder="最高费用" />
         <el-date-picker v-model="query.startFrom" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间从" />
         <el-date-picker v-model="query.startTo" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间到" />
-        <el-input-number v-model="query.lng" :precision="4" :step="0.0001" placeholder="经度" />
-        <el-input-number v-model="query.lat" :precision="4" :step="0.0001" placeholder="纬度" />
+        <el-input-number v-model="query.lng" :precision="6" :step="0.0001" placeholder="中心经度" />
+        <el-input-number v-model="query.lat" :precision="6" :step="0.0001" placeholder="中心纬度" />
         <el-input-number v-model="query.distanceKm" :min="1" :max="50" placeholder="附近公里数" />
       </div>
 
-      <div class="template-row">
-        <span class="label">模板:</span>
-        <el-button v-for="template in templates" :key="template.id" text @click="fillFromTemplate(template)">
-          {{ template.name }}
-        </el-button>
-        <span class="spacer" />
-        <el-button type="primary" @click="loadActivities">查询</el-button>
+      <div class="toolbar-bottom">
+        <div class="template-actions">
+          <span class="muted">模板：</span>
+          <el-button v-for="template in templates" :key="template.id" text @click="fillFromTemplate(template)">
+            {{ template.name }}
+          </el-button>
+        </div>
+        <el-button type="primary" @click="loadActivities">查询活动</el-button>
       </div>
     </section>
 
-    <section class="content-grid">
-      <section class="panel list-panel">
-        <div class="panel-header">
-          <span>活动发现</span>
-          <span class="panel-meta">{{ total }} 条</span>
+    <section class="layout-grid">
+      <section class="panel map-panel">
+        <div class="section-head">
+          <h3>地图模式</h3>
+          <div class="section-meta">
+            <el-button :loading="mapLoading" @click="refreshMapPoints(true)">刷新点位</el-button>
+            <span>{{ mapPoints.length }} 个点位</span>
+          </div>
         </div>
+        <div v-if="amapKey" ref="mapRef" class="map-canvas" />
+        <el-empty v-else description="未配置地图 Key，仍可使用列表发现活动" />
+        <div class="map-side-list">
+          <button v-for="point in mapPoints" :key="point.id" type="button" class="point-card" @click="openDetail(point.id)">
+            <strong>{{ point.name }}</strong>
+            <span>{{ categoryLabel(point.category) }} / {{ point.city || '未设置城市' }}</span>
+            <span>{{ point.status }} / {{ point.phase }}</span>
+          </button>
+        </div>
+      </section>
 
+      <section class="panel list-panel">
+        <div class="section-head">
+          <h3>活动发现</h3>
+          <span class="muted">{{ total }} 条</span>
+        </div>
         <el-skeleton :loading="loading" animated :rows="6">
           <div class="activity-list">
-            <button v-for="item in activities" :key="String(item.id)" class="activity-item" type="button" @click="openDetail(item.id as number)">
-              <div class="item-main">
-                <div class="item-title-row">
-                  <h3>{{ item.name }}</h3>
-                  <el-tag size="small" :type="item.status === 'REJECTED' ? 'danger' : ''">{{ statusLabel(item.status) }}</el-tag>
-                </div>
-                <p class="intro">{{ item.intro || '暂无简介' }}</p>
-                <div class="meta-row">
-                  <span>{{ item.category }}</span>
-                  <span>{{ item.city || '未填写城市' }}</span>
-                  <span>{{ phaseLabel(item.phase) }}</span>
-                  <span>{{ item.signupCount }}/{{ item.capacity || '∞' }}</span>
-                </div>
-                <div class="tag-row">
-                  <el-tag v-for="tag in item.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
-                </div>
+            <button v-for="item in activities" :key="String(item.id)" type="button" class="activity-card" @click="openDetail(item.id as number)">
+              <div class="title-row">
+                <h4>{{ item.name }}</h4>
+                <el-tag size="small">{{ item.status }}</el-tag>
+              </div>
+              <p class="intro">{{ item.intro || '暂无简介' }}</p>
+              <div class="meta-grid">
+                <span>{{ categoryLabel(item.category) }}</span>
+                <span>{{ item.city || '未设置城市' }}</span>
+                <span>{{ item.phase }}</span>
+                <span>{{ item.signupCount }}/{{ item.capacity || '-' }}</span>
+              </div>
+              <div class="tag-row">
+                <el-tag v-for="tag in item.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
               </div>
             </button>
           </div>
         </el-skeleton>
       </section>
 
-      <section class="panel side-panel">
-        <div class="panel-header">
-          <span>我的活动</span>
-          <span class="panel-meta">{{ mineActivities.length }} 条</span>
+      <section class="panel mine-panel" v-if="auth.token">
+        <div class="section-head">
+          <h3>我发起的活动</h3>
+          <span class="muted">{{ mineActivities.length }} 条</span>
         </div>
-        <div class="mine-list" v-if="mineActivities.length">
-          <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-item" @click="openDetail(item.id as number)">
+        <el-empty v-if="!mineActivities.length" description="还没有活动" />
+        <div v-else class="mine-list">
+          <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
-            <span :class="{ 'status-rejected': item.status === 'REJECTED' }">{{ statusLabel(item.status) }} / {{ phaseLabel(item.phase) }}</span>
+            <span>{{ item.status }} / {{ item.phase }}</span>
+            <span>{{ formatTime(item.startTime) }}</span>
           </button>
         </div>
-        <div v-else class="empty-text">登录后可查看你创建的活动</div>
       </section>
     </section>
 
-    <section class="panel map-panel">
-      <div class="panel-header">
-        <span>地图模式</span>
-        <div class="toolbar-actions">
-          <el-button :loading="mapLoading" @click="loadMapPoints">刷新点位</el-button>
-          <span class="panel-meta">{{ mapPoints.length }} 个点位</span>
-        </div>
-      </div>
-      <div class="map-layout">
-        <div ref="mapRef" class="map-canvas">
-          <div v-if="!amapKey" class="map-placeholder">未配置地图 Key，已保留点位列表</div>
-        </div>
-        <div class="map-list">
-          <button v-for="point in mapPoints" :key="point.id" type="button" class="map-item" @click="openDetail(point.id)">
-            <strong>{{ point.name }}</strong>
-            <span>{{ point.category }} / {{ point.city || '未填写城市' }}</span>
-            <span>{{ statusLabel(point.status) }} / {{ phaseLabel(point.phase) }}</span>
-          </button>
-        </div>
-      </div>
-    </section>
+    <el-dialog v-model="createVisible" title="创建活动" width="980px" destroy-on-close @closed="resetCreateForm">
+      <div class="dialog-grid">
+        <section class="dialog-panel">
+          <div class="section-head compact">
+            <h3>AI 活动策划</h3>
+          </div>
+          <div class="inline-row">
+            <el-input v-model="aiTheme" placeholder="输入主题，例如：期末复习局 / 周末羽毛球 / 城市漫步" />
+            <el-button type="primary" :loading="actionLoading" @click="generateAiPlan">AI 生成草稿</el-button>
+          </div>
+          <div class="hint">这里会调用 AI 生成名称、简介、时间建议、标签和基础配置，不是简单模板填空。</div>
+        </section>
 
-    <el-dialog v-model="detailVisible" title="活动详情" width="980px">
+        <section class="dialog-panel">
+          <div class="section-head compact">
+            <h3>基础信息</h3>
+          </div>
+          <div class="form-grid">
+            <el-input v-model="form.name" placeholder="活动名称" />
+            <el-select v-model="form.category" placeholder="活动分类">
+              <el-option v-for="option in categoryOptions" :key="option.value" :label="option.label" :value="option.value" />
+            </el-select>
+            <el-input v-model="form.city" placeholder="城市" />
+            <el-input v-model="form.address" placeholder="详细地址" />
+            <el-input-number v-model="form.capacity" :min="1" :max="500" placeholder="人数上限" />
+            <el-input-number v-model="form.fee" :min="0" :step="10" placeholder="费用" />
+            <el-date-picker v-model="form.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间" />
+            <el-date-picker v-model="form.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="结束时间" />
+            <el-date-picker v-model="form.signupDeadline" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="报名截止" />
+            <el-input v-model="tagText" placeholder="标签，逗号分隔" />
+          </div>
+          <el-input v-model="form.intro" type="textarea" :rows="5" placeholder="活动简介 / 注意事项" />
+        </section>
+
+        <section class="dialog-panel">
+          <div class="section-head compact">
+            <h3>地图选点</h3>
+            <div class="section-meta">
+              <el-button @click="useCurrentLocation('form')">使用当前位置</el-button>
+              <span v-if="form.lng != null && form.lat != null">{{ form.lng.toFixed(6) }}, {{ form.lat.toFixed(6) }}</span>
+              <span v-else>请在地图上点击选择活动地点</span>
+            </div>
+          </div>
+          <div v-if="amapKey" ref="pickerMapRef" class="picker-map" />
+          <div v-else class="hint">未配置地图 Key，当前只能退回经纬度方式。</div>
+          <div class="location-summary">
+            <div class="location-card">
+              <span class="location-label">选点方式</span>
+              <strong>点击地图或拖动标记</strong>
+            </div>
+            <div class="location-card">
+              <span class="location-label">当前坐标</span>
+              <strong v-if="form.lng != null && form.lat != null">{{ form.lng.toFixed(6) }}, {{ form.lat.toFixed(6) }}</strong>
+              <strong v-else>尚未选择</strong>
+            </div>
+          </div>
+          <div class="hint">创建活动时不再要求手动输入经纬度数字，直接在地图上选点即可。</div>
+        </section>
+      </div>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button :loading="saving" @click="submitCreate(false)">保存草稿</el-button>
+        <el-button type="primary" :loading="saving" @click="submitCreate(true)">提交发布</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="detailVisible" :title="detail?.name || '活动详情'" width="1100px" destroy-on-close>
       <template v-if="detail">
-        <div class="detail-toolbar">
-          <div class="detail-tags">
-            <el-tag :type="detail.status === 'REJECTED' ? 'danger' : ''">{{ statusLabel(detail.status) }}</el-tag>
-            <el-tag type="success">{{ phaseLabel(detail.phase) }}</el-tag>
-            <el-tag v-if="detail.mySignupStatus" type="warning">{{ detail.mySignupStatus }}</el-tag>
+        <div class="detail-hero">
+          <div>
+            <div class="title-row">
+              <h2>{{ detail.name }}</h2>
+              <el-tag>{{ detail.status }}</el-tag>
+              <el-tag type="info">{{ detail.phase }}</el-tag>
+            </div>
+            <p>{{ detail.intro || '暂无简介' }}</p>
+            <div class="tag-row">
+              <el-tag v-for="tag in detail.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+            </div>
           </div>
           <div class="detail-actions">
-            <el-button :loading="actionLoading" @click="refreshDetail">刷新</el-button>
-            <el-button :loading="actionLoading" @click="cloneCurrent">克隆</el-button>
-            <el-button v-if="canSubmitDraft" type="primary" :loading="actionLoading" @click="submitDraft">
-              {{ detail.status === 'REJECTED' ? '重新提交审核' : '提交审核' }}
-            </el-button>
-            <el-button v-if="canDelete" type="danger" plain :loading="actionLoading" @click="deleteCurrent">
-              {{ detail.status === 'PUBLISHED' ? '取消活动' : '删除活动' }}
-            </el-button>
-            <el-button v-if="canSignup" type="primary" :loading="actionLoading" @click="signupCurrent">立即报名</el-button>
-            <el-button v-if="canCancelSignup" type="danger" plain :loading="actionLoading" @click="cancelSignup">取消报名</el-button>
-            <el-button v-if="canConfirmWaitlist" type="warning" :loading="actionLoading" @click="confirmWaitlist">确认候补</el-button>
+            <el-button v-if="canSignup" type="primary" :loading="actionLoading" @click="signupCurrent">报名</el-button>
+            <el-button v-if="canCancelSignup" :loading="actionLoading" @click="cancelSignup">取消报名</el-button>
+            <el-button v-if="canConfirmWaitlist" type="warning" :loading="actionLoading" @click="confirmWaitlist">确认候补名额</el-button>
+            <el-button v-if="detail.status === 'PUBLISHED'" @click="cloneCurrent">克隆活动</el-button>
+            <el-button v-if="isOwner && detail.status === 'DRAFT'" type="primary" :loading="actionLoading" @click="submitDraft">提交审核</el-button>
+            <el-button v-if="isOwner" type="danger" plain :loading="actionLoading" @click="deleteCurrent">删除/取消</el-button>
           </div>
         </div>
 
         <el-tabs v-model="detailTab">
           <el-tab-pane label="概览" name="overview">
-            <div class="detail-grid">
-              <div><strong>标题</strong><p>{{ detail.name }}</p></div>
-              <div><strong>分类</strong><p>{{ detail.category }}</p></div>
-              <div><strong>城市</strong><p>{{ detail.city || '未填写' }}</p></div>
-              <div><strong>地址</strong><p>{{ detail.address || '未填写' }}</p></div>
-              <div><strong>发起人</strong><p class="creator-link" @click="detail.creator?.id && $router.push(`/social/user/${detail.creator.id}`)">{{ detail.creator?.nickname || '-' }}</p></div>
-              <div><strong>人数</strong><p>{{ detail.signupCount }} / {{ detail.capacity || '不限' }}</p></div>
-              <div><strong>开始时间</strong><p>{{ formatTime(detail.startTime) }}</p></div>
-              <div><strong>结束时间</strong><p>{{ formatTime(detail.endTime) }}</p></div>
-              <div><strong>报名截止</strong><p>{{ formatTime(detail.signupDeadline) }}</p></div>
-              <div><strong>候补人数</strong><p>{{ detail.waitlistCount || 0 }}</p></div>
-              <div class="full"><strong>简介</strong><p>{{ detail.intro || '暂无简介' }}</p></div>
-              <div class="full"><strong>标签</strong>
-                <div class="tag-row compact">
-                  <el-tag v-for="tag in detail.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
-                </div>
-              </div>
+            <div class="overview-grid">
+              <div class="kv-card"><span>分类</span><strong>{{ categoryLabel(detail.category) }}</strong></div>
+              <div class="kv-card"><span>时间</span><strong>{{ formatTime(detail.startTime) }}</strong></div>
+              <div class="kv-card"><span>报名截止</span><strong>{{ formatTime(detail.signupDeadline) }}</strong></div>
+              <div class="kv-card"><span>地点</span><strong>{{ detail.city || '-' }} {{ detail.address || '' }}</strong></div>
+              <div class="kv-card"><span>人数</span><strong>{{ detail.signupCount }}/{{ detail.capacity || '-' }}</strong></div>
+              <div class="kv-card"><span>费用</span><strong>{{ detail.fee ?? 0 }} 元</strong></div>
             </div>
+            <div class="hint">报名时会校验信誉分不少于 60、年龄不少于 16 岁，并要求确认安全须知。容量满后自动进入等待队列。</div>
+          </el-tab-pane>
 
-            <section class="inline-block" v-if="detail.mySignupStatus === 'REGISTERED' || isOwner">
-              <div class="inline-header">
-                <strong>签到</strong>
-                <el-button v-if="isOwner" size="small" :loading="actionLoading" @click="createCheckinCode">生成签到码</el-button>
-              </div>
-              <div class="checkin-grid">
-                <el-input v-model="checkinForm.code" placeholder="签到码" />
-                <el-input-number v-model="checkinForm.lng" :precision="4" :step="0.0001" placeholder="经度" />
-                <el-input-number v-model="checkinForm.lat" :precision="4" :step="0.0001" placeholder="纬度" />
+          <el-tab-pane label="签到" name="checkin">
+            <div class="checkin-grid">
+              <section class="dialog-panel">
+                <div class="section-head compact">
+                  <h3>签到码</h3>
+                  <el-button v-if="isOwner" type="primary" :loading="actionLoading" @click="createCheckinCode">生成签到码</el-button>
+                </div>
+                <div v-if="visibleCheckinCode" class="code-box">{{ visibleCheckinCode }}</div>
+                <div v-else class="hint">活动发起人开启签到后，已报名成员会在这里看到自己的专属签到码。</div>
+                <img v-if="checkinQrDataUrl" :src="checkinQrDataUrl" alt="签到码" class="qr-image" />
+              </section>
+              <section class="dialog-panel">
+                <div class="section-head compact">
+                  <h3>扫码/输入签到</h3>
+                </div>
+                <div class="form-grid">
+                  <el-input v-model="checkinForm.code" placeholder="签到码" />
+                  <el-button @click="useCurrentLocation('checkin')">使用当前位置</el-button>
+                  <el-input-number v-model="checkinForm.lng" :precision="6" :step="0.0001" placeholder="我的经度" />
+                  <el-input-number v-model="checkinForm.lat" :precision="6" :step="0.0001" placeholder="我的纬度" />
+                </div>
+                <div class="hint">若活动设置了地点，签到时会校验你与活动点位的距离。使用他人的专属签到码时，也会直接签到到对应报名人名下。</div>
                 <el-button type="primary" :loading="actionLoading" @click="submitCheckin">提交签到</el-button>
-              </div>
-              <div v-if="generatedCode" class="helper-text">当前签到码: {{ generatedCode }}</div>
-            </section>
-
-            <section v-if="isOwner" class="inline-block">
-              <div class="inline-header"><strong>发起人管理</strong></div>
-              <div class="owner-panels">
-                <div>
-                  <h4>报名名单</h4>
-                  <div v-if="signups.length" class="mini-list">
-                    <div v-for="item in signups" :key="item.signupId" class="mini-row">
-                      <span class="creator-link" @click="$router.push(`/social/user/${item.userId}`)">{{ item.nickname || item.userId }}</span>
-                      <span>{{ item.signupStatus }}</span>
-                      <span>{{ item.checkedIn ? '已签到' : '未签到' }}</span>
-                    </div>
-                  </div>
-                  <div v-else class="empty-text">暂无报名数据</div>
-                </div>
-                <div>
-                  <h4>候补队列</h4>
-                  <div v-if="waitlist?.list?.length" class="mini-list">
-                    <div v-for="item in waitlist.list" :key="item.id" class="mini-row">
-                      <span class="creator-link" @click="$router.push(`/social/user/${item.userId}`)">#{{ item.position }} {{ item.nickname || item.userId }}</span>
-                      <span>{{ item.status }}</span>
-                    </div>
-                  </div>
-                  <div v-else class="empty-text">暂无候补</div>
-                </div>
-              </div>
-            </section>
+              </section>
+            </div>
           </el-tab-pane>
 
           <el-tab-pane label="总结" name="summary">
-            <section class="summary-block">
-              <div class="inline-header">
-                <strong>图文总结</strong>
-                <el-tag v-if="summary">{{ summary.status }}</el-tag>
-              </div>
-              <p class="summary-text">{{ summary?.content || '暂未发布总结' }}</p>
-
-              <div v-if="summary?.images?.length" class="image-list">
-                <div v-for="image in summary.images" :key="image.id" class="image-item">
-                  <a :href="image.imageUrl" target="_blank" rel="noreferrer">{{ image.imageUrl }}</a>
-                  <div class="image-meta">
-                    <span>AI: {{ image.aiCategory || '-' }}</span>
-                    <span>确认: {{ image.confirmedCategory || '未确认' }}</span>
-                    <el-select
-                      v-if="isOwner"
-                      size="small"
-                      :model-value="image.confirmedCategory || image.aiCategory || 'PROCESS'"
-                      @change="onImageCategoryChange(image.id, $event)"
-                    >
-                      <el-option label="合影" value="GROUP_PHOTO" />
-                      <el-option label="场地" value="VENUE" />
-                      <el-option label="过程" value="PROCESS" />
-                      <el-option label="物资" value="MATERIAL" />
-                      <el-option label="成果" value="RESULT" />
-                    </el-select>
-                  </div>
+            <div v-if="canManageSummary" class="summary-manage">
+              <section class="dialog-panel">
+                <div class="section-head compact">
+                  <h3>总结内容</h3>
+                  <span class="muted">只有活动发起人可编辑，活动结束后开放</span>
                 </div>
-              </div>
-
-              <div v-if="isOwner" class="owner-summary-form">
-                <el-form label-width="88px">
-                  <el-form-item label="总结内容">
-                    <el-input v-model="summaryForm.content" type="textarea" :rows="5" />
-                  </el-form-item>
-                  <el-form-item label="图片 URL">
-                    <el-input v-model="summaryForm.imageUrlsText" type="textarea" :rows="3" placeholder="每行一个 URL，或用逗号分隔" />
-                  </el-form-item>
-                </el-form>
-                <div class="summary-actions">
-                  <el-button :loading="actionLoading" @click="uploadImages">上传图片</el-button>
+                <el-input v-model="summaryForm.content" type="textarea" :rows="6" placeholder="总结活动过程、成果、感想" />
+                <div class="action-row">
                   <el-button :loading="actionLoading" @click="saveSummary(false)">保存草稿</el-button>
                   <el-button type="primary" :loading="actionLoading" @click="saveSummary(true)">发布总结</el-button>
                 </div>
+              </section>
+              <section class="dialog-panel">
+                <div class="section-head compact">
+                  <h3>总结图片</h3>
+                  <span class="muted">支持多图、追加上传、删除重传</span>
+                </div>
+                <input type="file" accept="image/png,image/jpeg,image/webp" multiple @change="onSummaryFilesChange" />
+                <div v-if="summaryFiles.length" class="file-list">
+                  <span v-for="file in summaryFiles" :key="file.name + file.size">{{ file.name }}</span>
+                </div>
+                <div class="action-row">
+                  <el-button type="primary" :disabled="!summaryFiles.length" :loading="actionLoading" @click="uploadSelectedSummaryFiles">上传图片</el-button>
+                </div>
+                <div class="image-grid" v-if="summary?.images?.length">
+                  <div v-for="image in summary.images" :key="image.id" class="image-card">
+                    <img :src="image.imageUrl" alt="summary" />
+                    <div class="image-meta">
+                      <span>AI 识别：{{ imageCategoryLabel(image.aiCategory) }}</span>
+                      <span>已确认：{{ imageCategoryLabel(image.confirmedCategory) }}</span>
+                    </div>
+                    <div class="action-row wrap">
+                      <el-select :model-value="image.confirmedCategory || image.aiCategory" placeholder="确认分类" @change="(value: string | number | boolean) => confirmImage(image, String(value))">
+                        <el-option v-for="option in summaryCategoryOptions" :key="option.value" :label="option.label" :value="option.value" />
+                      </el-select>
+                      <el-button type="danger" plain @click="deleteImage(image)">删除</el-button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <section class="dialog-panel">
+              <div class="section-head compact">
+                <h3>已发布总结</h3>
               </div>
+              <el-empty v-if="!summary || summary.status !== 'PUBLISHED'" description="暂未发布总结" />
+              <template v-else>
+                <p class="summary-content">{{ summary.content || '暂无文字总结' }}</p>
+                <div class="image-grid" v-if="summary.images.length">
+                  <div v-for="image in summary.images" :key="image.id" class="image-card readonly">
+                    <img :src="image.imageUrl" alt="summary" />
+                    <div class="image-meta">
+                      <span>分类：{{ imageCategoryLabel(image.confirmedCategory || image.aiCategory) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </template>
             </section>
           </el-tab-pane>
 
           <el-tab-pane label="评价" name="reviews">
-            <section class="summary-block">
-              <div class="inline-header"><strong>活动评价</strong></div>
-              <div v-if="reviews.length" class="review-list">
-                <div v-for="review in reviews" :key="review.id" class="review-item">
-                  <div class="review-head">
-                    <strong>{{ review.nickname || review.userId }}</strong>
-                    <span>{{ review.rating }}/5</span>
+            <section class="dialog-panel">
+              <div class="section-head compact">
+                <h3>参与者评价</h3>
+                <span class="muted">活动结束后 7 天内可评价，过期自动隐藏</span>
+              </div>
+              <div v-if="canReview" class="review-form">
+                <el-rate v-model="reviewForm.rating" />
+                <el-input v-model="reviewForm.content" type="textarea" :rows="4" placeholder="写下你的体验" />
+                <el-button type="primary" :loading="actionLoading" @click="submitReview">提交评价</el-button>
+              </div>
+              <el-empty v-if="!reviews.length" description="暂无评价" />
+              <div v-else class="review-list">
+                <div v-for="review in reviews" :key="review.id" class="review-card">
+                  <div class="title-row">
+                    <strong>{{ review.nickname || `用户#${review.userId}` }}</strong>
                     <span>{{ formatTime(review.createdAt) }}</span>
                   </div>
-                  <p>{{ review.content || '无文字评价' }}</p>
+                  <el-rate :model-value="review.rating" disabled />
+                  <p>{{ review.content || '未填写文字评价' }}</p>
                 </div>
-              </div>
-              <div v-else class="empty-text">暂无评价</div>
-
-              <div v-if="canReview" class="owner-summary-form">
-                <el-form label-width="88px">
-                  <el-form-item label="评分">
-                    <el-rate v-model="reviewForm.rating" />
-                  </el-form-item>
-                  <el-form-item label="评价内容">
-                    <el-input v-model="reviewForm.content" type="textarea" :rows="4" />
-                  </el-form-item>
-                </el-form>
-                <el-button type="primary" :loading="actionLoading" @click="submitReview">提交评价</el-button>
               </div>
             </section>
           </el-tab-pane>
-        </el-tabs>
-      </template>
-    </el-dialog>
 
-    <el-dialog v-model="createVisible" title="新建活动" width="820px" @closed="resetForm">
-      <div class="ai-bar">
-        <el-input v-model="aiTheme" placeholder="先输入主题，例如：新生破冰夜跑" />
-        <el-button :loading="actionLoading" @click="generateAiPlan">AI 生成初稿</el-button>
-      </div>
-      <el-form label-width="96px">
-        <el-form-item label="活动标题"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="活动分类">
-          <el-select v-model="form.category">
-            <el-option v-for="option in categoryOptions" :key="option.value" :label="option.label" :value="option.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="活动简介"><el-input v-model="form.intro" type="textarea" :rows="4" /></el-form-item>
-        <el-form-item label="标签"><el-input v-model="tagText" placeholder="用英文逗号或中文逗号分隔" /></el-form-item>
-        <el-form-item label="城市"><el-input v-model="form.city" /></el-form-item>
-        <el-form-item label="地址"><el-input v-model="form.address" /></el-form-item>
-        <el-form-item label="经纬度">
-          <div class="lng-lat-row">
-            <el-input-number v-model="form.lng" :precision="4" :step="0.0001" placeholder="经度" />
-            <el-input-number v-model="form.lat" :precision="4" :step="0.0001" placeholder="纬度" />
-          </div>
-        </el-form-item>
-        <el-form-item label="人数上限"><el-input-number v-model="form.capacity" :min="1" :max="500" /></el-form-item>
-        <el-form-item label="费用"><el-input-number v-model="form.fee" :min="0" :step="10" /></el-form-item>
-        <el-form-item label="开始时间"><el-date-picker v-model="form.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
-        <el-form-item label="结束时间"><el-date-picker v-model="form.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
-        <el-form-item label="报名截止"><el-date-picker v-model="form.signupDeadline" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button :loading="saving" @click="submitCreate(false)">保存草稿</el-button>
-        <el-button type="primary" :loading="saving" @click="submitCreate(true)">提交审核</el-button>
+          <el-tab-pane v-if="isOwner" label="管理" name="manage">
+            <div class="manage-grid">
+              <section class="dialog-panel">
+                <div class="section-head compact">
+                  <h3>报名名单</h3>
+                  <span class="muted">{{ signups.length }} 人</span>
+                </div>
+                <el-empty v-if="!signups.length" description="暂无报名" />
+                <div v-else class="table-list">
+                  <div v-for="item in signups" :key="item.signupId" class="table-row">
+                    <span>{{ item.nickname || `用户#${item.userId}` }}</span>
+                    <span>{{ item.signupStatus }}</span>
+                    <span>{{ item.checkedIn ? '已签到' : '未签到' }}</span>
+                  </div>
+                </div>
+              </section>
+              <section class="dialog-panel">
+                <div class="section-head compact">
+                  <h3>等待队列</h3>
+                  <span class="muted">{{ waitlist?.waitlistCount || 0 }} 人</span>
+                </div>
+                <el-empty v-if="!waitlist?.list?.length" description="暂无候补" />
+                <div v-else class="table-list">
+                  <div v-for="item in waitlist.list" :key="item.id" class="table-row">
+                    <span>{{ item.nickname || `用户#${item.userId}` }}</span>
+                    <span>排位 {{ item.position }}</span>
+                    <span>{{ item.status }}</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </el-dialog>
   </div>
@@ -902,185 +1142,294 @@ onMounted(async () => {
 
 <style scoped>
 .activity-page {
-  padding: 24px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
-.panel {
+
+.panel,
+.dialog-panel {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
+}
+
+.panel {
   padding: 16px;
-  display: grid;
-  gap: 12px;
 }
-.tab-row,
-.panel-header,
-.detail-toolbar,
-.inline-header,
-.review-head,
-.image-meta,
-.item-title-row,
-.meta-row,
-.tag-row,
-.mini-row,
-.ai-bar,
-.lng-lat-row,
-.toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+
+.dialog-panel {
+  padding: 16px;
 }
-.tab-row,
-.panel-header,
-.detail-toolbar,
-.inline-header,
-.review-head,
-.image-meta,
-.item-title-row,
-.meta-row,
-.tag-row,
-.mini-row {
-  justify-content: space-between;
-}
-.spacer {
-  flex: 1;
-}
-.search-grid,
-.content-grid,
-.activity-list,
-.mine-list,
-.map-layout,
-.map-list,
-.review-list,
-.image-list,
-.mini-list,
-.item-main,
-.owner-summary-form,
-.summary-block,
-.inline-block,
-.detail-grid,
-.owner-panels,
+
+.page-toolbar,
+.layout-grid,
+.dialog-grid,
+.manage-grid,
 .checkin-grid,
-.summary-actions {
+.summary-manage,
+.overview-grid,
+.form-grid,
+.toolbar-grid {
   display: grid;
   gap: 12px;
 }
-.search-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-.content-grid {
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+
+.layout-grid {
+  grid-template-columns: 1.2fr 1fr 0.8fr;
   align-items: start;
 }
-.activity-item,
-.mine-item,
-.map-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  padding: 14px;
-  text-align: left;
-  cursor: pointer;
-}
-.activity-item:hover,
-.mine-item:hover,
-.map-item:hover {
-  border-color: #93c5fd;
-}
-.map-layout {
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-}
-.map-canvas {
-  min-height: 360px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f3f4f6;
-  position: relative;
-}
-.map-placeholder {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: #6b7280;
-}
-.intro,
-.summary-text,
-.review-item p,
-.detail-grid p {
-  margin: 0;
-  color: #374151;
-  line-height: 1.5;
-}
-.label,
-.panel-meta,
-.helper-text,
-.empty-text {
-  color: #6b7280;
-}
-.meta-row,
-.tag-row.compact,
-.template-row,
-.detail-tags,
-.detail-actions {
-  flex-wrap: wrap;
-}
-.mine-item {
+
+.toolbar-top,
+.toolbar-bottom,
+.section-head,
+.title-row,
+.action-row,
+.inline-row,
+.detail-hero,
+.toolbar-actions,
+.section-meta,
+.image-meta,
+.table-row {
   display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-top,
+.toolbar-bottom,
+.section-head,
+.detail-hero {
   justify-content: space-between;
 }
-.detail-grid {
+
+.toolbar-grid,
+.form-grid,
+.overview-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dialog-grid,
+.summary-manage,
+.manage-grid,
+.checkin-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.detail-grid .full {
-  grid-column: 1 / -1;
-}
-.inline-block {
-  margin-top: 16px;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 16px;
-}
-.owner-panels {
+
+.inline-row.two-up {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
 }
-.image-item,
-.review-item {
+
+.map-panel {
+  grid-column: span 2;
+}
+
+.map-canvas,
+.picker-map {
+  width: 100%;
+  height: 420px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.picker-map {
+  height: 280px;
+}
+
+.location-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.location-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #f8fbff;
+}
+
+.location-label {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.location-card strong {
+  display: block;
+  font-size: 14px;
+  color: #111827;
+  word-break: break-all;
+}
+
+.map-side-list,
+.activity-list,
+.mine-list,
+.review-list,
+.table-list,
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.point-card,
+.activity-card,
+.mine-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.point-card:hover,
+.activity-card:hover,
+.mine-card:hover {
+  border-color: #409eff;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.tag-row,
+.template-actions,
+.detail-actions,
+.review-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.intro,
+.summary-content,
+.hint {
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.kv-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.code-box {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f3f4f6;
+}
+
+.qr-image {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.image-card {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 12px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
-.checkin-grid {
-  grid-template-columns: minmax(0, 1fr) 150px 150px auto;
+
+.image-card img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f3f4f6;
 }
-.summary-actions {
-  grid-template-columns: repeat(3, auto);
-  justify-content: end;
+
+.image-meta {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  color: #4b5563;
+  font-size: 14px;
 }
-.ai-bar,
-.lng-lat-row {
-  justify-content: stretch;
+
+.table-row {
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
 }
-.ai-bar :deep(.el-input),
-.lng-lat-row :deep(.el-input-number) {
-  flex: 1;
+
+.wrap {
+  flex-wrap: wrap;
 }
-@media (max-width: 1100px) {
-  .content-grid,
-  .map-layout,
-  .owner-panels,
-  .search-grid,
+
+.compact {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 1200px) {
+  .layout-grid,
+  .dialog-grid,
+  .manage-grid,
   .checkin-grid,
-  .summary-actions {
+  .summary-manage {
     grid-template-columns: 1fr;
   }
-  .detail-grid {
-    grid-template-columns: 1fr;
+
+  .map-panel {
+    grid-column: span 1;
+  }
+
+  .toolbar-grid,
+  .form-grid,
+  .overview-grid,
+  .meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-.status-rejected { color: #f56c6c; font-weight: 600; }
-.creator-link { color: #409eff; cursor: pointer; }
-.creator-link:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+  .toolbar-grid,
+  .form-grid,
+  .overview-grid,
+  .meta-grid,
+  .inline-row.two-up {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-top,
+  .toolbar-bottom,
+  .section-head,
+  .detail-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 </style>

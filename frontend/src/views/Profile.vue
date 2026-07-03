@@ -5,7 +5,14 @@ import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
 
 const auth = useAuthStore()
-const form = reactive({ accountId: '', nickname: '', gender: 'UNKNOWN', signature: '', privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean> })
+const form = reactive({
+  accountId: '',
+  nickname: '',
+  gender: 'UNKNOWN',
+  birthday: '',
+  signature: '',
+  privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean>,
+})
 const loading = ref(false)
 const uploading = ref(false)
 
@@ -14,6 +21,7 @@ onMounted(async () => {
   form.accountId = auth.user?.accountId || ''
   form.nickname = auth.user?.nickname || ''
   form.gender = auth.user?.gender || 'UNKNOWN'
+  form.birthday = auth.user?.birthday || ''
   form.signature = auth.user?.signature || ''
   if ((auth.user as any)?.privacySettings) {
     form.privacySettings = { showActivities: true, showTeams: true, ...(auth.user as any).privacySettings }
@@ -23,9 +31,20 @@ onMounted(async () => {
 async function save() {
   loading.value = true
   try {
-    auth.user = await authApi.updateMe(form)
+    auth.user = await authApi.updateMe({
+      accountId: form.accountId,
+      nickname: form.nickname,
+      gender: form.gender,
+      birthday: form.birthday || undefined,
+      signature: form.signature,
+      privacySettings: form.privacySettings,
+    })
     ElMessage.success('已保存')
-  } catch { /* 已提示 */ } finally { loading.value = false }
+  } catch {
+    // handled by interceptor
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleAvatarChange(e: Event) {
@@ -48,7 +67,7 @@ async function handleAvatarChange(e: Event) {
 </script>
 
 <template>
-  <el-card class="box" v-if="auth.user">
+  <el-card v-if="auth.user" class="box">
     <h2>我的资料</h2>
 
     <div class="avatar-section">
@@ -67,7 +86,7 @@ async function handleAvatarChange(e: Event) {
       <el-descriptions-item label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
     </el-descriptions>
 
-    <el-form label-width="80px" style="margin-top:16px" @submit.prevent>
+    <el-form label-width="80px" style="margin-top: 16px" @submit.prevent>
       <el-form-item label="趣聚号"><el-input v-model="form.accountId" placeholder="4-32位，字母或数字" /></el-form-item>
       <el-form-item label="昵称"><el-input v-model="form.nickname" /></el-form-item>
       <el-form-item label="性别">
@@ -76,6 +95,9 @@ async function handleAvatarChange(e: Event) {
           <el-option label="男" value="MALE" />
           <el-option label="女" value="FEMALE" />
         </el-select>
+      </el-form-item>
+      <el-form-item label="生日">
+        <el-date-picker v-model="form.birthday" type="date" value-format="YYYY-MM-DD" placeholder="请选择出生日期" style="width: 100%" />
       </el-form-item>
       <el-form-item label="签名"><el-input v-model="form.signature" type="textarea" :rows="2" /></el-form-item>
 

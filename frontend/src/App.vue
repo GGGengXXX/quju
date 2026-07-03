@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { onBeforeUnmount, provide, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, provide, ref, watch } from 'vue'
 import { ElNotification } from 'element-plus'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { teamApi, type TeamAnnouncementItem, type TeamSummary } from './api/team'
 import { notificationApi } from './api/notification'
 import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
+const minimalLayout = computed(() => Boolean(route.meta.minimalLayout))
 let notificationTimer: number | null = null
 const unreadCount = ref(0)
 
 async function pollUnreadCount() {
-  if (!auth.token) { unreadCount.value = 0; return }
-  try { unreadCount.value = await notificationApi.unreadCount() } catch { /* ignore */ }
+  if (!auth.token) {
+    unreadCount.value = 0
+    return
+  }
+  try {
+    unreadCount.value = await notificationApi.unreadCount()
+  } catch {
+    // ignore
+  }
 }
 
 function startUnreadPolling() {
@@ -30,12 +39,12 @@ function goNotifications() {
   router.push('/notifications')
 }
 
-// 监听路由变化，从通知页离开时刷新未读数
 watch(() => router.currentRoute.value.path, (newPath, oldPath) => {
   if (oldPath === '/notifications' && newPath !== '/notifications') {
     pollUnreadCount()
   }
 })
+
 let notificationChecking = false
 
 function logout() {
@@ -97,7 +106,7 @@ async function ensureCurrentUserLoaded() {
 }
 
 async function pollAnnouncements() {
-  if (notificationChecking || !auth.token) return
+  if (notificationChecking || !auth.token || minimalLayout.value) return
   const ready = await ensureCurrentUserLoaded()
   if (!ready || !auth.user?.id) return
 
@@ -164,6 +173,7 @@ function stopAnnouncementPolling() {
 
 async function startAnnouncementPolling() {
   stopAnnouncementPolling()
+  if (minimalLayout.value) return
   const ready = await ensureCurrentUserLoaded()
   if (!ready) return
   await pollAnnouncements()
@@ -172,8 +182,8 @@ async function startAnnouncementPolling() {
   }, 30000)
 }
 
-watch(() => auth.token, (token) => {
-  if (token) {
+watch(() => [auth.token, minimalLayout.value], ([token, minimal]) => {
+  if (token && !minimal) {
     void startAnnouncementPolling()
     startUnreadPolling()
     return
@@ -189,7 +199,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <el-container>
+  <template v-if="minimalLayout">
+    <router-view />
+  </template>
+  <el-container v-else>
     <el-header class="hd">
       <span class="logo" @click="router.push('/')">趣聚 QuJu</span>
       <span class="spacer" />
@@ -208,9 +221,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
-body { margin: 0; }
-.hd { display: flex; align-items: center; background: #409eff; color: #fff; }
-.logo { font-weight: 700; font-size: 18px; cursor: pointer; }
+body { margin: 0; background: #f7f8fa; }
+.hd { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e5e7eb; background: #fff; }
+.logo { font-weight: 700; cursor: pointer; }
 .spacer { flex: 1; }
-.hd .el-button { color: #fff; }
+.notify-badge { margin-left: 6px; vertical-align: middle; }
 </style>
