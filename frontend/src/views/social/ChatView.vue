@@ -19,6 +19,9 @@ const messages = ref<MessageVO[]>([])
 const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
+const showEmoji = ref(false)
+
+const emojis = ['😀','😂','🥰','😎','🤔','👍','👋','🎉','🔥','❤️','😭','😅','🙏','💪','✨','🥳','😤','🤣','😘','🫡','👀','💯','🤝','🫶','😈','🥲','😊','🤗','😏','🙄']
 const messagesEnd = ref<HTMLElement | null>(null)
 const memberMap = ref<Map<number, TeamMemberItem>>(new Map())
 
@@ -80,6 +83,11 @@ async function send() {
   } finally {
     sending.value = false
   }
+}
+
+function insertEmoji(emoji: string) {
+  inputText.value += emoji
+  showEmoji.value = false
 }
 
 async function sendImage(e: Event) {
@@ -193,11 +201,15 @@ onBeforeUnmount(() => {
 
     <div class="chat-input">
       <el-input v-model="inputText" placeholder="输入消息..." @keyup.enter="send" :disabled="sending" />
+      <span class="emoji-btn" @click="showEmoji = !showEmoji">😊</span>
       <label class="img-btn">
         <span>📷</span>
         <input type="file" accept="image/*" hidden @change="sendImage" :disabled="sending" />
       </label>
       <el-button type="primary" :loading="sending" @click="send">发送</el-button>
+    </div>
+    <div v-if="showEmoji" class="emoji-panel">
+      <span v-for="e in emojis" :key="e" class="emoji-item" @click="insertEmoji(e)">{{ e }}</span>
     </div>
   </div>
 </template>
@@ -228,4 +240,9 @@ onBeforeUnmount(() => {
 .chat-input .el-input { flex: 1; }
 .img-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 4px; }
 .img-btn:hover { background: #f0f0f0; }
+.emoji-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 4px; }
+.emoji-btn:hover { background: #f0f0f0; }
+.emoji-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 16px; border-top: 1px solid #eee; max-height: 120px; overflow-y: auto; }
+.emoji-item { cursor: pointer; font-size: 22px; padding: 4px; border-radius: 4px; }
+.emoji-item:hover { background: #f0f0f0; }
 </style>
