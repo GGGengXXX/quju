@@ -22,7 +22,7 @@ const tab = ref((route.query.tab as string) || 'friends')
 const friends = ref<FriendVO[]>([])
 const friendsLoading = ref(false)
 
-// 好友申请
+// 好友申请（保留但降级）
 const requests = ref<FriendRequestVO[]>([])
 const requestsLoading = ref(false)
 
@@ -30,10 +30,11 @@ const requestsLoading = ref(false)
 const blocks = ref<BlockVO[]>([])
 const blocksLoading = ref(false)
 
-// 关注
-const followTab = ref('FOLLOWING')
-const followList = ref<FollowVO[]>([])
+// 关注 / 粉丝
+const followingList = ref<FollowVO[]>([])
+const followersList = ref<FollowVO[]>([])
 const followLoading = ref(false)
+const fansLoading = ref(false)
 
 // 我的小队
 const myTeams = ref<any[]>([])
@@ -80,9 +81,18 @@ async function loadBlocks() {
 async function loadFollows() {
   followLoading.value = true
   try {
-    followList.value = await socialApi.getFollows({ type: followTab.value as 'FOLLOWING' | 'FOLLOWERS' })
+    followingList.value = await socialApi.getFollows({ type: 'FOLLOWING' })
   } finally {
     followLoading.value = false
+  }
+}
+
+async function loadFans() {
+  fansLoading.value = true
+  try {
+    followersList.value = await socialApi.getFollows({ type: 'FOLLOWERS' })
+  } finally {
+    fansLoading.value = false
   }
 }
 
@@ -99,8 +109,8 @@ async function loadMyTeams() {
 function onTabChange(t: string) {
   tab.value = t
   if (t === 'friends') loadFriends()
-  else if (t === 'requests') loadRequests()
-  else if (t === 'follows') loadFollows()
+  else if (t === 'following') loadFollows()
+  else if (t === 'fans') loadFans()
   else if (t === 'blocks') loadBlocks()
   else if (t === 'teams') loadMyTeams()
 }
@@ -156,10 +166,18 @@ async function unblock(userId: number) {
 }
 
 async function unfollow(userId: number) {
-  await ElMessageBox.confirm('取消关注后，如果之前是互关好友，好友关系也会解除', '提示')
+  await ElMessageBox.confirm('取消关注后，如果是互关好友，好友关系也会解除', '提示')
   await socialApi.unfollow(userId)
   ElMessage.success('已取消关注')
   loadFollows()
+  loadFriends()
+}
+
+async function followUser(userId: number) {
+  await socialApi.follow(userId)
+  ElMessage.success('已关注（互相关注自动成为好友）')
+  loadFans()
+  loadFriends()
 }
 
 function openAdd() {
@@ -203,8 +221,8 @@ function goProfile(userId: number) {
 }
 
 onMounted(() => {
-  if (tab.value === 'requests') loadRequests()
-  else if (tab.value === 'follows') loadFollows()
+  if (tab.value === 'following') loadFollows()
+  else if (tab.value === 'fans') loadFans()
   else if (tab.value === 'blocks') loadBlocks()
   else if (tab.value === 'teams') loadMyTeams()
   else loadFriends()
@@ -215,7 +233,7 @@ onMounted(() => {
   <div class="social-hub">
     <div class="hub-header">
       <h2>社交</h2>
-      <el-button type="primary" size="small" @click="openAdd">添加好友</el-button>
+      <el-button type="primary" size="small" @click="openAdd">搜索用户</el-button>
     </div>
 
     <el-tabs v-model="tab" @tab-change="onTabChange">
@@ -241,23 +259,35 @@ onMounted(() => {
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="好友申请" name="requests">
-        <div v-loading="requestsLoading" class="list">
-          <div v-if="!requests.length && !requestsLoading" class="empty">暂无申请</div>
-          <div v-for="r in requests" :key="r.id" class="card">
-            <div class="info" style="cursor: pointer" @click="goProfile(r.fromUserId)">
-              <el-avatar :size="40" :src="r.fromAvatar" />
+      <el-tab-pane label="关注" name="following">
+        <div v-loading="followLoading" class="list">
+          <div v-if="!followingList.length && !followLoading" class="empty">暂未关注任何人</div>
+          <div v-for="f in followingList" :key="f.userId" class="card">
+            <div class="info" style="cursor: pointer" @click="goProfile(f.userId)">
+              <el-avatar :size="40" :src="f.avatar" />
               <div class="text">
-                <strong class="link-name">{{ r.fromNickname || r.fromUserId }}</strong>
-                <span class="sub">{{ r.message || '请求加为好友' }}</span>
+                <strong class="link-name">{{ f.nickname || f.userId }}</strong>
               </div>
             </div>
             <div class="actions">
-              <template v-if="r.status === 'PENDING'">
-                <el-button size="small" type="success" @click="acceptRequest(r.id)">接受</el-button>
-                <el-button size="small" type="info" @click="rejectRequest(r.id)">拒绝</el-button>
-              </template>
-              <el-tag v-else size="small">{{ r.status === 'ACCEPTED' ? '已接受' : '已拒绝' }}</el-tag>
+              <el-button text size="small" type="danger" @click="unfollow(f.userId)">取消关注</el-button>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="粉丝" name="fans">
+        <div v-loading="fansLoading" class="list">
+          <div v-if="!followersList.length && !fansLoading" class="empty">暂无粉丝</div>
+          <div v-for="f in followersList" :key="f.userId" class="card">
+            <div class="info" style="cursor: pointer" @click="goProfile(f.userId)">
+              <el-avatar :size="40" :src="f.avatar" />
+              <div class="text">
+                <strong class="link-name">{{ f.nickname || f.userId }}</strong>
+              </div>
+            </div>
+            <div class="actions">
+              <el-button text size="small" type="success" @click="followUser(f.userId)">回关</el-button>
             </div>
           </div>
         </div>
@@ -275,28 +305,6 @@ onMounted(() => {
             </div>
             <div class="actions">
               <el-button text size="small" type="success" @click="unblock(b.userId)">解除</el-button>
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane label="关注" name="follows">
-        <el-radio-group v-model="followTab" style="margin-bottom: 12px" @change="loadFollows">
-          <el-radio-button value="FOLLOWING">我关注的</el-radio-button>
-          <el-radio-button value="FOLLOWERS">关注我的</el-radio-button>
-        </el-radio-group>
-        <div v-loading="followLoading" class="list">
-          <div v-if="!followList.length && !followLoading" class="empty">暂无数据</div>
-          <div v-for="f in followList" :key="f.userId" class="card">
-            <div class="info" style="cursor: pointer" @click="goProfile(f.userId)">
-              <el-avatar :size="40" :src="f.avatar" />
-              <div class="text">
-                <strong class="link-name">{{ f.nickname || f.userId }}</strong>
-              </div>
-            </div>
-            <div class="actions">
-              <el-button v-if="followTab === 'FOLLOWING'" text size="small" type="danger" @click="unfollow(f.userId)">取消关注</el-button>
-              <el-button text size="small" type="primary" @click="goProfile(f.userId)">主页</el-button>
             </div>
           </div>
         </div>
