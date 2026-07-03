@@ -44,6 +44,7 @@ import cn.edu.buaa.quju.module.activity.mapper.ActivitySummaryMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityTagMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityTemplateMapper;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityWaitlistMapper;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserBrief;
 import cn.edu.buaa.quju.module.user.entity.User;
 import cn.edu.buaa.quju.module.user.mapper.UserMapper;
@@ -97,6 +98,7 @@ public class ActivityService {
     private final ActivityAiService activityAiService;
     private final ActivityImageStorageService activityImageStorageService;
     private final EmailService emailService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ActivityService(ActivityDomainMapper activityMapper,
@@ -112,7 +114,8 @@ public class ActivityService {
                            ActivityAuditLogMapper activityAuditLogMapper,
                            ActivityAiService activityAiService,
                            ActivityImageStorageService activityImageStorageService,
-                           EmailService emailService) {
+                           EmailService emailService,
+                           NotificationService notificationService) {
         this.activityMapper = activityMapper;
         this.activityTagMapper = activityTagMapper;
         this.templateMapper = templateMapper;
@@ -127,6 +130,7 @@ public class ActivityService {
         this.activityAiService = activityAiService;
         this.activityImageStorageService = activityImageStorageService;
         this.emailService = emailService;
+        this.notificationService = notificationService;
     }
 
     public List<TemplateVO> listTemplates() {
@@ -201,6 +205,15 @@ public class ActivityService {
         if (status != null && !status.isBlank()) qw.eq(Activity::getStatus, status);
         activityMapper.selectPage(p, qw);
         return new PageResult<>(p.getTotal(), page, size, toActivityVOList(p.getRecords()));
+    }
+
+    public List<ActivityVO> userJoinedActivities(long userId) {
+        List<ActivitySignup> signups = signupMapper.selectList(Wrappers.<ActivitySignup>lambdaQuery()
+                .eq(ActivitySignup::getUserId, userId).eq(ActivitySignup::getStatus, "REGISTERED"));
+        if (signups.isEmpty()) return List.of();
+        List<Long> activityIds = signups.stream().map(ActivitySignup::getActivityId).toList();
+        List<Activity> activities = activityMapper.selectBatchIds(activityIds);
+        return toActivityVOList(activities.stream().filter(a -> a.getDeletedAt() == null).toList());
     }
 
     public List<ActivityPointVO> mapPoints(BigDecimal minLng, BigDecimal maxLng, BigDecimal minLat, BigDecimal maxLat) {
@@ -379,6 +392,9 @@ public class ActivityService {
             signup.setStatus("REGISTERED");
             signup.setSignupInfo(toJson(createSignupPayload(req)));
             signupMapper.insert(signup);
+            // 通知活动创建者有人报名
+            notificationService.send(activity.getCreatorId(), "ACTIVITY_SIGNUP",
+                    "活动「" + activity.getName() + "」有新报名", null, "ACTIVITY", activityId);
             return new SignupResultVO("REGISTERED", null);
         }
 
@@ -764,7 +780,7 @@ public class ActivityService {
         List<User> users = userMapper.selectList(new QueryWrapper<User>().in("id", userIds));
         Map<Long, UserBrief> map = new HashMap<>();
         for (User user : users) {
-            map.put(user.getId(), new UserBrief(user.getId(), user.getNickname(), user.getAvatar(), user.getUserType(), user.getStatus()));
+            map.put(user.getId(), new UserBrief(user.getId(), user.getAccountId(), user.getNickname(), user.getAvatar(), user.getUserType(), user.getStatus()));
         }
         return map;
     }

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private String accountId;
     private String email;
     private String passwordHash;
     private String userType;   // INDIVIDUAL | MERCHANT
@@ -23,6 +24,7 @@ public class User {
     private LocalDate birthday;
     private String signature;
     private Integer reputation;
+    private String privacySettings;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;   // 软删；查询默认过滤 deleted_at IS NULL

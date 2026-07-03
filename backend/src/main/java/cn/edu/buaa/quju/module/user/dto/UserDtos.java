@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /** 用户/鉴权模块 DTO（请求体校验 + 响应视图）。字段对齐 contracts/openapi.yaml。 */
 public final class UserDtos {
@@ -30,17 +31,17 @@ public final class UserDtos {
                                    @NotBlank @Size(min = 8) String newPassword) {}
 
     // ---- 用户资料响应 ----
-    public record UserBrief(Long id, String nickname, String avatar, String userType, String status) {}
+    public record UserBrief(Long id, String accountId, String nickname, String avatar, String userType, String status) {}
 
     public record LoginResp(String token, long expiresIn, UserBrief user) {}
 
-    public record UserVO(Long id, String email, String nickname, String avatar, String userType,
+    public record UserVO(Long id, String accountId, String email, String nickname, String avatar, String userType,
                          String status, String gender, LocalDate birthday, String signature,
-                         Integer reputation, List<String> interestTags) {}
+                         Integer reputation, List<String> interestTags, Map<String, Boolean> privacySettings) {}
 
-    public record UpdateProfileReq(String nickname, String avatar, String gender,
+    public record UpdateProfileReq(String accountId, String nickname, String avatar, String gender,
                                    LocalDate birthday, String signature,
-                                   List<String> interestTags) {}
+                                   List<String> interestTags, Map<String, Boolean> privacySettings) {}
 
     // ---- 商家 ----
     public record MerchantApplyReq(@NotBlank String merchantName, String nickname,

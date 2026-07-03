@@ -14,6 +14,7 @@ SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `user` (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  account_id    VARCHAR(32)   DEFAULT NULL                   COMMENT '趣聚号(唯一，注册自动生成，可修改)',
   email         VARCHAR(128)  NOT NULL,
   password_hash VARCHAR(100)  NOT NULL                       COMMENT 'BCrypt',
   user_type     VARCHAR(16)   NOT NULL                       COMMENT 'INDIVIDUAL|MERCHANT',
@@ -24,11 +25,13 @@ CREATE TABLE IF NOT EXISTS `user` (
   birthday      DATE          DEFAULT NULL,
   signature     VARCHAR(140)  DEFAULT NULL,
   reputation    INT           NOT NULL DEFAULT 100           COMMENT '信誉分(报名校验用)',
+  privacy_settings JSON       DEFAULT NULL                   COMMENT '隐私设置 {showActivities,showTeams}',
   created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at    TIMESTAMP     NULL DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uk_user_email (email),
+  UNIQUE KEY uk_user_account_id (account_id),
   UNIQUE KEY uk_user_nickname (nickname),
   KEY idx_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户(个人/商家)';
@@ -452,6 +455,20 @@ CREATE TABLE IF NOT EXISTS moderation_action (
   PRIMARY KEY (id),
   KEY idx_mod_target (target_type, target_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下架/停用/恢复记录';
+
+CREATE TABLE IF NOT EXISTS notification (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id     BIGINT UNSIGNED NOT NULL                       COMMENT '接收人',
+  type        VARCHAR(32)  NOT NULL                          COMMENT 'ACTIVITY_REVIEW|ACTIVITY_SIGNUP|FRIEND_REQUEST|FRIEND_ACCEPT|TEAM_JOIN|SYSTEM',
+  title       VARCHAR(128) NOT NULL,
+  content     VARCHAR(512) DEFAULT NULL,
+  is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+  ref_type    VARCHAR(32)  DEFAULT NULL                      COMMENT '关联实体类型: ACTIVITY|USER|TEAM',
+  ref_id      BIGINT UNSIGNED DEFAULT NULL                   COMMENT '关联实体ID',
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_notification_user (user_id, is_read, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知';
 
 CREATE TABLE IF NOT EXISTS report (
   id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

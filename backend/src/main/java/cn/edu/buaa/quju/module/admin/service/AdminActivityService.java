@@ -12,6 +12,9 @@ import cn.edu.buaa.quju.module.admin.entity.Activity;
 import cn.edu.buaa.quju.module.admin.entity.ModerationAction;
 import cn.edu.buaa.quju.module.admin.mapper.ActivityMapper;
 import cn.edu.buaa.quju.module.admin.mapper.ModerationActionMapper;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
+import cn.edu.buaa.quju.module.user.entity.User;
+import cn.edu.buaa.quju.module.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,13 +31,19 @@ public class AdminActivityService {
     private final ActivityMapper activityMapper;
     private final ModerationActionMapper moderationMapper;
     private final ActivityAuditLogMapper activityAuditLogMapper;
+    private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
     public AdminActivityService(ActivityMapper activityMapper,
                                 ModerationActionMapper moderationMapper,
-                                ActivityAuditLogMapper activityAuditLogMapper) {
+                                ActivityAuditLogMapper activityAuditLogMapper,
+                                UserMapper userMapper,
+                                NotificationService notificationService) {
         this.activityMapper = activityMapper;
         this.moderationMapper = moderationMapper;
         this.activityAuditLogMapper = activityAuditLogMapper;
+        this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     public PageResult<ActivityListVO> listActivities(String status, String keyword, int page, int size) {
@@ -56,7 +66,7 @@ public class AdminActivityService {
     public void reviewActivity(long adminId, long activityId, ActivityReviewReq req) {
         Activity a = requireActivity(activityId);
         if (!"PENDING_REVIEW".equals(a.getStatus())) throw new BizException(ErrorCode.CONFLICT);
-        String action = req.action() == null ? "" : req.action().trim().toUpperCase();
+        String action = req.result() == null ? "" : req.result().trim().toUpperCase();
         if (List.of("REJECTED", "NEEDS_REVISION").contains(action) && (req.reason() == null || req.reason().isBlank())) {
             throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
         }
@@ -66,6 +76,7 @@ public class AdminActivityService {
             default -> throw new BizException(ErrorCode.BAD_REQUEST, "审核动作非法");
         }
         activityMapper.updateById(a);
+
         ActivityAuditLog log = new ActivityAuditLog();
         log.setActivityId(activityId);
         log.setAuditType("MANUAL");
@@ -73,6 +84,22 @@ public class AdminActivityService {
         log.setReason(req.reason());
         log.setAuditorAdminId(adminId);
         activityAuditLogMapper.insert(log);
+
+        String logAction = switch (action) {
+            case "PASSED", "APPROVED" -> "REVIEW_PASS";
+            case "REJECTED" -> "REVIEW_REJECT";
+            case "NEEDS_REVISION" -> "REVIEW_REVISE";
+            default -> "REVIEW";
+        };
+        logModeration(adminId, activityId, logAction, req.reason() != null ? req.reason() : "");
+
+        String notifyTitle = switch (action) {
+            case "PASSED", "APPROVED" -> "活动「" + a.getName() + "」审核通过";
+            case "REJECTED" -> "活动「" + a.getName() + "」被驳回";
+            case "NEEDS_REVISION" -> "活动「" + a.getName() + "」需要修改";
+            default -> "活动审核结果";
+        };
+        notificationService.send(a.getCreatorId(), "ACTIVITY_REVIEW", notifyTitle, req.reason(), "ACTIVITY", activityId);
     }
 
     @Transactional
@@ -111,9 +138,18 @@ public class AdminActivityService {
     }
 
     private PageResult<ActivityListVO> toPage(IPage<Activity> p, int page, int size) {
-        List<ActivityListVO> list = p.getRecords().stream()
-                .map(a -> new ActivityListVO(a.getId(), a.getCreatorId(), a.getName(),
-                        a.getCategory(), a.getStatus(), a.getStartTime(), a.getCreatedAt()))
+        List<Activity> records = p.getRecords();
+        List<Long> creatorIds = records.stream().map(Activity::getCreatorId).distinct().toList();
+        Map<Long, String> nicknames = Map.of();
+        if (!creatorIds.isEmpty()) {
+            nicknames = userMapper.selectBatchIds(creatorIds).stream()
+                    .collect(Collectors.toMap(User::getId, u -> u.getNickname() != null ? u.getNickname() : ""));
+        }
+        Map<Long, String> finalNicknames = nicknames;
+        List<ActivityListVO> list = records.stream()
+                .map(a -> new ActivityListVO(a.getId(), a.getCreatorId(),
+                        finalNicknames.getOrDefault(a.getCreatorId(), ""),
+                        a.getName(), a.getCategory(), a.getStatus(), a.getStartTime(), a.getCreatedAt()))
                 .collect(Collectors.toList());
         return new PageResult<>(p.getTotal(), page, size, list);
     }

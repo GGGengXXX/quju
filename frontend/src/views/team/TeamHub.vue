@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { teamApi, type TeamDetail, type TeamSummary, type TeamMemberItem, type TeamJoinRequestItem, type TeamAnnouncementItem, type TeamVoteItem, type TeamFileItem, type TeamAlbumPhotoItem, type TeamMomentItem, type TeamPointItem, type ActivityItem } from '../../api/team'
 
@@ -466,7 +467,16 @@ async function featureMoment(momentId: number) {
   await refreshDetails()
 }
 
-onMounted(loadTeams)
+const teamRoute = useRoute()
+
+onMounted(async () => {
+  await loadTeams()
+  const detailId = Number(teamRoute.query.detail)
+  if (detailId) {
+    const target = teams.value.find(t => t.id === detailId)
+    if (target) openTeam(target)
+  }
+})
 onBeforeUnmount(() => {
   hideMentionMenu()
   clearFileDraft()
@@ -559,6 +569,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="actions">
+            <el-button v-if="selectedTeam.joined" type="primary" @click="$router.push(`/social/team-chat/${selectedTeam.id}`)">群聊</el-button>
             <el-button v-if="selectedTeam.joined && !isOwner" @click="leaveTeam">退出小队</el-button>
             <el-button v-if="isOwner" type="danger" @click="dissolveTeam">解散小队</el-button>
           </div>
@@ -567,7 +578,11 @@ onBeforeUnmount(() => {
         <el-tabs v-model="activeTab">
           <el-tab-pane label="成员" name="members">
             <el-table :data="members" stripe>
-              <el-table-column prop="nickname" label="成员" />
+              <el-table-column label="成员">
+                <template #default="{ row }">
+                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || row.userId }}</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="role" label="角色" width="120" />
               <el-table-column prop="points" label="积分" width="100" />
               <el-table-column v-if="canManage" label="操作" width="240">
@@ -737,7 +752,11 @@ onBeforeUnmount(() => {
           <el-tab-pane label="积分榜" name="points">
             <el-table :data="points" stripe>
               <el-table-column prop="rank" label="名次" width="80" />
-              <el-table-column prop="nickname" label="成员" />
+              <el-table-column label="成员">
+                <template #default="{ row }">
+                  <span class="member-link" @click="$router.push(`/social/user/${row.userId}`)">{{ row.nickname || row.userId }}</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="points" label="积分" width="100" />
             </el-table>
           </el-tab-pane>
@@ -898,4 +917,6 @@ onBeforeUnmount(() => {
   .search-row, .search-row.compact { grid-template-columns: 1fr; }
   .mention-menu { width: 100% !important; left: 0 !important; }
 }
+.member-link { color: #409eff; cursor: pointer; }
+.member-link:hover { text-decoration: underline; }
 </style>

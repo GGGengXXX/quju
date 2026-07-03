@@ -2,6 +2,7 @@ package cn.edu.buaa.quju.module.team.service;
 
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.team.dto.TeamDtos.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,17 +35,20 @@ public class TeamService {
     private final NamedParameterJdbcTemplate namedJdbcTemplate;
     private final ObjectMapper objectMapper;
     private final TeamImageStorageService teamImageStorageService;
+    private final NotificationService notificationService;
 
     public TeamService(
             JdbcTemplate jdbcTemplate,
             NamedParameterJdbcTemplate namedJdbcTemplate,
             ObjectMapper objectMapper,
-            TeamImageStorageService teamImageStorageService
+            TeamImageStorageService teamImageStorageService,
+            NotificationService notificationService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.namedJdbcTemplate = namedJdbcTemplate;
         this.objectMapper = objectMapper;
         this.teamImageStorageService = teamImageStorageService;
+        this.notificationService = notificationService;
     }
 
     public PageResult<TeamSummary> searchTeams(String keyword, String tag, int page, int size, Long viewerId) {
@@ -126,6 +130,8 @@ public class TeamService {
         String joinType = String.valueOf(team.get("join_type"));
         if ("PUBLIC".equals(joinType)) {
             addMember(teamId, userId, "MEMBER");
+            String teamName = String.valueOf(team.get("name"));
+            notificationService.send(ownerId, "TEAM_JOIN", "有新成员加入小队「" + teamName + "」", null, "TEAM", teamId);
             return new TeamJoinResult("JOINED", null);
         }
         Long existingPending = namedJdbcTemplate.query(
@@ -139,6 +145,8 @@ public class TeamService {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         namedJdbcTemplate.update("insert into team_join_request(team_id, user_id, status) values (:teamId, :userId, 'PENDING')",
                 new MapSqlParameterSource().addValue("teamId", teamId).addValue("userId", userId), keyHolder, new String[]{"id"});
+        String teamName = String.valueOf(team.get("name"));
+        notificationService.send(ownerId, "TEAM_JOIN_REQUEST", "有人申请加入小队「" + teamName + "」，请审核", null, "TEAM", teamId);
         return new TeamJoinResult("PENDING", requireGeneratedId(keyHolder));
     }
 
@@ -183,6 +191,8 @@ public class TeamService {
             }
             ensureTeamHasCapacity(teamId);
             addMember(teamId, applicantId, "MEMBER");
+            Map<String, Object> teamRow = findActiveTeam(teamId);
+            notificationService.send(applicantId, "TEAM_JOIN", "你已被批准加入小队「" + teamRow.get("name") + "」", null, "TEAM", teamId);
         }
         jdbcTemplate.update("update team_join_request set status = ?, handler_id = ?, handled_at = current_timestamp where id = ?",
                 "APPROVE".equals(action) ? "APPROVED" : "REJECTED", userId, reqId);

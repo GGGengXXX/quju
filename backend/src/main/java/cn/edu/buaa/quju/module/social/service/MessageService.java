@@ -3,6 +3,7 @@ package cn.edu.buaa.quju.module.social.service;
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
 import cn.edu.buaa.quju.common.PageResult;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.ForwardMessageReq;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.MarkReadReq;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.MessageVO;
@@ -29,13 +30,19 @@ public class MessageService {
     private final FriendshipMapper friendshipMapper;
     private final ChatWebSocketHandler wsHandler;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public MessageService(MessageMapper messageMapper, FriendshipMapper friendshipMapper,
-                          ChatWebSocketHandler wsHandler, ObjectMapper objectMapper) {
+                          ChatWebSocketHandler wsHandler, ObjectMapper objectMapper,
+                          NotificationService notificationService,
+                          org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.messageMapper = messageMapper;
         this.friendshipMapper = friendshipMapper;
         this.wsHandler = wsHandler;
         this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public PageResult<MessageVO> getMessages(long userId, String scope, long peerId, int page, int size) {
@@ -79,8 +86,24 @@ public class MessageService {
         }
         messageMapper.insert(msg);
         MessageVO vo = toVO(msg);
-        // 实时推送给接收方
         pushMessage(req.scope(), req.peerId(), senderId, vo);
+        String preview = req.content() != null && req.content().length() > 20
+                ? req.content().substring(0, 20) + "..." : req.content();
+        if ("FRIEND".equals(req.scope())) {
+            notificationService.send(req.peerId(), "FRIEND_MESSAGE",
+                    "收到一条新消息", preview, "USER", senderId);
+        } else {
+            // 小队群聊：通知所有队员（除发送者）
+            List<Long> memberIds = jdbcTemplate.queryForList(
+                    "SELECT user_id FROM team_member WHERE team_id = ? AND user_id != ?",
+                    Long.class, req.peerId(), senderId);
+            String teamName = jdbcTemplate.queryForObject(
+                    "SELECT name FROM team WHERE id = ?", String.class, req.peerId());
+            for (Long memberId : memberIds) {
+                notificationService.send(memberId, "TEAM_MESSAGE",
+                        "小队「" + teamName + "」有新消息", preview, "TEAM", req.peerId());
+            }
+        }
         return vo;
     }
 

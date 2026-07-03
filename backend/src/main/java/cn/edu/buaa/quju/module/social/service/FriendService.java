@@ -3,6 +3,7 @@ package cn.edu.buaa.quju.module.social.service;
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
 import cn.edu.buaa.quju.common.PageResult;
+import cn.edu.buaa.quju.module.notification.service.NotificationService;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.BlockVO;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.FollowVO;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.FriendRequestVO;
@@ -37,14 +38,17 @@ public class FriendService {
     private final FollowMapper followMapper;
     private final UserBlockMapper blockMapper;
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
     public FriendService(FriendRequestMapper requestMapper, FriendshipMapper friendshipMapper,
-                         FollowMapper followMapper, UserBlockMapper blockMapper, UserMapper userMapper) {
+                         FollowMapper followMapper, UserBlockMapper blockMapper, UserMapper userMapper,
+                         NotificationService notificationService) {
         this.requestMapper = requestMapper;
         this.friendshipMapper = friendshipMapper;
         this.followMapper = followMapper;
         this.blockMapper = blockMapper;
         this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     // ---- R3.1 好友申请 ----
@@ -72,6 +76,11 @@ public class FriendService {
         fr.setSource(req.source());
         fr.setMessage(req.message());
         requestMapper.insert(fr);
+        // 通知接收人
+        User sender = userMapper.selectById(fromId);
+        String senderName = sender != null && sender.getNickname() != null ? sender.getNickname() : "用户";
+        notificationService.send(toId, "FRIEND_REQUEST",
+                senderName + " 请求加你为好友", req.message(), "USER", fromId);
     }
 
     public PageResult<FriendRequestVO> getReceivedRequests(long userId, int page, int size) {
@@ -81,7 +90,7 @@ public class FriendService {
                         .eq(FriendRequest::getStatus, "PENDING")
                         .orderByDesc(FriendRequest::getCreatedAt));
         List<Long> fromIds = pg.getRecords().stream().map(FriendRequest::getFromUserId).toList();
-        Map<Long, User> users = userMapper.selectBatchIds(fromIds).stream()
+        Map<Long, User> users = fromIds.isEmpty() ? Map.of() : userMapper.selectBatchIds(fromIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
         List<FriendRequestVO> list = pg.getRecords().stream().map(fr -> {
             User u = users.get(fr.getFromUserId());
@@ -98,10 +107,13 @@ public class FriendService {
         fr.setStatus("ACCEPTED");
         fr.setHandledAt(LocalDateTime.now());
         requestMapper.updateById(fr);
-        // 双向建立好友关系
         addFriendship(fr.getFromUserId(), fr.getToUserId());
         addFriendship(fr.getToUserId(), fr.getFromUserId());
-        // 清理双方互相的关注（互关升级为好友，保留关注关系不强制删除，只升级好友表）
+        // 通知申请人
+        User acceptor = userMapper.selectById(userId);
+        String name = acceptor != null && acceptor.getNickname() != null ? acceptor.getNickname() : "用户";
+        notificationService.send(fr.getFromUserId(), "FRIEND_ACCEPT",
+                name + " 接受了你的好友申请", null, "USER", userId);
     }
 
     @Transactional

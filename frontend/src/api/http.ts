@@ -25,8 +25,10 @@ const http = axios.create({
   timeout: 15000,
 })
 
+// 注入 JWT（管理员接口用 admin token，其它用普通 token）
 http.interceptors.request.use((cfg) => {
-  const token = localStorage.getItem('quju_token')
+  const isAdmin = cfg.url?.startsWith('/admin')
+  const token = localStorage.getItem(isAdmin ? 'quju_admin_token' : 'quju_token')
   if (token) cfg.headers.Authorization = `Bearer ${token}`
   return cfg
 })
@@ -37,8 +39,10 @@ http.interceptors.response.use(
     if (r && typeof r.code === 'number') {
       if (r.code === 0) return r.data
       if (r.code === 1001) {
-        localStorage.removeItem('quju_token')
-        if (!location.pathname.startsWith('/login')) location.assign('/login')
+        const isAdmin = location.pathname.startsWith('/admin')
+        localStorage.removeItem(isAdmin ? 'quju_admin_token' : 'quju_token')
+        const loginPath = isAdmin ? '/admin/login' : '/login'
+        if (!location.pathname.startsWith(loginPath)) location.assign(loginPath)
       }
       if (!resp.config.silentError) ElMessage.error(r.message || '请求失败')
       return Promise.reject(new Error(r.message || 'error'))
