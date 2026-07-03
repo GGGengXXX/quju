@@ -149,20 +149,33 @@ async function sendLocation() {
   }
   if (!locationMap) {
     locationMap = new AMap.Map(locationPickerRef.value, { zoom: 14, center: [116.3521, 39.9835] })
-    locationMap.on('click', (e: any) => {
+    locationMap.on('click', async (e: any) => {
       pickedLocation.lng = e.lnglat.getLng().toFixed(6)
       pickedLocation.lat = e.lnglat.getLat().toFixed(6)
       if (locationMarker) locationMarker.setPosition(e.lnglat)
       else {
         locationMarker = new AMap.Marker({ map: locationMap, position: e.lnglat })
       }
+      // 逆地理编码获取地址
+      pickedLocation.address = '获取中...'
+      try {
+        const res = await fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${amapKey}&location=${pickedLocation.lng},${pickedLocation.lat}`)
+        const data = await res.json()
+        if (data.status === '1' && data.regeocode?.formatted_address) {
+          pickedLocation.address = data.regeocode.formatted_address
+        } else {
+          pickedLocation.address = `${pickedLocation.lng}, ${pickedLocation.lat}`
+        }
+      } catch {
+        pickedLocation.address = `${pickedLocation.lng}, ${pickedLocation.lat}`
+      }
     })
   }
 }
 
 async function confirmLocation() {
-  if (!pickedLocation.address.trim()) {
-    ElMessage.warning('请输入位置描述')
+  if (!pickedLocation.address.trim() || pickedLocation.address === '获取中...') {
+    ElMessage.warning('请在地图上点击选择位置')
     return
   }
   showLocationPicker.value = false
