@@ -99,6 +99,7 @@ public class ActivityService {
     private final ActivityImageStorageService activityImageStorageService;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ActivityService(ActivityDomainMapper activityMapper,
@@ -115,7 +116,8 @@ public class ActivityService {
                            ActivityAiService activityAiService,
                            ActivityImageStorageService activityImageStorageService,
                            EmailService emailService,
-                           NotificationService notificationService) {
+                           NotificationService notificationService,
+                           org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.activityMapper = activityMapper;
         this.activityTagMapper = activityTagMapper;
         this.templateMapper = templateMapper;
@@ -131,6 +133,7 @@ public class ActivityService {
         this.activityImageStorageService = activityImageStorageService;
         this.emailService = emailService;
         this.notificationService = notificationService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public List<TemplateVO> listTemplates() {
@@ -395,6 +398,10 @@ public class ActivityService {
             // 通知活动创建者有人报名
             notificationService.send(activity.getCreatorId(), "ACTIVITY_SIGNUP",
                     "活动「" + activity.getName() + "」有新报名", null, "ACTIVITY", activityId);
+            // 队内活动报名加积分
+            if (activity.getTeamId() != null) {
+                awardTeamPoints(activity.getTeamId(), userId, 3, "JOIN_ACTIVITY", activityId);
+            }
             return new SignupResultVO("REGISTERED", null);
         }
 
@@ -677,6 +684,13 @@ public class ActivityService {
         if (!Objects.equals(activity.getCreatorId(), userId)) {
             throw new BizException(ErrorCode.ACTIVITY_NOT_OWNER);
         }
+    }
+
+    private void awardTeamPoints(long teamId, long userId, int points, String reason, long refId) {
+        try {
+            jdbcTemplate.update("INSERT INTO team_points_log(team_id, user_id, points, reason, ref_id) VALUES (?, ?, ?, ?, ?)", teamId, userId, points, reason, refId);
+            jdbcTemplate.update("UPDATE team_member SET points = points + ? WHERE team_id = ? AND user_id = ?", points, teamId, userId);
+        } catch (Exception ignored) {}
     }
 
     private void ensureReadable(Activity activity, Long userId) {
@@ -1002,6 +1016,11 @@ public class ActivityService {
         checkin.setLng(req.lng());
         checkin.setLat(req.lat());
         checkinMapper.insert(checkin);
+        // 队内活动签到加积分
+        Activity act = activityMapper.selectById(activityId);
+        if (act != null && act.getTeamId() != null) {
+            awardTeamPoints(act.getTeamId(), targetUserId, 5, "CHECKIN_ACTIVITY", activityId);
+        }
     }
 
     private String exposeCheckinCode(Activity activity, String mySignupStatus, Long viewerId) {
