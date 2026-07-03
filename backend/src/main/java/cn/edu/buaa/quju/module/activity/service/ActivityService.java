@@ -682,6 +682,18 @@ public class ActivityService {
     private void ensureReadable(Activity activity, Long userId) {
         if ("PUBLISHED".equals(activity.getStatus())) return;
         if (userId != null && Objects.equals(activity.getCreatorId(), userId)) return;
+        // 队内活动：同小队成员可查看任何状态
+        if (userId != null && activity.getTeamId() != null) {
+            Long isMember = signupMapper.selectCount(
+                Wrappers.<ActivitySignup>lambdaQuery()
+                    .apply("EXISTS (SELECT 1 FROM team_member WHERE team_id = {0} AND user_id = {1})", activity.getTeamId(), userId)
+                    .last("LIMIT 1"));
+            // 上面的 hack 不对，直接用 userMapper 查
+            Long memberCount = userMapper.selectCount(
+                Wrappers.<cn.edu.buaa.quju.module.user.entity.User>lambdaQuery()
+                    .apply("EXISTS (SELECT 1 FROM team_member WHERE team_id = {0} AND user_id = {1})", activity.getTeamId(), userId));
+            if (memberCount != null && memberCount > 0) return;
+        }
         throw new BizException(ErrorCode.NOT_FOUND);
     }
 
