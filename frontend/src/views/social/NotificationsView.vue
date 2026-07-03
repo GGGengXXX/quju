@@ -64,6 +64,7 @@ function navigate(item: NotificationItem) {
       router.push(`/teams?detail=${refId}`)
       break
     case 'TEAM_MESSAGE':
+    case 'TEAM_AT':
       router.push(`/social/team-chat/${refId}`)
       break
     default:
@@ -95,6 +96,7 @@ const typeLabel: Record<string, string> = {
   TEAM_JOIN: '小队加入',
   TEAM_JOIN_REQUEST: '小队申请',
   TEAM_MESSAGE: '小队消息',
+  TEAM_AT: '小队@提醒',
   SYSTEM: '系统通知',
 }
 
