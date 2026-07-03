@@ -18,7 +18,8 @@ public final class UserDtos {
             @NotBlank @Email String email,
             @NotBlank @Size(min = 8, max = 64) String password,
             @NotBlank String userType,
-            String licenseUrl) {}
+            String licenseUrl,
+            String merchantName) {}
 
     public record ActivateReq(@NotBlank String token) {}
 

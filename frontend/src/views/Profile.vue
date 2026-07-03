@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
+import { merchantApi, type MerchantVO } from '../api/merchant'
 
 const auth = useAuthStore()
+const isMerchant = computed(() => auth.user?.userType === 'MERCHANT')
+
 const form = reactive({
   accountId: '',
   nickname: '',
@@ -13,8 +16,14 @@ const form = reactive({
   signature: '',
   privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean>,
 })
+const merchantForm = reactive({ merchantName: '', nickname: '', focusFields: '' })
+const merchant = ref<MerchantVO | null>(null)
 const loading = ref(false)
 const uploading = ref(false)
+
+const auditStatusLabel: Record<string, string> = {
+  PENDING: '审核中', APPROVED: '已通过', REJECTED: '已驳回',
+}
 
 onMounted(async () => {
   await auth.loadMe()
@@ -25,6 +34,14 @@ onMounted(async () => {
   form.signature = auth.user?.signature || ''
   if ((auth.user as any)?.privacySettings) {
     form.privacySettings = { showActivities: true, showTeams: true, ...(auth.user as any).privacySettings }
+  }
+  if (isMerchant.value) {
+    try {
+      merchant.value = await merchantApi.getMyProfile()
+      merchantForm.merchantName = merchant.value?.merchantName || ''
+      merchantForm.nickname = merchant.value?.nickname || ''
+      merchantForm.focusFields = merchant.value?.focusFields || ''
+    } catch { /* 尚无商家资料时忽略 */ }
   }
 })
 
@@ -38,6 +55,23 @@ async function save() {
       birthday: form.birthday || undefined,
       signature: form.signature,
       privacySettings: form.privacySettings,
+    })
+    ElMessage.success('已保存')
+  } catch {
+    // handled by interceptor
+  } finally {
+    loading.value = false
+  }
+}
+
+async function saveMerchant() {
+  if (!merchantForm.merchantName.trim()) { ElMessage.warning('请填写商家名称'); return }
+  loading.value = true
+  try {
+    merchant.value = await merchantApi.updateProfile({
+      merchantName: merchantForm.merchantName,
+      nickname: merchantForm.nickname || undefined,
+      focusFields: merchantForm.focusFields || undefined,
     })
     ElMessage.success('已保存')
   } catch {
@@ -68,7 +102,7 @@ async function handleAvatarChange(e: Event) {
 
 <template>
   <el-card v-if="auth.user" class="box">
-    <h2>我的资料</h2>
+    <h2>{{ isMerchant ? '我的商家资料' : '我的资料' }}</h2>
 
     <div class="avatar-section">
       <el-avatar :size="80" :src="auth.user.avatar" />
@@ -81,12 +115,32 @@ async function handleAvatarChange(e: Event) {
     <el-descriptions :column="1" border style="margin-top: 16px">
       <el-descriptions-item label="趣聚号">{{ auth.user.accountId || '未设置' }}</el-descriptions-item>
       <el-descriptions-item label="邮箱">{{ auth.user.email }}</el-descriptions-item>
-      <el-descriptions-item label="类型">{{ auth.user.userType }}</el-descriptions-item>
+      <el-descriptions-item label="类型">{{ isMerchant ? '商家' : '个人' }}</el-descriptions-item>
       <el-descriptions-item label="状态">{{ auth.user.status }}</el-descriptions-item>
-      <el-descriptions-item label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
+      <el-descriptions-item v-if="!isMerchant" label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
+      <el-descriptions-item v-if="isMerchant" label="审核状态">
+        <el-tag v-if="merchant" :type="merchant.auditStatus === 'APPROVED' ? 'success' : merchant.auditStatus === 'REJECTED' ? 'danger' : 'warning'">
+          {{ auditStatusLabel[merchant.auditStatus] || merchant.auditStatus }}
+        </el-tag>
+        <span v-else class="muted">未提交</span>
+        <span v-if="merchant?.auditStatus === 'REJECTED' && merchant?.auditReason" class="reject-reason">（{{ merchant.auditReason }}）</span>
+      </el-descriptions-item>
     </el-descriptions>
 
-    <el-form label-width="80px" style="margin-top: 16px" @submit.prevent>
+    <!-- 商家资料 -->
+    <el-form v-if="isMerchant" label-width="90px" style="margin-top: 16px" @submit.prevent>
+      <el-form-item label="商家名称" required><el-input v-model="merchantForm.merchantName" placeholder="营业执照上的名称" /></el-form-item>
+      <el-form-item label="商家昵称"><el-input v-model="merchantForm.nickname" placeholder="对外展示的昵称" /></el-form-item>
+      <el-form-item label="关注领域"><el-input v-model="merchantForm.focusFields" type="textarea" :rows="2" placeholder="如：运动健身、户外徒步、桌游聚会" /></el-form-item>
+      <el-form-item label="营业执照">
+        <el-link v-if="merchant?.licenseUrl" :href="merchant.licenseUrl" target="_blank" type="primary">查看已上传凭证</el-link>
+        <span v-else class="muted">无</span>
+      </el-form-item>
+      <el-button type="primary" :loading="loading" @click="saveMerchant">保存</el-button>
+    </el-form>
+
+    <!-- 个人资料 -->
+    <el-form v-else label-width="80px" style="margin-top: 16px" @submit.prevent>
       <el-form-item label="趣聚号"><el-input v-model="form.accountId" placeholder="4-32位，字母或数字" /></el-form-item>
       <el-form-item label="昵称"><el-input v-model="form.nickname" /></el-form-item>
       <el-form-item label="性别">
@@ -119,4 +173,6 @@ async function handleAvatarChange(e: Event) {
 .avatar-section { display: flex; align-items: center; gap: 16px; }
 .avatar-btn { color: #409eff; cursor: pointer; font-size: 14px; }
 .avatar-btn:hover { text-decoration: underline; }
+.muted { color: #999; }
+.reject-reason { color: #f56c6c; margin-left: 6px; }
 </style>

@@ -16,6 +16,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(2003, "邮箱或密码错误"),
     ACTIVATION_TOKEN_INVALID(2004, "激活/重置令牌无效或过期"),
     MERCHANT_LICENSE_REQUIRED(2005, "商家需上传营业执照"),
+    MERCHANT_NAME_REQUIRED(2006, "商家需填写商家名称"),
     ACCOUNT_BANNED(2007, "账号已被封禁"),
     // 活动 3000-3999
     ACTIVITY_FULL(3000, "活动名额已满"),
