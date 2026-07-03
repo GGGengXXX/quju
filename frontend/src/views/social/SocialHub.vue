@@ -10,6 +10,7 @@ import {
   type BlockVO,
   type UserBrief,
 } from '../../api/social'
+import http from '../../api/http'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -26,6 +27,10 @@ const requestsLoading = ref(false)
 // 黑名单
 const blocks = ref<BlockVO[]>([])
 const blocksLoading = ref(false)
+
+// 我的小队
+const myTeams = ref<any[]>([])
+const teamsLoading = ref(false)
 
 // 修改备注弹窗
 const remarkVisible = ref(false)
@@ -65,11 +70,22 @@ async function loadBlocks() {
   }
 }
 
+async function loadMyTeams() {
+  teamsLoading.value = true
+  try {
+    const me = auth.user?.id
+    if (me) myTeams.value = await http.get<any, any[]>(`/users/${me}/teams`)
+  } finally {
+    teamsLoading.value = false
+  }
+}
+
 function onTabChange(t: string) {
   tab.value = t
   if (t === 'friends') loadFriends()
   else if (t === 'requests') loadRequests()
   else if (t === 'blocks') loadBlocks()
+  else if (t === 'teams') loadMyTeams()
 }
 
 async function acceptRequest(id: number) {
@@ -229,6 +245,25 @@ onMounted(loadFriends)
             </div>
             <div class="actions">
               <el-button text size="small" type="success" @click="unblock(b.userId)">解除</el-button>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="我的小队" name="teams">
+        <div v-loading="teamsLoading" class="list">
+          <div v-if="!myTeams.length && !teamsLoading" class="empty">暂未加入小队</div>
+          <div v-for="t in myTeams" :key="t.id" class="card">
+            <div class="info" style="cursor: pointer" @click="router.push(`/teams?detail=${t.id}`)">
+              <el-avatar :size="40" :src="t.avatar" />
+              <div class="text">
+                <strong>{{ t.name }}</strong>
+                <span class="sub">{{ t.memberCount || 0 }} 人</span>
+              </div>
+            </div>
+            <div class="actions">
+              <el-button text size="small" type="primary" @click="router.push(`/social/team-chat/${t.id}`)">群聊</el-button>
+              <el-button text size="small" @click="router.push(`/teams?detail=${t.id}`)">详情</el-button>
             </div>
           </div>
         </div>
