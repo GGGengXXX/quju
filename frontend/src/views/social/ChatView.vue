@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
 import { teamApi, type TeamMemberItem } from '../../api/team'
+import { authApi } from '../../api/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +79,26 @@ async function send() {
     scrollToBottom()
   } finally {
     sending.value = false
+  }
+}
+
+async function sendImage(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  sending.value = true
+  try {
+    const res = await authApi.uploadImage(file)
+    const url = res?.url || res
+    const msg = await socialApi.sendMessage({ scope, peerId, contentType: 'IMAGE', content: url as string })
+    messages.value.push(msg)
+    await nextTick()
+    scrollToBottom()
+  } catch {
+    ElMessage.error('图片发送失败')
+  } finally {
+    sending.value = false
+    input.value = ''
   }
 }
 
@@ -169,6 +190,10 @@ onBeforeUnmount(() => {
 
     <div class="chat-input">
       <el-input v-model="inputText" placeholder="输入消息..." @keyup.enter="send" :disabled="sending" />
+      <label class="img-btn">
+        <span>📷</span>
+        <input type="file" accept="image/*" hidden @change="sendImage" :disabled="sending" />
+      </label>
       <el-button type="primary" :loading="sending" @click="send">发送</el-button>
     </div>
   </div>
@@ -196,6 +221,8 @@ onBeforeUnmount(() => {
 .theirs .bubble { background: #f0f0f0; color: #333; border-top-left-radius: 4px; }
 .recalled { font-size: 12px; color: #999; font-style: italic; padding: 4px 0; }
 .msg-img { max-width: 200px; border-radius: 8px; display: block; }
-.chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; }
+.chat-input { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; }
 .chat-input .el-input { flex: 1; }
+.img-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 4px; }
+.img-btn:hover { background: #f0f0f0; }
 </style>
