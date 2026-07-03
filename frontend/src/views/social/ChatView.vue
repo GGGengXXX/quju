@@ -44,6 +44,12 @@ const showLocationPicker = ref(false)
 const locationPickerRef = ref<HTMLElement | null>(null)
 let locationMap: any = null
 let locationMarker: any = null
+
+// @提醒
+const showAtMenu = ref(false)
+const atFilterText = ref('')
+const atMenuMembers = ref<TeamMemberItem[]>([])
+const inputRef = ref<any>(null)
 const pickedLocation = reactive({ lng: '116.3521', lat: '39.9835', address: '' })
 
 // 右键菜单
@@ -126,6 +132,34 @@ async function send() {
 function insertEmoji(emoji: string) {
   inputText.value += emoji
   showEmoji.value = false
+}
+
+function onInputChange() {
+  if (!isFriendChat && inputText.value.endsWith('@')) {
+    // 弹出@成员选择
+    atFilterText.value = ''
+    atMenuMembers.value = Array.from(memberMap.value.values()).filter(m => m.userId !== auth.user?.id)
+    showAtMenu.value = true
+  } else if (showAtMenu.value) {
+    const lastAt = inputText.value.lastIndexOf('@')
+    if (lastAt === -1) { showAtMenu.value = false; return }
+    const filter = inputText.value.slice(lastAt + 1).toLowerCase()
+    atMenuMembers.value = Array.from(memberMap.value.values())
+      .filter(m => m.userId !== auth.user?.id && (m.nickname || '').toLowerCase().includes(filter))
+    if (!atMenuMembers.value.length) showAtMenu.value = false
+  }
+}
+
+function selectAtMember(member: TeamMemberItem) {
+  const lastAt = inputText.value.lastIndexOf('@')
+  inputText.value = inputText.value.slice(0, lastAt) + `@${member.nickname || member.userId} `
+  showAtMenu.value = false
+}
+
+function selectAtAll() {
+  const lastAt = inputText.value.lastIndexOf('@')
+  inputText.value = inputText.value.slice(0, lastAt) + '@所有人 '
+  showAtMenu.value = false
 }
 
 function parseLocationLabel(content: string) {
@@ -362,7 +396,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="chat-input">
-      <el-input v-model="inputText" placeholder="输入消息..." @keyup.enter="send" :disabled="sending" />
+      <el-input ref="inputRef" v-model="inputText" placeholder="输入消息...（群聊中输入@提醒成员）" @keyup.enter="send" @input="onInputChange" :disabled="sending" />
       <span class="emoji-btn" @click="showEmoji = !showEmoji">😊</span>
       <span class="img-btn" @click="sendLocation" title="发送位置">📍</span>
       <label class="img-btn">
@@ -373,6 +407,15 @@ onBeforeUnmount(() => {
     </div>
     <div v-if="showEmoji" class="emoji-panel">
       <span v-for="e in emojis" :key="e" class="emoji-item" @click="insertEmoji(e)">{{ e }}</span>
+    </div>
+
+    <!-- @提醒成员选择 -->
+    <div v-if="showAtMenu && !isFriendChat" class="at-menu">
+      <div class="at-menu-item at-all" @click="selectAtAll">@所有人</div>
+      <div v-for="m in atMenuMembers" :key="m.userId" class="at-menu-item" @click="selectAtMember(m)">
+        <el-avatar :size="24" :src="m.avatar" />
+        <span>{{ m.nickname || m.userId }}</span>
+      </div>
     </div>
 
     <!-- 地图选点弹窗 -->
@@ -450,4 +493,8 @@ onBeforeUnmount(() => {
 .forward-item { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
 .forward-item:hover { background: #ecf5ff; }
 .forward-item:last-child { border-bottom: none; }
+.at-menu { position: relative; background: #fff; border: 1px solid #eee; border-radius: 6px; box-shadow: 0 -2px 8px rgba(0,0,0,0.08); padding: 4px 0; max-height: 200px; overflow-y: auto; margin: 0 16px; }
+.at-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
+.at-menu-item:hover { background: #ecf5ff; }
+.at-all { font-weight: 600; color: #409eff; }
 </style>

@@ -93,15 +93,26 @@ public class MessageService {
             notificationService.send(req.peerId(), "FRIEND_MESSAGE",
                     "收到一条新消息", preview, "USER", senderId);
         } else {
-            // 小队群聊：通知所有队员（除发送者）
+            // 小队群聊：检测@提醒
             List<Long> memberIds = jdbcTemplate.queryForList(
                     "SELECT user_id FROM team_member WHERE team_id = ? AND user_id != ?",
                     Long.class, req.peerId(), senderId);
             String teamName = jdbcTemplate.queryForObject(
                     "SELECT name FROM team WHERE id = ?", String.class, req.peerId());
+            String content = req.content() != null ? req.content() : "";
+            boolean atAll = content.contains("@所有人");
+
             for (Long memberId : memberIds) {
-                notificationService.send(memberId, "TEAM_MESSAGE",
-                        "小队「" + teamName + "」有新消息", preview, "TEAM", req.peerId());
+                if (atAll) {
+                    notificationService.send(memberId, "TEAM_AT",
+                            "小队「" + teamName + "」中有人@了所有人", preview, "TEAM", req.peerId());
+                } else if (isUserMentioned(content, memberId, req.peerId())) {
+                    notificationService.send(memberId, "TEAM_AT",
+                            "小队「" + teamName + "」中有人@了你", preview, "TEAM", req.peerId());
+                } else {
+                    notificationService.send(memberId, "TEAM_MESSAGE",
+                            "小队「" + teamName + "」有新消息", preview, "TEAM", req.peerId());
+                }
             }
         }
         return vo;
@@ -155,6 +166,13 @@ public class MessageService {
         MessageVO vo = toVO(fwd);
         pushMessage(req.scope(), req.peerId(), senderId, vo);
         return vo;
+    }
+
+    private boolean isUserMentioned(String content, long userId, long teamId) {
+        String nickname = jdbcTemplate.query(
+                "SELECT u.nickname FROM team_member tm JOIN user u ON u.id = tm.user_id WHERE tm.team_id = ? AND tm.user_id = ?",
+                rs -> rs.next() ? rs.getString("nickname") : null, teamId, userId);
+        return nickname != null && !nickname.isBlank() && content.contains("@" + nickname);
     }
 
     private void pushMessage(String scope, long peerId, long senderId, MessageVO vo) {
