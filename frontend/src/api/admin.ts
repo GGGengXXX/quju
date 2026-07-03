@@ -67,6 +67,8 @@ export interface MerchantAppVO {
   id: number
   userId: number
   merchantName?: string
+  nickname?: string
+  focusFields?: string
   licenseUrl?: string
   auditStatus: string
   auditReason?: string

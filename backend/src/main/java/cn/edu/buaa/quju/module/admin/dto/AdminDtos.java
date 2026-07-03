@@ -31,7 +31,8 @@ public final class AdminDtos {
 
     // ---- 商家审核 ----
     public record MerchantReviewReq(@NotBlank String action, String reason) {}
-    public record MerchantAppVO(Long id, Long userId, String merchantName, String licenseUrl,
+    public record MerchantAppVO(Long id, Long userId, String merchantName, String nickname,
+                                 String focusFields, String licenseUrl,
                                  String auditStatus, String auditReason, LocalDateTime createdAt) {}
 
     // ---- 活动管理 ----

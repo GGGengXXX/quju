@@ -16,6 +16,7 @@ export interface MerchantUpdateReq {
   merchantName?: string
   nickname?: string
   focusFields?: string
+  licenseUrl?: string
 }
 
 export const merchantApi = {

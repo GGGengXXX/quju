@@ -20,4 +20,10 @@ export const authApi = {
     form.append('file', file)
     return http.post<any, { url: string }>('/upload/image', form)
   },
+  // 营业执照上传：注册阶段（未登录）也可调用
+  uploadLicense: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return http.post<any, { url: string }>('/upload/license', form)
+  },
 }
