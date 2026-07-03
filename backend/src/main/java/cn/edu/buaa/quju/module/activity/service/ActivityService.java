@@ -238,6 +238,7 @@ public class ActivityService {
 
     public ActivityVO aiPlan(AiPlanReq req) {
         long userId = UserContext.require();
+        ensureCanCreateActivity(userId);
         UserBrief creator = loadUserBriefs(List.of(userId)).get(userId);
         String normalizedCategory = normalizeCategory(req == null ? null : req.category());
         String theme = req == null || req.theme() == null || req.theme().isBlank() ? categoryLabel(normalizedCategory) + "主题活动" : req.theme().trim();
@@ -291,6 +292,7 @@ public class ActivityService {
     @Transactional
     public ActivityVO create(ActivityUpsertReq req) {
         long userId = UserContext.require();
+        ensureCanCreateActivity(userId);
         Activity activity = new Activity();
         fillActivity(activity, req);
         activity.setCreatorId(userId);
@@ -342,6 +344,7 @@ public class ActivityService {
     @Transactional
     public ActivityVO cloneActivity(long id) {
         long userId = UserContext.require();
+        ensureCanCreateActivity(userId);
         Activity src = getActivityOrThrow(id);
         Activity clone = new Activity();
         clone.setCreatorId(userId);
@@ -799,6 +802,21 @@ public class ActivityService {
 
     private Map<Long, UserBrief> loadCreators(List<Activity> activities) {
         return loadUserBriefs(activities.stream().map(Activity::getCreatorId).filter(Objects::nonNull).distinct().toList());
+    }
+
+    /**
+     * 发起活动资质校验：商家（userType=MERCHANT）必须营业执照审核通过（merchant_profile.audit_status=APPROVED）
+     * 才能发起活动；个人用户不受限。未过审商家在创建/克隆/AI 生成草稿时即被拦截。
+     */
+    private void ensureCanCreateActivity(long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null || !"MERCHANT".equals(user.getUserType())) return;
+        String auditStatus = jdbcTemplate.query(
+                "SELECT audit_status FROM merchant_profile WHERE user_id = ? LIMIT 1",
+                rs -> rs.next() ? rs.getString("audit_status") : null, userId);
+        if (!"APPROVED".equals(auditStatus)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "商家资质未通过审核，暂不能发起活动");
+        }
     }
 
     private Map<Long, UserBrief> loadUserBriefs(List<Long> userIds) {

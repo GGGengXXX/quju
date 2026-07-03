@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import QRCode from 'qrcode'
 import { useAuthStore } from '../../stores/auth'
+import { merchantApi } from '../../api/merchant'
 import {
   activityApi,
   type ActivityDetail,
@@ -310,6 +311,25 @@ async function generateAiPlan() {
   }
 }
 
+// 未过审的商家禁止发起活动：个人用户直接放行，商家需审核通过（后端为权威校验，此处仅前置提示）
+async function ensureCanCreate(): Promise<boolean> {
+  if (auth.user?.userType !== 'MERCHANT') return true
+  try {
+    const m = await merchantApi.getMyProfile()
+    if (m?.auditStatus === 'APPROVED') return true
+    ElMessage.warning('商家资质未通过审核，暂不能发起活动')
+    return false
+  } catch {
+    ElMessage.warning('无法确认商家审核状态，暂不能发起活动')
+    return false
+  }
+}
+
+async function openCreate() {
+  if (!(await ensureCanCreate())) return
+  createVisible.value = true
+}
+
 async function submitCreate(submit: boolean) {
   saving.value = true
   try {
@@ -375,6 +395,7 @@ async function confirmWaitlist() {
 
 async function cloneCurrent() {
   if (!detail.value) return
+  if (!(await ensureCanCreate())) return
   actionLoading.value = true
   try {
     await activityApi.clone(detail.value.id as number)
@@ -788,7 +809,7 @@ onMounted(async () => {
   const teamId = Number(currentRoute.query.createForTeam)
   if (teamId) {
     form.teamId = teamId
-    createVisible.value = true
+    if (await ensureCanCreate()) createVisible.value = true
   }
 })
 </script>
@@ -804,7 +825,7 @@ onMounted(async () => {
         </el-radio-group>
         <div class="toolbar-actions">
           <el-button @click="useCurrentLocation('query')">使用我的位置</el-button>
-          <el-button type="primary" @click="createVisible = true">创建活动</el-button>
+          <el-button type="primary" @click="openCreate">创建活动</el-button>
         </div>
       </div>
 
