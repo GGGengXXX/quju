@@ -27,6 +27,20 @@ export interface AdminUserListVO {
   createdAt?: string
 }
 
+export interface AdminUserActivityBriefVO {
+  id: number
+  name: string
+  status: string
+  startTime?: string
+}
+
+export interface AdminUserTeamBriefVO {
+  id: number
+  name: string
+  status: string
+  memberCount?: number
+}
+
 export interface AdminUserDetailVO {
   id: number
   email: string
@@ -40,6 +54,8 @@ export interface AdminUserDetailVO {
   reputation?: number
   createdAt?: string
   updatedAt?: string
+  activities?: AdminUserActivityBriefVO[]
+  teams?: AdminUserTeamBriefVO[]
 }
 
 export interface BanReq {

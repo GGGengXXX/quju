@@ -125,19 +125,41 @@ onMounted(load)
     />
 
     <!-- 用户详情 -->
-    <el-dialog v-model="detailVisible" title="用户详情" width="500px">
-      <el-descriptions v-if="detail" :column="1" border v-loading="detailLoading">
-        <el-descriptions-item label="ID">{{ detail.id }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ detail.email }}</el-descriptions-item>
-        <el-descriptions-item label="昵称">{{ detail.nickname }}</el-descriptions-item>
-        <el-descriptions-item label="类型">{{ detail.userType }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ detail.status }}</el-descriptions-item>
-        <el-descriptions-item label="性别">{{ detail.gender || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="生日">{{ detail.birthday || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="签名">{{ detail.signature || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="信誉">{{ detail.reputation ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="注册时间">{{ detail.createdAt }}</el-descriptions-item>
-      </el-descriptions>
+    <el-dialog v-model="detailVisible" title="用户详情" width="640px">
+      <div v-loading="detailLoading">
+        <el-descriptions v-if="detail" :column="1" border>
+          <el-descriptions-item label="ID">{{ detail.id }}</el-descriptions-item>
+          <el-descriptions-item label="邮箱">{{ detail.email }}</el-descriptions-item>
+          <el-descriptions-item label="昵称">{{ detail.nickname }}</el-descriptions-item>
+          <el-descriptions-item label="类型">{{ detail.userType }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ detail.status }}</el-descriptions-item>
+          <el-descriptions-item label="性别">{{ detail.gender || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="生日">{{ detail.birthday || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="签名">{{ detail.signature || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="信誉">{{ detail.reputation ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="注册时间">{{ detail.createdAt }}</el-descriptions-item>
+        </el-descriptions>
+
+        <template v-if="detail">
+          <h4 class="section-title">发布的活动（{{ detail.activities?.length ?? 0 }}）</h4>
+          <el-table v-if="detail.activities?.length" :data="detail.activities" size="small" border>
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="name" label="活动名称" />
+            <el-table-column prop="status" label="状态" width="120" />
+            <el-table-column prop="startTime" label="开始时间" width="170" />
+          </el-table>
+          <el-empty v-else description="暂无活动" :image-size="60" />
+
+          <h4 class="section-title">创建的小队（{{ detail.teams?.length ?? 0 }}）</h4>
+          <el-table v-if="detail.teams?.length" :data="detail.teams" size="small" border>
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="name" label="小队名称" />
+            <el-table-column prop="status" label="状态" width="120" />
+            <el-table-column prop="memberCount" label="成员数" width="80" />
+          </el-table>
+          <el-empty v-else description="暂无小队" :image-size="60" />
+        </template>
+      </div>
     </el-dialog>
 
     <!-- 封禁弹窗 -->
@@ -161,4 +183,5 @@ onMounted(load)
 <style scoped>
 .page { padding: 16px; }
 h3 { margin-bottom: 16px; }
+.section-title { margin: 18px 0 8px; font-size: 14px; font-weight: 600; }
 </style>
