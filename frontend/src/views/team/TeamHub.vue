@@ -378,7 +378,21 @@ async function publishVote() {
 
 async function castVote(vote: TeamVoteItem) {
   if (!selectedTeam.value) return
-  await teamApi.castVote(selectedTeam.value.id, vote.id, voteSelections[vote.id] || [])
+  let selections = voteSelections[vote.id] || []
+  // 单选时 radio v-model 绑定的是 selections[0]（单个值），转为数组
+  if (!vote.multiChoice) {
+    const val = selections[0]
+    if (val === undefined || val === null) {
+      ElMessage.warning('请选择一个选项')
+      return
+    }
+    selections = [val]
+  }
+  if (!selections.length) {
+    ElMessage.warning('请至少选择一个选项')
+    return
+  }
+  await teamApi.castVote(selectedTeam.value.id, vote.id, selections)
   ElMessage.success('投票成功')
   await refreshDetails()
 }
@@ -664,11 +678,20 @@ onBeforeUnmount(() => {
                 </div>
                 <el-tag v-if="vote.multiChoice">多选</el-tag>
               </div>
-              <el-checkbox-group v-model="voteSelections[vote.id]">
-                <div v-for="(item, index) in vote.options" :key="`${vote.id}-${index}`" class="vote-option">
-                  <el-checkbox :label="index">{{ item }}（{{ vote.counts[index] || 0 }}票）</el-checkbox>
-                </div>
-              </el-checkbox-group>
+              <template v-if="vote.multiChoice">
+                <el-checkbox-group v-model="voteSelections[vote.id]">
+                  <div v-for="(item, index) in vote.options" :key="`${vote.id}-${index}`" class="vote-option">
+                    <el-checkbox :label="index">{{ item }}（{{ vote.counts[index] || 0 }}票）</el-checkbox>
+                  </div>
+                </el-checkbox-group>
+              </template>
+              <template v-else>
+                <el-radio-group v-model="voteSelections[vote.id][0]">
+                  <div v-for="(item, index) in vote.options" :key="`${vote.id}-${index}`" class="vote-option">
+                    <el-radio :label="index">{{ item }}（{{ vote.counts[index] || 0 }}票）</el-radio>
+                  </div>
+                </el-radio-group>
+              </template>
               <el-button type="primary" size="small" @click="castVote(vote)">提交投票</el-button>
             </el-card>
           </el-tab-pane>
