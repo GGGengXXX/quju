@@ -48,6 +48,8 @@ function navigate(item: NotificationItem) {
       router.push(`/activities?detail=${refId}`)
       break
     case 'FRIEND_REQUEST':
+      router.push('/social?tab=requests')
+      break
     case 'FRIEND_ACCEPT':
       router.push(`/social/user/${refId}`)
       break

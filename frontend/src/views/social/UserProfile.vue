@@ -15,6 +15,7 @@ const teams = ref<any[]>([])
 const loading = ref(true)
 const isFriend = ref(false)
 const addingFriend = ref(false)
+const following = ref(false)
 
 function privacyShow(key: string) {
   if (!profile.value?.privacySettings) return true
@@ -24,12 +25,14 @@ function privacyShow(key: string) {
 async function load() {
   loading.value = true
   try {
-    const [p, friendList] = await Promise.all([
+    const [p, friendList, followingList] = await Promise.all([
       socialApi.getUserProfile(userId),
       socialApi.getFriends(),
+      socialApi.getFollows({ type: 'FOLLOWING' }),
     ])
     profile.value = p
     isFriend.value = friendList.some((f: any) => f.userId === userId)
+    following.value = followingList.some((f: any) => f.userId === userId)
 
     const fetches: Promise<any>[] = []
     fetches.push(http.get<any, any[]>(`/users/${userId}/activities`).then(r => { activities.value = r }).catch(() => {}))
@@ -47,6 +50,18 @@ async function addFriend() {
     ElMessage.success('好友申请已发送')
   } catch { /* 已提示 */ } finally {
     addingFriend.value = false
+  }
+}
+
+async function toggleFollow() {
+  if (following.value) {
+    await socialApi.unfollow(userId)
+    following.value = false
+    ElMessage.success('已取消关注')
+  } else {
+    await socialApi.follow(userId)
+    following.value = true
+    ElMessage.success('已关注（互相关注可自动成为好友）')
   }
 }
 
@@ -75,7 +90,9 @@ onMounted(load)
         </div>
         <div class="profile-actions">
           <el-button v-if="isFriend" type="primary" size="small" @click="router.push(`/social/chat/${userId}`)">发消息</el-button>
-          <el-button v-else type="success" size="small" :loading="addingFriend" @click="addFriend">添加好友</el-button>
+          <el-button v-if="!isFriend" type="success" size="small" :loading="addingFriend" @click="addFriend">添加好友</el-button>
+          <el-button :type="following ? 'info' : 'warning'" size="small" plain @click="toggleFollow">{{ following ? '已关注' : '关注' }}</el-button>
+          <el-tag v-if="isFriend" size="small" type="success">互关好友</el-tag>
         </div>
       </div>
     </el-card>

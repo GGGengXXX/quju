@@ -40,6 +40,9 @@ router.beforeEach((to) => {
   if (to.meta.adminAuth && !localStorage.getItem('quju_admin_token')) {
     return { path: '/admin/login', query: { redirect: to.fullPath } }
   }
+  if (to.path === '/login' && localStorage.getItem('quju_token')) {
+    return '/activities'
+  }
 })
 
 export default router
