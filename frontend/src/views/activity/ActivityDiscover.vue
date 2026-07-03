@@ -47,6 +47,7 @@ const summaryCategoryOptions = [
 
 const loading = ref(false)
 const mapLoading = ref(false)
+const showMapPanel = ref(false)
 const saving = ref(false)
 const actionLoading = ref(false)
 const activities = ref<ActivityItem[]>([])
@@ -833,13 +834,14 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="layout-grid">
-      <section class="panel map-panel">
+    <section class="layout-grid" :class="{ 'no-map': !showMapPanel }">
+      <section v-if="showMapPanel" class="panel map-panel">
         <div class="section-head">
           <h3>地图模式</h3>
           <div class="section-meta">
             <el-button :loading="mapLoading" @click="refreshMapPoints(true)">刷新点位</el-button>
             <span>{{ mapPoints.length }} 个点位</span>
+            <el-button text @click="showMapPanel = false">收起地图</el-button>
           </div>
         </div>
         <div v-if="amapKey" ref="mapRef" class="map-canvas" />
@@ -856,7 +858,10 @@ onMounted(async () => {
       <section class="panel list-panel">
         <div class="section-head">
           <h3>活动发现</h3>
-          <span class="muted">{{ total }} 条</span>
+          <div class="section-meta">
+            <span class="muted">{{ total }} 条</span>
+            <el-button v-if="!showMapPanel" text type="primary" @click="showMapPanel = true">显示地图</el-button>
+          </div>
         </div>
         <el-skeleton :loading="loading" animated :rows="6">
           <div class="activity-list">
@@ -1196,6 +1201,14 @@ onMounted(async () => {
   align-items: start;
 }
 
+.layout-grid.no-map {
+  grid-template-columns: 1fr;
+}
+
+.layout-grid.no-map .list-panel {
+  grid-column: span 1;
+}
+
 .toolbar-top,
 .toolbar-bottom,
 .section-head,
@@ -1220,12 +1233,18 @@ onMounted(async () => {
 }
 
 .toolbar-grid,
-.form-grid,
 .overview-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.dialog-grid,
+.form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dialog-grid {
+  grid-template-columns: 1fr;
+}
+
 .summary-manage,
 .manage-grid,
 .checkin-grid {

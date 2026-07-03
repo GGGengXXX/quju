@@ -802,6 +802,7 @@ onBeforeUnmount(() => {
               </div>
               <p>{{ activity.intro || '暂无简介' }}</p>
               <p>{{ activity.address || '未设置地点' }}</p>
+              <el-button size="small" type="primary" @click="$router.push(`/activities?detail=${activity.id}`)">查看/报名</el-button>
             </el-card>
           </el-tab-pane>
         </el-tabs>
