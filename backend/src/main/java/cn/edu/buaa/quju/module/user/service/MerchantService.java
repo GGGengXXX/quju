@@ -48,9 +48,8 @@ public class MerchantService {
             mp.setLicenseUrl(req.licenseUrl());
             mp.setAuditStatus("PENDING");
             merchantMapper.insert(mp);
-            // 将用户类型升级为 MERCHANT
-            u.setUserType("MERCHANT");
-            userMapper.updateById(u);
+            // 商家身份需后台审核通过后由管理员授予（见 AdminUserService#reviewMerchant），
+            // 提交申请阶段不提前升级 userType。
         }
     }
 
