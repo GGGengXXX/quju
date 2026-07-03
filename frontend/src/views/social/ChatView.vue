@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
-import { teamApi } from '../../api/team'
+import { teamApi, type TeamMemberItem } from '../../api/team'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +19,7 @@ const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
 const messagesEnd = ref<HTMLElement | null>(null)
+const memberMap = ref<Map<number, TeamMemberItem>>(new Map())
 
 let ws: WebSocket | null = null
 
@@ -33,8 +34,19 @@ async function loadPeerInfo() {
     try {
       const team = await teamApi.getTeam(peerId)
       if (team?.name) peerName.value = team.name
+      const members = await teamApi.listMembers(peerId)
+      members.forEach(m => memberMap.value.set(m.userId, m))
     } catch { /* ignore */ }
   }
+}
+
+function getMemberName(senderId: number) {
+  const m = memberMap.value.get(senderId)
+  return m?.nickname || `用户${senderId}`
+}
+
+function getMemberAvatar(senderId: number) {
+  return memberMap.value.get(senderId)?.avatar || undefined
 }
 
 async function loadMessages() {
@@ -130,16 +142,21 @@ onBeforeUnmount(() => {
     <div class="chat-messages" v-loading="loading">
       <div v-for="msg in messages" :key="msg.id" :class="['msg-row', isMine(msg) ? 'mine' : 'theirs']">
         <div v-if="msg.isRecalled" class="recalled">消息已撤回</div>
-        <div v-else class="bubble" @contextmenu.prevent="isMine(msg) && recall(msg)">
-          <span v-if="!isFriendChat && !isMine(msg)" class="sender-id">用户{{ msg.senderId }}</span>
-          <template v-if="msg.contentType === 'IMAGE'">
-            <img :src="msg.content" class="msg-img" />
-          </template>
-          <template v-else>
-            {{ msg.content }}
-          </template>
-          <span class="time">{{ msg.createdAt?.slice(11, 16) }}</span>
-        </div>
+        <template v-else>
+          <div v-if="!isFriendChat && !isMine(msg)" class="sender-info" @click="router.push(`/social/user/${msg.senderId}`)">
+            <el-avatar :size="28" :src="getMemberAvatar(msg.senderId)" />
+            <span class="sender-name">{{ getMemberName(msg.senderId) }}</span>
+          </div>
+          <div class="bubble" @contextmenu.prevent="isMine(msg) && recall(msg)">
+            <template v-if="msg.contentType === 'IMAGE'">
+              <img :src="msg.content" class="msg-img" />
+            </template>
+            <template v-else>
+              {{ msg.content }}
+            </template>
+            <span class="time">{{ msg.createdAt?.slice(11, 16) }}</span>
+          </div>
+        </template>
       </div>
       <div ref="messagesEnd" />
     </div>
@@ -164,7 +181,9 @@ onBeforeUnmount(() => {
 .theirs .bubble { background: #f0f0f0; color: #333; border-bottom-left-radius: 4px; }
 .recalled { font-size: 12px; color: #999; font-style: italic; padding: 4px 0; }
 .time { font-size: 10px; opacity: 0.7; margin-left: 8px; }
-.sender-id { font-size: 11px; color: #999; display: block; margin-bottom: 2px; }
+.sender-info { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; cursor: pointer; }
+.sender-info:hover .sender-name { text-decoration: underline; }
+.sender-name { font-size: 12px; color: #666; }
 .msg-img { max-width: 200px; border-radius: 8px; display: block; }
 .chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; }
 .chat-input .el-input { flex: 1; }
