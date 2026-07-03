@@ -20,12 +20,17 @@ function fillDemo(email: string, password: string) {
   form.password = password
 }
 
-async function submit(nextPath = '/activities') {
+function resolveNextPath(fallback = '/activities') {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  return redirect || fallback
+}
+
+async function submit(nextPath?: string) {
   loading.value = true
   try {
     await auth.login(form.email, form.password)
     ElMessage.success('登录成功')
-    router.push(nextPath)
+    router.push(nextPath || resolveNextPath())
   } catch {
     // http 拦截器已提示
   } finally {
@@ -36,7 +41,7 @@ async function submit(nextPath = '/activities') {
 async function loginDemo(type: keyof typeof demoAccounts) {
   const account = demoAccounts[type]
   fillDemo(account.email, account.password)
-  await submit('/teams')
+  await submit(type === 'member' ? resolveNextPath('/activities') : '/teams')
 }
 
 onMounted(async () => {

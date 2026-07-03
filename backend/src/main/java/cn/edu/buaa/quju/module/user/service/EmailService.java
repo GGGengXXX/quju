@@ -25,17 +25,17 @@ public class EmailService {
     public void sendActivation(String to, String token) {
         send(to, "【趣聚】激活你的账号",
                 "欢迎注册趣聚！请点击以下链接激活账号（24 小时内有效）：\n"
-                + webBaseUrl + "/activate?token=" + token);
+                        + webBaseUrl + "/activate?token=" + token);
     }
 
     public void sendPasswordReset(String to, String token) {
         send(to, "【趣聚】重置密码",
                 "你申请了重置密码，请点击以下链接（1 小时内有效）：\n"
-                + webBaseUrl + "/reset-password?token=" + token
-                + "\n如非本人操作请忽略此邮件。");
+                        + webBaseUrl + "/reset-password?token=" + token
+                        + "\n如非本人操作请忽略此邮件。");
     }
 
-    private void send(String to, String subject, String text) {
+    public void send(String to, String subject, String text) {
         try {
             SimpleMailMessage m = new SimpleMailMessage();
             m.setFrom(from);

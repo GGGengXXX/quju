@@ -5,27 +5,42 @@ import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
 
 const auth = useAuthStore()
-const form = reactive({ nickname: '', gender: 'UNKNOWN', signature: '' })
+const form = reactive({
+  nickname: '',
+  gender: 'UNKNOWN',
+  birthday: '',
+  signature: '',
+})
 const loading = ref(false)
 
 onMounted(async () => {
   await auth.loadMe()
   form.nickname = auth.user?.nickname || ''
   form.gender = auth.user?.gender || 'UNKNOWN'
+  form.birthday = auth.user?.birthday || ''
   form.signature = auth.user?.signature || ''
 })
 
 async function save() {
   loading.value = true
   try {
-    auth.user = await authApi.updateMe(form)
+    auth.user = await authApi.updateMe({
+      nickname: form.nickname,
+      gender: form.gender,
+      birthday: form.birthday || undefined,
+      signature: form.signature,
+    })
     ElMessage.success('已保存')
-  } catch { /* 已提示 */ } finally { loading.value = false }
+  } catch {
+    // handled by interceptor
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <template>
-  <el-card class="box" v-if="auth.user">
+  <el-card v-if="auth.user" class="box">
     <h2>我的资料</h2>
     <el-descriptions :column="1" border>
       <el-descriptions-item label="ID">{{ auth.user.id }}</el-descriptions-item>
@@ -34,7 +49,7 @@ async function save() {
       <el-descriptions-item label="状态">{{ auth.user.status }}</el-descriptions-item>
       <el-descriptions-item label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
     </el-descriptions>
-    <el-form label-width="64px" style="margin-top:16px" @submit.prevent>
+    <el-form label-width="80px" style="margin-top: 16px" @submit.prevent>
       <el-form-item label="昵称"><el-input v-model="form.nickname" /></el-form-item>
       <el-form-item label="性别">
         <el-select v-model="form.gender">
@@ -43,10 +58,15 @@ async function save() {
           <el-option label="女" value="FEMALE" />
         </el-select>
       </el-form-item>
+      <el-form-item label="生日">
+        <el-date-picker v-model="form.birthday" type="date" value-format="YYYY-MM-DD" placeholder="请选择出生日期" style="width: 100%" />
+      </el-form-item>
       <el-form-item label="签名"><el-input v-model="form.signature" type="textarea" :rows="2" /></el-form-item>
       <el-button type="primary" :loading="loading" @click="save">保存</el-button>
     </el-form>
   </el-card>
 </template>
 
-<style scoped>.box{max-width:560px;margin:30px auto}</style>
+<style scoped>
+.box { max-width: 560px; margin: 30px auto; }
+</style>

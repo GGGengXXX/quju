@@ -70,7 +70,8 @@ public final class ActivityDtos {
             UserBrief creator,
             Long teamId,
             String mySignupStatus,
-            Integer waitlistCount
+            Integer waitlistCount,
+            String checkinCode
     ) {}
 
     public record ActivityPointVO(
@@ -108,7 +109,10 @@ public final class ActivityDtos {
             String category
     ) {}
 
-    public record SignupReq(Map<String, Object> signupInfo) {}
+    public record SignupReq(
+            Map<String, Object> signupInfo,
+            Boolean safetyConfirmed
+    ) {}
 
     public record SignupResultVO(String status, Integer waitlistPosition) {}
 

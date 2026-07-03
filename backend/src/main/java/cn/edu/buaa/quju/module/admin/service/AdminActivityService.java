@@ -2,6 +2,8 @@ package cn.edu.buaa.quju.module.admin.service;
 
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
+import cn.edu.buaa.quju.module.activity.entity.ActivityAuditLog;
+import cn.edu.buaa.quju.module.activity.mapper.ActivityAuditLogMapper;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityListVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityReviewReq;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
@@ -24,10 +26,14 @@ import java.util.stream.Collectors;
 public class AdminActivityService {
     private final ActivityMapper activityMapper;
     private final ModerationActionMapper moderationMapper;
+    private final ActivityAuditLogMapper activityAuditLogMapper;
 
-    public AdminActivityService(ActivityMapper activityMapper, ModerationActionMapper moderationMapper) {
+    public AdminActivityService(ActivityMapper activityMapper,
+                                ModerationActionMapper moderationMapper,
+                                ActivityAuditLogMapper activityAuditLogMapper) {
         this.activityMapper = activityMapper;
         this.moderationMapper = moderationMapper;
+        this.activityAuditLogMapper = activityAuditLogMapper;
     }
 
     public PageResult<ActivityListVO> listActivities(String status, String keyword, int page, int size) {
@@ -50,10 +56,23 @@ public class AdminActivityService {
     public void reviewActivity(long adminId, long activityId, ActivityReviewReq req) {
         Activity a = requireActivity(activityId);
         if (!"PENDING_REVIEW".equals(a.getStatus())) throw new BizException(ErrorCode.CONFLICT);
-        if ("REJECTED".equals(req.action()) && (req.reason() == null || req.reason().isBlank()))
+        String action = req.action() == null ? "" : req.action().trim().toUpperCase();
+        if (List.of("REJECTED", "NEEDS_REVISION").contains(action) && (req.reason() == null || req.reason().isBlank())) {
             throw new BizException(ErrorCode.REJECT_REASON_REQUIRED);
-        a.setStatus("APPROVED".equals(req.action()) ? "PUBLISHED" : "REJECTED");
+        }
+        switch (action) {
+            case "PASSED", "APPROVED" -> a.setStatus("PUBLISHED");
+            case "REJECTED", "NEEDS_REVISION" -> a.setStatus("REJECTED");
+            default -> throw new BizException(ErrorCode.BAD_REQUEST, "审核动作非法");
+        }
         activityMapper.updateById(a);
+        ActivityAuditLog log = new ActivityAuditLog();
+        log.setActivityId(activityId);
+        log.setAuditType("MANUAL");
+        log.setResult("PASSED".equals(action) || "APPROVED".equals(action) ? "PASSED" : action);
+        log.setReason(req.reason());
+        log.setAuditorAdminId(adminId);
+        activityAuditLogMapper.insert(log);
     }
 
     @Transactional

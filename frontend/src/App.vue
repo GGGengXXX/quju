@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { ElNotification } from 'element-plus'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { teamApi, type TeamAnnouncementItem, type TeamSummary } from './api/team'
 import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
+const minimalLayout = computed(() => Boolean(route.meta.minimalLayout))
 let notificationTimer: number | null = null
 let notificationChecking = false
 
@@ -69,7 +71,7 @@ async function ensureCurrentUserLoaded() {
 }
 
 async function pollAnnouncements() {
-  if (notificationChecking || !auth.token) return
+  if (notificationChecking || !auth.token || minimalLayout.value) return
   const ready = await ensureCurrentUserLoaded()
   if (!ready || !auth.user?.id) return
 
@@ -136,6 +138,7 @@ function stopAnnouncementPolling() {
 
 async function startAnnouncementPolling() {
   stopAnnouncementPolling()
+  if (minimalLayout.value) return
   const ready = await ensureCurrentUserLoaded()
   if (!ready) return
   await pollAnnouncements()
@@ -144,8 +147,8 @@ async function startAnnouncementPolling() {
   }, 30000)
 }
 
-watch(() => auth.token, (token) => {
-  if (token) {
+watch(() => [auth.token, minimalLayout.value], ([token, minimal]) => {
+  if (token && !minimal) {
     void startAnnouncementPolling()
     return
   }
@@ -158,7 +161,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <el-container>
+  <template v-if="minimalLayout">
+    <router-view />
+  </template>
+  <el-container v-else>
     <el-header class="hd">
       <span class="logo" @click="router.push('/')">趣聚 QuJu</span>
       <span class="spacer" />

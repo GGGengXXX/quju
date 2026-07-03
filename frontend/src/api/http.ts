@@ -7,18 +7,30 @@ declare module 'axios' {
   }
 }
 
-// 生产由 nginx 反代 /v1；开发用 .env 的 VITE_API_BASE
-const baseURL = (import.meta as any).env?.VITE_API_BASE || '/v1'
-const http = axios.create({ baseURL, timeout: 15000 })
+function resolveBaseUrl() {
+  const envBase = (import.meta as any).env?.VITE_API_BASE as string | undefined
+  if (envBase && envBase.trim()) {
+    return envBase
+      .replace('127.0.0.1', location.hostname)
+      .replace('localhost', location.hostname)
+  }
+  if ((import.meta as any).env?.DEV) {
+    return `${location.protocol}//${location.hostname}:8541/v1`
+  }
+  return '/v1'
+}
 
-// 注入 JWT
+const http = axios.create({
+  baseURL: resolveBaseUrl(),
+  timeout: 15000,
+})
+
 http.interceptors.request.use((cfg) => {
   const token = localStorage.getItem('quju_token')
   if (token) cfg.headers.Authorization = `Bearer ${token}`
   return cfg
 })
 
-// 统一解信封：code=0 取 data；1001 跳登录；其它弹错
 http.interceptors.response.use(
   (resp) => {
     const r = resp.data
@@ -34,7 +46,7 @@ http.interceptors.response.use(
     return r
   },
   (err) => {
-    if (!err?.config?.silentError) ElMessage.error(err?.message || '网络错误')
+    if (!err?.config?.silentError) ElMessage.error(err?.message || 'Network Error')
     return Promise.reject(err)
   }
 )
