@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { socialApi, type MessageVO, type FriendVO } from '../../api/social'
 import { teamApi, type TeamMemberItem } from '../../api/team'
@@ -108,6 +108,9 @@ async function recall(msg: MessageVO) {
     ElMessage.warning('只能撤回2分钟内的消息')
     return
   }
+  try {
+    await ElMessageBox.confirm('确认撤回这条消息？', '撤回消息', { confirmButtonText: '撤回', cancelButtonText: '取消', type: 'warning' })
+  } catch { return }
   await socialApi.recallMessage(msg.id)
   msg.isRecalled = true
   ElMessage.success('已撤回')
