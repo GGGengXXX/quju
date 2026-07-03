@@ -54,13 +54,28 @@ public class MerchantService {
     }
 
     public MerchantVO getMyProfile(long userId) {
-        MerchantProfile mp = requireMerchant(userId);
+        MerchantProfile mp = findByUserId(userId);
+        // 尚无档案（如历史商家账号）时返回空档，前端可加载并引导补交，而非报"资源不存在"。
+        if (mp == null) return new MerchantVO(null, userId, null, null, null, null, null, null, null);
         return toVO(mp);
     }
 
     @Transactional
     public MerchantVO updateProfile(long userId, MerchantUpdateReq req) {
-        MerchantProfile mp = requireMerchant(userId);
+        MerchantProfile mp = findByUserId(userId);
+        if (mp == null) {
+            // upsert：缺档案时按本次填写建档并进入后台审核（PENDING）。
+            if (req.merchantName() == null || req.merchantName().isBlank())
+                throw new BizException(ErrorCode.MERCHANT_NAME_REQUIRED);
+            mp = new MerchantProfile();
+            mp.setUserId(userId);
+            mp.setMerchantName(req.merchantName());
+            mp.setNickname(req.nickname());
+            mp.setFocusFields(req.focusFields());
+            mp.setAuditStatus("PENDING");
+            merchantMapper.insert(mp);
+            return toVO(mp);
+        }
         if (req.merchantName() != null) mp.setMerchantName(req.merchantName());
         if (req.nickname() != null) mp.setNickname(req.nickname());
         if (req.focusFields() != null) mp.setFocusFields(req.focusFields());
@@ -68,11 +83,9 @@ public class MerchantService {
         return toVO(mp);
     }
 
-    private MerchantProfile requireMerchant(long userId) {
-        MerchantProfile mp = merchantMapper.selectOne(
+    private MerchantProfile findByUserId(long userId) {
+        return merchantMapper.selectOne(
                 Wrappers.<MerchantProfile>lambdaQuery().eq(MerchantProfile::getUserId, userId));
-        if (mp == null) throw new BizException(ErrorCode.NOT_FOUND);
-        return mp;
     }
 
     private MerchantVO toVO(MerchantProfile mp) {

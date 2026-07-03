@@ -119,10 +119,10 @@ async function handleAvatarChange(e: Event) {
       <el-descriptions-item label="状态">{{ auth.user.status }}</el-descriptions-item>
       <el-descriptions-item v-if="!isMerchant" label="信誉">{{ auth.user.reputation }}</el-descriptions-item>
       <el-descriptions-item v-if="isMerchant" label="审核状态">
-        <el-tag v-if="merchant" :type="merchant.auditStatus === 'APPROVED' ? 'success' : merchant.auditStatus === 'REJECTED' ? 'danger' : 'warning'">
+        <el-tag v-if="merchant?.auditStatus" :type="merchant.auditStatus === 'APPROVED' ? 'success' : merchant.auditStatus === 'REJECTED' ? 'danger' : 'warning'">
           {{ auditStatusLabel[merchant.auditStatus] || merchant.auditStatus }}
         </el-tag>
-        <span v-else class="muted">未提交</span>
+        <span v-else class="muted">未提交（完善资料并保存后进入后台审核）</span>
         <span v-if="merchant?.auditStatus === 'REJECTED' && merchant?.auditReason" class="reject-reason">（{{ merchant.auditReason }}）</span>
       </el-descriptions-item>
     </el-descriptions>
