@@ -357,10 +357,20 @@ async function submitCreate(submit: boolean) {
 async function signupCurrent() {
   if (!detail.value) return
   try {
-    await ElMessageBox.confirm('报名后将校验信誉分（至少 60）、年龄（至少 16 岁），并默认你已确认线下活动安全须知。是否继续？', '确认报名', {
-      confirmButtonText: '确认报名',
+    await ElMessageBox.confirm(
+      '<div style="text-align:left;line-height:1.8">' +
+      '<p><b>线下活动安全须知：</b></p>' +
+      '<p>1. 请确认活动地点安全，注意人身和财产安全</p>' +
+      '<p>2. 活动中如遇紧急情况，请及时拨打110/120</p>' +
+      '<p>3. 请勿向陌生人透露个人隐私信息</p>' +
+      '<p>4. 报名即视为确认本人信誉分≥60、年龄≥16岁</p>' +
+      '<p>5. 活动开始前可取消报名，开始后无法取消</p>' +
+      '</div>',
+      '报名确认', {
+      confirmButtonText: '我已阅读并同意，确认报名',
       cancelButtonText: '取消',
       type: 'warning',
+      dangerouslyUseHTMLString: true,
     })
   } catch {
     return
