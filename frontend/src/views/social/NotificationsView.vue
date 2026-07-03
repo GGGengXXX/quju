@@ -9,6 +9,10 @@ const list = ref<NotificationItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
+const expandedId = ref<number | null>(null)
+
+// 暴露给父组件（App.vue 可通过 provide/inject 或直接刷新）
+const emit = defineEmits<{ (e: 'unreadChange'): void }>()
 
 async function load() {
   loading.value = true
@@ -21,22 +25,25 @@ async function load() {
   }
 }
 
-async function handleClick(item: NotificationItem) {
-  // 标记已读
+async function toggleExpand(item: NotificationItem) {
+  if (expandedId.value === item.id) {
+    expandedId.value = null
+    return
+  }
+  expandedId.value = item.id
+  // 展开即标记已读
   if (!item.isRead) {
     try {
       await notificationApi.markRead(item.id)
       item.isRead = true
+      emit('unreadChange')
     } catch { /* ignore */ }
   }
-  // 根据类型跳转
-  navigate(item)
 }
 
 function navigate(item: NotificationItem) {
   const { type, refType, refId } = item
   if (!refId) return
-
   switch (type) {
     case 'ACTIVITY_REVIEW':
     case 'ACTIVITY_SIGNUP':
@@ -63,6 +70,7 @@ function navigate(item: NotificationItem) {
 async function markAllRead() {
   await notificationApi.markAllRead()
   list.value.forEach(n => { n.isRead = true })
+  emit('unreadChange')
   ElMessage.success('已全部标记已读')
 }
 
@@ -97,20 +105,22 @@ onMounted(load)
       <div
         v-for="item in list"
         :key="item.id"
-        :class="['notify-item', { unread: !item.isRead }]"
-        @click="handleClick(item)"
+        :class="['notify-item', { unread: !item.isRead, expanded: expandedId === item.id }]"
+        @click="toggleExpand(item)"
       >
         <div class="item-main">
           <div class="item-left">
+            <span v-if="!item.isRead" class="dot" />
             <el-tag size="small" :type="item.isRead ? 'info' : ''">{{ typeLabel[item.type] || item.type }}</el-tag>
             <span class="title">{{ item.title }}</span>
           </div>
-          <div class="item-right">
-            <span class="time">{{ item.createdAt?.slice(0, 16).replace('T', ' ') }}</span>
-            <span v-if="!item.isRead" class="dot" />
-          </div>
+          <span class="time">{{ item.createdAt?.slice(0, 16).replace('T', ' ') }}</span>
         </div>
-        <div v-if="item.content" class="item-content">{{ item.content }}</div>
+        <div v-if="expandedId === item.id" class="item-detail">
+          <p v-if="item.content" class="detail-content">{{ item.content }}</p>
+          <p v-else class="detail-content empty-content">无附加内容</p>
+          <el-button v-if="item.refId" size="small" type="primary" @click.stop="navigate(item)">前往查看</el-button>
+        </div>
       </div>
     </div>
 
@@ -132,14 +142,16 @@ onMounted(load)
 .header h2 { margin: 0; }
 .list { min-height: 100px; }
 .empty { text-align: center; color: #999; padding: 32px 0; }
-.notify-item { padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; }
+.notify-item { padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; border-radius: 6px; margin-bottom: 4px; }
 .notify-item:hover { background: #f9f9f9; }
 .notify-item.unread { background: #ecf5ff; }
+.notify-item.expanded { background: #f5f7fa; }
 .item-main { display: flex; align-items: center; justify-content: space-between; }
 .item-left { display: flex; align-items: center; gap: 8px; }
 .title { font-size: 14px; font-weight: 500; }
-.item-right { display: flex; align-items: center; gap: 8px; }
-.time { font-size: 12px; color: #999; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #f56c6c; }
-.item-content { font-size: 13px; color: #666; margin-top: 6px; padding-left: 4px; }
+.time { font-size: 12px; color: #999; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #f56c6c; flex-shrink: 0; }
+.item-detail { margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px; border: 1px solid #eee; }
+.detail-content { font-size: 13px; color: #666; margin: 0 0 8px 0; }
+.empty-content { color: #bbb; font-style: italic; }
 </style>
