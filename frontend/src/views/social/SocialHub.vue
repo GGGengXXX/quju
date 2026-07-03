@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import {
   socialApi,
   type FriendVO,
   type FriendRequestVO,
+  type FollowVO,
   type BlockVO,
   type UserBrief,
 } from '../../api/social'
@@ -14,7 +15,8 @@ import http from '../../api/http'
 
 const auth = useAuthStore()
 const router = useRouter()
-const tab = ref('friends')
+const route = useRoute()
+const tab = ref((route.query.tab as string) || 'friends')
 
 // 好友列表
 const friends = ref<FriendVO[]>([])
@@ -27,6 +29,11 @@ const requestsLoading = ref(false)
 // 黑名单
 const blocks = ref<BlockVO[]>([])
 const blocksLoading = ref(false)
+
+// 关注
+const followTab = ref('FOLLOWING')
+const followList = ref<FollowVO[]>([])
+const followLoading = ref(false)
 
 // 我的小队
 const myTeams = ref<any[]>([])
@@ -70,6 +77,15 @@ async function loadBlocks() {
   }
 }
 
+async function loadFollows() {
+  followLoading.value = true
+  try {
+    followList.value = await socialApi.getFollows({ type: followTab.value as 'FOLLOWING' | 'FOLLOWERS' })
+  } finally {
+    followLoading.value = false
+  }
+}
+
 async function loadMyTeams() {
   teamsLoading.value = true
   try {
@@ -84,6 +100,7 @@ function onTabChange(t: string) {
   tab.value = t
   if (t === 'friends') loadFriends()
   else if (t === 'requests') loadRequests()
+  else if (t === 'follows') loadFollows()
   else if (t === 'blocks') loadBlocks()
   else if (t === 'teams') loadMyTeams()
 }
@@ -138,6 +155,13 @@ async function unblock(userId: number) {
   loadBlocks()
 }
 
+async function unfollow(userId: number) {
+  await ElMessageBox.confirm('取消关注后，如果之前是互关好友，好友关系也会解除', '提示')
+  await socialApi.unfollow(userId)
+  ElMessage.success('已取消关注')
+  loadFollows()
+}
+
 function openAdd() {
   addForm.accountId = ''
   addForm.message = ''
@@ -178,7 +202,13 @@ function goProfile(userId: number) {
   router.push(`/social/user/${userId}`)
 }
 
-onMounted(loadFriends)
+onMounted(() => {
+  if (tab.value === 'requests') loadRequests()
+  else if (tab.value === 'follows') loadFollows()
+  else if (tab.value === 'blocks') loadBlocks()
+  else if (tab.value === 'teams') loadMyTeams()
+  else loadFriends()
+})
 </script>
 
 <template>
@@ -215,10 +245,10 @@ onMounted(loadFriends)
         <div v-loading="requestsLoading" class="list">
           <div v-if="!requests.length && !requestsLoading" class="empty">暂无申请</div>
           <div v-for="r in requests" :key="r.id" class="card">
-            <div class="info">
+            <div class="info" style="cursor: pointer" @click="goProfile(r.fromUserId)">
               <el-avatar :size="40" :src="r.fromAvatar" />
               <div class="text">
-                <strong>{{ r.fromNickname || r.fromUserId }}</strong>
+                <strong class="link-name">{{ r.fromNickname || r.fromUserId }}</strong>
                 <span class="sub">{{ r.message || '请求加为好友' }}</span>
               </div>
             </div>
@@ -245,6 +275,28 @@ onMounted(loadFriends)
             </div>
             <div class="actions">
               <el-button text size="small" type="success" @click="unblock(b.userId)">解除</el-button>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="关注" name="follows">
+        <el-radio-group v-model="followTab" style="margin-bottom: 12px" @change="loadFollows">
+          <el-radio-button value="FOLLOWING">我关注的</el-radio-button>
+          <el-radio-button value="FOLLOWERS">关注我的</el-radio-button>
+        </el-radio-group>
+        <div v-loading="followLoading" class="list">
+          <div v-if="!followList.length && !followLoading" class="empty">暂无数据</div>
+          <div v-for="f in followList" :key="f.userId" class="card">
+            <div class="info" style="cursor: pointer" @click="goProfile(f.userId)">
+              <el-avatar :size="40" :src="f.avatar" />
+              <div class="text">
+                <strong class="link-name">{{ f.nickname || f.userId }}</strong>
+              </div>
+            </div>
+            <div class="actions">
+              <el-button v-if="followTab === 'FOLLOWING'" text size="small" type="danger" @click="unfollow(f.userId)">取消关注</el-button>
+              <el-button text size="small" type="primary" @click="goProfile(f.userId)">主页</el-button>
             </div>
           </div>
         </div>
@@ -328,4 +380,6 @@ onMounted(loadFriends)
 .sub { font-size: 12px; color: #999; }
 .actions { display: flex; gap: 4px; }
 .search-result { display: flex; align-items: center; gap: 8px; }
+.link-name { color: #409eff; }
+.link-name:hover { text-decoration: underline; }
 </style>
