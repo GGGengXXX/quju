@@ -247,6 +247,11 @@ public class FriendService {
             friendshipMapper.delete(Wrappers.<Friendship>lambdaQuery()
                     .eq(Friendship::getOwnerId, targetId).eq(Friendship::getFriendId, userId));
         }
+        // 拉黑同时取消双向关注
+        followMapper.delete(Wrappers.<Follow>lambdaQuery()
+                .eq(Follow::getFollowerId, userId).eq(Follow::getFolloweeId, targetId));
+        followMapper.delete(Wrappers.<Follow>lambdaQuery()
+                .eq(Follow::getFollowerId, targetId).eq(Follow::getFolloweeId, userId));
     }
 
     public void unblock(long userId, long targetId) {
