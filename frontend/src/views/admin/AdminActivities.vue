@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi, type AdminActivityListVO, type PageResult } from '../../api/admin'
+import { adminApi, type AdminActivityListVO, type AuditLogVO, type PageResult } from '../../api/admin'
+import {
+  activityAuditTypeLabel,
+  activityAuditResultLabel,
+  activityAuditResultTagType,
+} from '../../constants/enums'
 
 const loading = ref(false)
 const list = ref<AdminActivityListVO[]>([])
@@ -12,6 +17,8 @@ const query = reactive({ status: '', keyword: '', page: 1, size: 10 })
 const reviewVisible = ref(false)
 const reviewForm = reactive({ result: '' as 'PASSED' | 'REJECTED' | 'NEEDS_REVISION', reason: '' })
 const reviewTargetId = ref(0)
+const auditLogs = ref<AuditLogVO[]>([])
+const auditLogsLoading = ref(false)
 
 const reasonVisible = ref(false)
 const reasonForm = reactive({ reason: '' })
@@ -39,11 +46,25 @@ function switchTab(t: string) {
   load()
 }
 
-function openReview(id: number) {
+async function openReview(id: number) {
   reviewTargetId.value = id
   reviewForm.result = 'PASSED'
   reviewForm.reason = ''
   reviewVisible.value = true
+  // 拉取审核流水时间线，帮助审核员了解 AI 为何转人工
+  auditLogs.value = []
+  auditLogsLoading.value = true
+  try {
+    auditLogs.value = await adminApi.getActivityAuditLogs(id)
+  } catch {
+    auditLogs.value = []
+  } finally {
+    auditLogsLoading.value = false
+  }
+}
+
+function formatAuditTime(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : ''
 }
 
 async function submitReview() {
@@ -149,7 +170,27 @@ onMounted(load)
     />
 
     <!-- 审核弹窗 -->
-    <el-dialog v-model="reviewVisible" title="审核活动" width="450px">
+    <el-dialog v-model="reviewVisible" title="审核活动" width="480px">
+      <!-- 审核流水时间线：突出 AI 判定与理由，辅助人工决策 -->
+      <div class="audit-logs" v-loading="auditLogsLoading">
+        <div class="audit-logs__title">审核流水</div>
+        <el-empty v-if="!auditLogsLoading && auditLogs.length === 0" description="暂无审核记录" :image-size="48" />
+        <el-timeline v-else>
+          <el-timeline-item
+            v-for="log in auditLogs"
+            :key="log.id"
+            :timestamp="formatAuditTime(log.createdAt)"
+            placement="top"
+          >
+            <el-tag size="small" effect="plain">{{ activityAuditTypeLabel(log.auditType) }}</el-tag>
+            <el-tag size="small" :type="activityAuditResultTagType(log.result)" style="margin-left: 6px">
+              {{ activityAuditResultLabel(log.result) }}
+            </el-tag>
+            <div v-if="log.reason" class="audit-logs__reason">{{ log.reason }}</div>
+          </el-timeline-item>
+        </el-timeline>
+      </div>
+      <el-divider />
       <el-form label-width="80px">
         <el-form-item label="结果">
           <el-radio-group v-model="reviewForm.result">
@@ -182,4 +223,7 @@ onMounted(load)
 <style scoped>
 .page { padding: 16px; }
 h3 { margin-bottom: 16px; }
+.audit-logs { max-height: 220px; overflow-y: auto; }
+.audit-logs__title { font-weight: 600; margin-bottom: 8px; }
+.audit-logs__reason { margin-top: 4px; color: #606266; font-size: 13px; line-height: 1.5; }
 </style>

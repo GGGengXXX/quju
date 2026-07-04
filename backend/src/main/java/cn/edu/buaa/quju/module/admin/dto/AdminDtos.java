@@ -40,6 +40,9 @@ public final class AdminDtos {
                                   String status, LocalDateTime startTime, LocalDateTime createdAt) {}
     public record ActivityReviewReq(@NotBlank String result, String reason) {}
     public record ReasonReq(String reason) {}
+    /** 活动审核流水时间线项（AI/人工，供审核员参考） */
+    public record AuditLogVO(Long id, String auditType, String result, String reason,
+                             Long auditorAdminId, LocalDateTime createdAt) {}
 
     // ---- 小队管理 ----
     public record TeamListVO(Long id, Long ownerId, String name, String status,

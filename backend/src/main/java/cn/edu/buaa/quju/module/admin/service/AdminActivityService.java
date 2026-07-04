@@ -6,6 +6,7 @@ import cn.edu.buaa.quju.module.activity.entity.ActivityAuditLog;
 import cn.edu.buaa.quju.module.activity.mapper.ActivityAuditLogMapper;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityListVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityReviewReq;
+import cn.edu.buaa.quju.module.admin.dto.AdminDtos.AuditLogVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ReasonReq;
 import cn.edu.buaa.quju.module.admin.entity.Activity;
@@ -60,6 +61,18 @@ public class AdminActivityService {
                         .eq(Activity::getStatus, "PENDING_REVIEW")
                         .isNull(Activity::getDeletedAt));
         return toPage(p, page, size);
+    }
+
+    /** 活动审核流水时间线（AI/人工，按时间正序），供人工审核弹窗参考 */
+    public List<AuditLogVO> getAuditLogs(long activityId) {
+        return activityAuditLogMapper.selectList(Wrappers.<ActivityAuditLog>lambdaQuery()
+                        .eq(ActivityAuditLog::getActivityId, activityId)
+                        .orderByAsc(ActivityAuditLog::getCreatedAt)
+                        .orderByAsc(ActivityAuditLog::getId))
+                .stream()
+                .map(l -> new AuditLogVO(l.getId(), l.getAuditType(), l.getResult(),
+                        l.getReason(), l.getAuditorAdminId(), l.getCreatedAt()))
+                .collect(Collectors.toList());
     }
 
     @Transactional

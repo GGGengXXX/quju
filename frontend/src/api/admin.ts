@@ -96,6 +96,15 @@ export interface ActivityReviewReq {
   reason?: string
 }
 
+export interface AuditLogVO {
+  id: number
+  auditType: string
+  result: string
+  reason?: string | null
+  auditorAdminId?: number | null
+  createdAt: string
+}
+
 export interface ReasonReq {
   reason: string
 }
@@ -167,6 +176,9 @@ export const adminApi = {
 
   getPendingReviewActivities: (params: { page?: number; size?: number }) =>
     http.get<any, PageResult<AdminActivityListVO>>('/admin/activities/pending-review', { params }),
+
+  getActivityAuditLogs: (id: number) =>
+    http.get<any, AuditLogVO[]>(`/admin/activities/${id}/audit-logs`),
 
   reviewActivity: (id: number, data: ActivityReviewReq) =>
     http.post<any, void>(`/admin/activities/${id}/review`, data),
