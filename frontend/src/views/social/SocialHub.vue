@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import jsQR from 'jsqr'
@@ -226,6 +226,11 @@ function scanQrFromImage(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  processQrImage(file)
+  input.value = ''
+}
+
+function processQrImage(file: File | Blob) {
   const img = new Image()
   img.onload = () => {
     const canvas = document.createElement('canvas')
@@ -236,7 +241,6 @@ function scanQrFromImage(e: Event) {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
     const code = jsQR(imageData.data, imageData.width, imageData.height)
     if (code?.data) {
-      // 尝试解析 URL 中的用户 ID
       const match = code.data.match(/\/social\/user\/(\d+)/)
       if (match) {
         router.push(`/social/user/${match[1]}`)
@@ -246,9 +250,25 @@ function scanQrFromImage(e: Event) {
     } else {
       ElMessage.warning('未识别到二维码，请选择清晰的二维码图片')
     }
+    URL.revokeObjectURL(img.src)
   }
   img.src = URL.createObjectURL(file)
-  input.value = ''
+}
+
+function handlePaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault()
+      const blob = item.getAsFile()
+      if (blob) {
+        ElMessage.info('正在识别粘贴的二维码...')
+        processQrImage(blob)
+      }
+      return
+    }
+  }
 }
 
 onMounted(() => {
@@ -258,6 +278,11 @@ onMounted(() => {
   else if (tab.value === 'blocks') loadBlocks()
   else if (tab.value === 'teams') loadMyTeams()
   else loadFriends()
+  document.addEventListener('paste', handlePaste)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('paste', handlePaste)
 })
 </script>
 
@@ -273,6 +298,7 @@ onMounted(() => {
         <el-button type="primary" size="small" @click="openAdd">搜索用户</el-button>
       </div>
     </div>
+    <p class="paste-hint">💡 也可以直接 Ctrl+V / Cmd+V 粘贴二维码截图识别</p>
 
     <el-tabs v-model="tab" @tab-change="onTabChange">
       <el-tab-pane label="好友" name="friends">
@@ -440,6 +466,7 @@ onMounted(() => {
 .hub-actions { display: flex; align-items: center; gap: 8px; }
 .scan-btn { cursor: pointer; font-size: 13px; color: #409eff; padding: 6px 12px; border: 1px solid #dcdfe6; border-radius: 4px; }
 .scan-btn:hover { background: #ecf5ff; }
+.paste-hint { font-size: 12px; color: #999; margin: 0 0 12px 0; }
 .list { min-height: 100px; }
 .empty { text-align: center; color: #999; padding: 32px 0; }
 .card { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
