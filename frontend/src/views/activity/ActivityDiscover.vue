@@ -85,6 +85,8 @@ let amap: any = null
 let pickerMap: any = null
 let pickerMarker: any = null
 let mapMarkers: any[] = []
+let mapInfoWindow: any = null
+let myLocationMarker: any = null
 let mapRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
 const query = reactive({
@@ -557,7 +559,10 @@ async function useCurrentLocation(target: 'query' | 'form' | 'checkin') {
     query.lng = lng
     query.lat = lat
     query.tab = 'NEARBY'
-    if (amap) amap.setCenter([lng, lat])
+    if (amap) {
+      amap.setCenter([lng, lat])
+      setMyLocationMarker(lng, lat)
+    }
   } else if (target === 'form') {
     form.lng = lng
     form.lat = lat
@@ -737,6 +742,25 @@ async function ensureAmap() {
   return window.__qujuAmapLoading__
 }
 
+function escapeHtml(value?: string) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string)
+  )
+}
+
+function buildPointInfoHtml(point: ActivityPoint) {
+  const name = escapeHtml(point.name)
+  const meta = escapeHtml(`${categoryLabel(point.category)} · ${point.city || '未设置城市'}`)
+  const state = escapeHtml(`${activityStatusLabel(point.status)} · ${activityPhaseLabel(point.phase)}`)
+  return (
+    `<div style="padding:8px 10px;min-width:160px;max-width:240px;line-height:1.5">` +
+    `<div style="font-weight:600;color:#111827;margin-bottom:4px">${name}</div>` +
+    `<div style="font-size:12px;color:#6b7280">${meta}</div>` +
+    `<div style="font-size:12px;color:#6b7280">${state}</div>` +
+    `</div>`
+  )
+}
+
 function renderMapMarkers() {
   if (!amap || !window.AMap) return
   mapMarkers.forEach((marker) => marker.setMap(null))
@@ -748,9 +772,36 @@ function renderMapMarkers() {
         position: [point.lng, point.lat],
         title: point.name,
       })
+      marker.on('mouseover', () => {
+        if (!mapInfoWindow) {
+          mapInfoWindow = new window.AMap.InfoWindow({
+            isCustom: false,
+            offset: new window.AMap.Pixel(0, -30),
+          })
+        }
+        mapInfoWindow.setContent(buildPointInfoHtml(point))
+        mapInfoWindow.open(amap, [point.lng, point.lat])
+      })
+      marker.on('mouseout', () => mapInfoWindow?.close())
       marker.on('click', () => openDetail(point.id))
       return marker
     })
+}
+
+function setMyLocationMarker(lng: number, lat: number) {
+  if (!amap || !window.AMap) return
+  if (!myLocationMarker) {
+    myLocationMarker = new window.AMap.Marker({
+      map: amap,
+      position: [lng, lat],
+      offset: new window.AMap.Pixel(-9, -9),
+      zIndex: 150,
+      content:
+        '<div style="width:14px;height:14px;background:#3b82f6;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 5px rgba(59,130,246,.25)"></div>',
+    })
+  } else {
+    myLocationMarker.setPosition([lng, lat])
+  }
 }
 
 async function initMainMap() {
@@ -813,6 +864,13 @@ watch(createVisible, async (visible) => {
 
 watch(visibleCheckinCode, () => {
   updateCheckinQrCode()
+})
+
+// 地图面板从隐藏(display:none)重新显示后，高德需要 resize 重新计算尺寸，否则会空白/错位
+watch(showMapPanel, async (visible) => {
+  if (!visible) return
+  await nextTick()
+  amap?.resize()
 })
 
 watch(
@@ -893,13 +951,6 @@ onMounted(async () => {
         </div>
         <div v-if="amapKey" ref="mapRef" class="map-canvas" />
         <el-empty v-else description="未配置地图 Key，仍可使用列表发现活动" />
-        <div class="map-side-list">
-          <button v-for="point in mapPoints" :key="point.id" type="button" class="point-card" @click="openDetail(point.id)">
-            <strong>{{ point.name }}</strong>
-            <span>{{ categoryLabel(point.category) }} / {{ point.city || '未设置城市' }}</span>
-            <span>{{ activityStatusLabel(point.status) }} / {{ activityPhaseLabel(point.phase) }}</span>
-          </button>
-        </div>
       </section>
 
       <section class="panel list-panel">
@@ -1290,11 +1341,14 @@ onMounted(async () => {
   flex: 0 0 auto;
 }
 
-/* 内部滚动区：地图点位列表 / 活动发现列表吃剩余高度独立滚动 */
-.map-panel .map-side-list,
+/* 地图 canvas 填满面板剩余高度；活动发现列表吃剩余高度独立滚动 */
+.map-panel .map-canvas,
 .list-panel .activity-list {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.list-panel .activity-list {
   overflow-y: auto;
 }
 
@@ -1374,10 +1428,14 @@ onMounted(async () => {
 .map-canvas,
 .picker-map {
   width: 100%;
-  height: 420px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
+}
+
+/* 主地图填满面板高度（配合 .map-panel .map-canvas 的 flex），并给窄屏兜底最小高度 */
+.map-canvas {
+  min-height: 320px;
 }
 
 .picker-map {
@@ -1412,7 +1470,6 @@ onMounted(async () => {
   word-break: break-all;
 }
 
-.map-side-list,
 .activity-list,
 .mine-list,
 .review-list,
@@ -1423,7 +1480,6 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.point-card,
 .activity-card,
 .mine-card {
   width: 100%;
@@ -1435,7 +1491,6 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.point-card:hover,
 .activity-card:hover,
 .mine-card:hover {
   border-color: #409eff;
@@ -1564,7 +1619,6 @@ onMounted(async () => {
     height: auto;
   }
 
-  .map-panel .map-side-list,
   .list-panel .activity-list {
     overflow-y: visible;
   }
