@@ -956,13 +956,11 @@ onMounted(async () => {
           <el-option v-for="option in categoryOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
         <el-input v-model="query.city" clearable placeholder="城市" />
-        <el-input-number v-model="query.feeMin" :min="0" :step="10" placeholder="最低费用" />
-        <el-input-number v-model="query.feeMax" :min="0" :step="10" placeholder="最高费用" />
-        <el-date-picker v-model="query.startFrom" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间从" />
-        <el-date-picker v-model="query.startTo" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间到" />
-        <el-input-number v-model="query.lng" :precision="6" :step="0.0001" placeholder="中心经度" />
-        <el-input-number v-model="query.lat" :precision="6" :step="0.0001" placeholder="中心纬度" />
-        <el-input-number v-model="query.distanceKm" :min="1" :max="50" placeholder="附近公里数" />
+        <el-input-number v-model="query.feeMin" :min="0" :step="10" placeholder="最低费用(元)" controls-position="right" />
+        <el-input-number v-model="query.feeMax" :min="0" :step="10" placeholder="最高费用(元)" controls-position="right" />
+        <el-date-picker v-model="query.startFrom" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间(从)" />
+        <el-date-picker v-model="query.startTo" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间(到)" />
+        <el-input-number v-model="query.distanceKm" :min="1" :max="50" placeholder="附近范围(公里)" controls-position="right" />
       </div>
 
       <div class="toolbar-bottom">

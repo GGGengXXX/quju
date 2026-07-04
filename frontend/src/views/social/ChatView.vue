@@ -104,7 +104,7 @@ async function loadMessages() {
     messages.value = res.list
     await nextTick()
     scrollToBottom()
-    if (isFriendChat) socialApi.markRead({ scope, peerId })
+    socialApi.markRead({ scope, peerId })
   } finally {
     loading.value = false
   }
