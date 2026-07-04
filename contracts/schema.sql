@@ -309,6 +309,14 @@ CREATE TABLE IF NOT EXISTS message (
   KEY idx_msg_sender (sender_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='即时通讯消息(好友+群)';
 
+CREATE TABLE IF NOT EXISTS message_read_receipt (
+  message_id  BIGINT UNSIGNED NOT NULL,
+  user_id     BIGINT UNSIGNED NOT NULL,
+  read_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (message_id, user_id),
+  KEY idx_receipt_msg (message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群消息已读回执';
+
 -- ============================== 四、兴趣小队 ==============================
 
 CREATE TABLE IF NOT EXISTS team (

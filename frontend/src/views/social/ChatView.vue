@@ -322,12 +322,27 @@ function connectWebSocket() {
   ws = new WebSocket(wsUrl)
   ws.onmessage = (event) => {
     try {
-      const msg: MessageVO = JSON.parse(event.data)
+      const data = JSON.parse(event.data)
+      // 处理已读回执
+      if (data.type === 'READ_RECEIPT') {
+        if (data.scope === 'FRIEND' && data.messageIds) {
+          messages.value.forEach(m => {
+            if (data.messageIds.includes(m.id)) m.isRead = true
+          })
+        } else if (data.scope === 'TEAM' && data.teamId === peerId) {
+          // 群聊有人已读，增加所有自己发的消息的 readCount
+          messages.value.forEach(m => {
+            if (isMine(m) && m.readCount != null) m.readCount++
+          })
+        }
+        return
+      }
+      // 普通消息
+      const msg: MessageVO = data
       const match = isFriendChat
         ? msg.scope === 'FRIEND' && (msg.senderId === peerId || msg.receiverId === peerId)
         : msg.scope === 'TEAM' && msg.teamId === peerId
       if (match) {
-        // 避免重复（自己发的消息已经在 send() 中 push 了）
         if (!messages.value.some(m => m.id === msg.id)) {
           messages.value.push(msg)
           nextTick(scrollToBottom)
@@ -391,6 +406,7 @@ onBeforeUnmount(() => {
             <span class="msg-time">
               {{ msg.createdAt?.slice(11, 16) }}
               <span v-if="isMine(msg) && isFriendChat" class="read-status" :class="{ read: msg.isRead }">{{ msg.isRead ? '已读' : '未读' }}</span>
+              <span v-if="isMine(msg) && !isFriendChat && msg.readCount != null" class="read-status read">{{ msg.readCount }}人已读</span>
             </span>
           </div>
         </template>

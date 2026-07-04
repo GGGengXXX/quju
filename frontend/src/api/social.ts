@@ -50,6 +50,7 @@ export interface MessageVO {
   isRecalled?: boolean
   forwardedFromId?: number
   createdAt?: string
+  readCount?: number
 }
 
 export interface PageResult<T> {
