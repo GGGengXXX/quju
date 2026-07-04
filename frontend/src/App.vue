@@ -207,6 +207,7 @@ onBeforeUnmount(() => {
       <span class="logo" @click="router.push('/')">趣聚 QuJu</span>
       <span class="spacer" />
       <template v-if="auth.token">
+        <el-button text @click="router.push('/activities')">活动</el-button>
         <el-button text @click="router.push('/social')">社交</el-button>
         <el-button text @click="goNotifications">
           通知<el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99" class="notify-badge" />
@@ -214,6 +215,10 @@ onBeforeUnmount(() => {
         <el-button text @click="router.push('/teams')">小队</el-button>
         <el-button text @click="router.push('/profile')">我的</el-button>
         <el-button text @click="logout">退出</el-button>
+      </template>
+      <template v-else>
+        <el-button text @click="router.push('/login')">登录</el-button>
+        <el-button text @click="router.push('/register')">注册</el-button>
       </template>
     </el-header>
     <el-main><router-view /></el-main>
