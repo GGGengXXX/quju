@@ -119,18 +119,6 @@ public class MessageService {
     }
 
     @Transactional
-    public void markRead(long userId, MarkReadReq req) {
-        if ("FRIEND".equals(req.scope())) {
-            messageMapper.update(null, Wrappers.<Message>lambdaUpdate()
-                    .set(Message::getIsRead, true)
-                    .eq(Message::getScope, "FRIEND")
-                    .eq(Message::getSenderId, req.peerId())
-                    .eq(Message::getReceiverId, userId)
-                    .eq(Message::getIsRead, false));
-        }
-    }
-
-    @Transactional
     public void recall(long userId, long messageId) {
         Message msg = messageMapper.selectById(messageId);
         if (msg == null || !msg.getSenderId().equals(userId))
@@ -187,8 +175,59 @@ public class MessageService {
     }
 
     private MessageVO toVO(Message m) {
+        Integer readCount = null;
+        if ("TEAM".equals(m.getScope())) {
+            readCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM message_read_receipt WHERE message_id = ?", Integer.class, m.getId());
+        }
         return new MessageVO(m.getId(), m.getScope(), m.getSenderId(), m.getReceiverId(),
                 m.getTeamId(), m.getContentType(), m.getContent(),
-                m.getIsRead(), m.getIsRecalled(), m.getForwardedFromId(), m.getCreatedAt());
+                m.getIsRead(), m.getIsRecalled(), m.getForwardedFromId(), m.getCreatedAt(), readCount);
+    }
+
+    @Transactional
+    public void markRead(long userId, MarkReadReq req) {
+        if ("FRIEND".equals(req.scope())) {
+            // 标记对方发给我的消息为已读
+            List<Long> updatedIds = messageMapper.selectList(Wrappers.<Message>lambdaQuery()
+                    .eq(Message::getScope, "FRIEND")
+                    .eq(Message::getSenderId, req.peerId())
+                    .eq(Message::getReceiverId, userId)
+                    .eq(Message::getIsRead, false))
+                .stream().map(Message::getId).toList();
+
+            if (!updatedIds.isEmpty()) {
+                messageMapper.update(null, Wrappers.<Message>lambdaUpdate()
+                        .set(Message::getIsRead, true)
+                        .in(Message::getId, updatedIds));
+                // WebSocket 通知发送方消息已读
+                try {
+                    String json = objectMapper.writeValueAsString(java.util.Map.of(
+                        "type", "READ_RECEIPT", "scope", "FRIEND", "messageIds", updatedIds));
+                    wsHandler.sendToUser(req.peerId(), json);
+                } catch (Exception ignored) {}
+            }
+        } else if ("TEAM".equals(req.scope())) {
+            // 群聊：记录已读回执
+            List<Message> unread = messageMapper.selectList(Wrappers.<Message>lambdaQuery()
+                    .eq(Message::getScope, "TEAM")
+                    .eq(Message::getTeamId, req.peerId())
+                    .ne(Message::getSenderId, userId)
+                    .orderByDesc(Message::getCreatedAt)
+                    .last("LIMIT 50"));
+            for (Message msg : unread) {
+                try {
+                    jdbcTemplate.update(
+                        "INSERT IGNORE INTO message_read_receipt(message_id, user_id) VALUES (?, ?)",
+                        msg.getId(), userId);
+                } catch (Exception ignored) {}
+            }
+            // WebSocket 通知群内所有人有人已读
+            try {
+                String json = objectMapper.writeValueAsString(java.util.Map.of(
+                    "type", "READ_RECEIPT", "scope", "TEAM", "teamId", req.peerId(), "userId", userId));
+                wsHandler.sendToTeam(req.peerId(), userId, json);
+            } catch (Exception ignored) {}
+        }
     }
 }

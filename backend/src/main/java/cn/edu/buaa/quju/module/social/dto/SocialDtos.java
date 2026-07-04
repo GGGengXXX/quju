@@ -51,5 +51,5 @@ public final class SocialDtos {
     public record MessageVO(
             Long id, String scope, Long senderId, Long receiverId, Long teamId,
             String contentType, String content, Boolean isRead, Boolean isRecalled,
-            Long forwardedFromId, LocalDateTime createdAt) {}
+            Long forwardedFromId, LocalDateTime createdAt, Integer readCount) {}
 }
