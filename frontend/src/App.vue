@@ -12,6 +12,16 @@ const router = useRouter()
 const minimalLayout = computed(() => Boolean(route.meta.minimalLayout))
 let notificationTimer: number | null = null
 const unreadCount = ref(0)
+const isDark = ref(localStorage.getItem('quju_dark') === 'true')
+
+function toggleDark() {
+  isDark.value = !isDark.value
+  localStorage.setItem('quju_dark', isDark.value ? 'true' : 'false')
+  document.documentElement.classList.toggle('dark', isDark.value)
+}
+
+// 初始化暗色模式
+if (isDark.value) document.documentElement.classList.add('dark')
 
 async function pollUnreadCount() {
   if (!auth.token) {
@@ -204,8 +214,9 @@ onBeforeUnmount(() => {
   </template>
   <el-container v-else>
     <el-header class="hd">
-      <span class="logo" @click="router.push('/')">趣聚 QuJu</span>
+      <span class="logo" @click="router.push('/')">🎯 趣聚</span>
       <span class="spacer" />
+      <el-button text class="theme-toggle" @click="toggleDark">{{ isDark ? '☀️' : '🌙' }}</el-button>
       <template v-if="auth.token">
         <el-button text @click="router.push('/activities')">活动</el-button>
         <el-button text @click="router.push('/social')">社交</el-button>
@@ -232,21 +243,40 @@ onBeforeUnmount(() => {
   --qj-primary: #f56c2e;
   --qj-primary-light: #fff7ed;
   --qj-primary-hover: #ea580c;
-  --qj-secondary: #fb923c;
-  --qj-accent: #6366f1;
+  --qj-secondary: #8b5cf6;
+  --qj-accent: #06b6d4;
   --qj-text: #1e293b;
   --qj-text-secondary: #64748b;
-  --qj-bg: #fffbf7;
+  --qj-bg: #fefcfa;
   --qj-card: #ffffff;
-  --qj-border: #f1ede8;
-  --qj-nav-bg: #1e293b;
+  --qj-border: #f0ece6;
+  --qj-nav-bg: linear-gradient(135deg, #1e293b 0%, #312e81 100%);
   --qj-nav-text: #f8fafc;
   --qj-success: #10b981;
   --qj-danger: #ef4444;
-  --qj-radius: 14px;
-  --qj-radius-sm: 8px;
-  --qj-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-  --qj-shadow-hover: 0 4px 16px rgba(245,108,46,0.12);
+  --qj-radius: 16px;
+  --qj-radius-sm: 10px;
+  --qj-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.02);
+  --qj-shadow-hover: 0 8px 32px rgba(245,108,46,0.15), 0 2px 8px rgba(0,0,0,0.04);
+  --qj-gradient: linear-gradient(135deg, #f56c2e, #8b5cf6);
+}
+
+html.dark {
+  --qj-primary: #fb923c;
+  --qj-primary-light: #1c1917;
+  --qj-primary-hover: #f97316;
+  --qj-secondary: #a78bfa;
+  --qj-accent: #22d3ee;
+  --qj-text: #f1f5f9;
+  --qj-text-secondary: #94a3b8;
+  --qj-bg: #0f172a;
+  --qj-card: #1e293b;
+  --qj-border: #334155;
+  --qj-nav-bg: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  --qj-nav-text: #f1f5f9;
+  --qj-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.2);
+  --qj-shadow-hover: 0 8px 32px rgba(251,146,60,0.2), 0 2px 8px rgba(0,0,0,0.3);
+  --qj-gradient: linear-gradient(135deg, #fb923c, #a78bfa);
 }
 
 * { box-sizing: border-box; }
@@ -256,6 +286,7 @@ body {
   font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--qj-text);
   line-height: 1.6;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3, h4, h5 {
@@ -265,16 +296,30 @@ h1, h2, h3, h4, h5 {
 }
 
 /* Element Plus 主题覆盖 */
-.el-button--primary { background: var(--qj-primary) !important; border-color: var(--qj-primary) !important; border-radius: var(--qj-radius-sm) !important; }
-.el-button--primary:hover { background: var(--qj-primary-hover) !important; border-color: var(--qj-primary-hover) !important; transform: translateY(-1px); box-shadow: var(--qj-shadow-hover); }
-.el-button { border-radius: var(--qj-radius-sm) !important; transition: all 0.2s ease; }
-.el-tag { border-radius: 6px; font-weight: 500; }
-.el-card { border-radius: var(--qj-radius) !important; border: 1px solid var(--qj-border) !important; box-shadow: var(--qj-shadow) !important; transition: box-shadow 0.2s ease, transform 0.2s ease; }
-.el-card:hover { box-shadow: var(--qj-shadow-hover) !important; }
-.el-dialog { border-radius: var(--qj-radius) !important; }
-.el-input__wrapper { border-radius: var(--qj-radius-sm) !important; }
-.el-tabs__item.is-active { color: var(--qj-primary) !important; }
-.el-tabs__active-bar { background-color: var(--qj-primary) !important; }
+.el-button--primary {
+  background: var(--qj-gradient) !important;
+  border: none !important;
+  border-radius: var(--qj-radius-sm) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.el-button--primary:hover { transform: translateY(-2px); box-shadow: var(--qj-shadow-hover); opacity: 0.9; }
+.el-button { border-radius: var(--qj-radius-sm) !important; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.el-tag { border-radius: 20px; font-weight: 600; padding: 2px 12px; }
+.el-card {
+  border-radius: var(--qj-radius) !important;
+  border: 1px solid var(--qj-border) !important;
+  background: var(--qj-card) !important;
+  box-shadow: var(--qj-shadow) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.el-card:hover { box-shadow: var(--qj-shadow-hover) !important; transform: translateY(-3px); }
+.el-dialog { border-radius: var(--qj-radius) !important; background: var(--qj-card) !important; }
+.el-input__wrapper { border-radius: var(--qj-radius-sm) !important; background: var(--qj-card) !important; }
+.el-tabs__item.is-active { color: var(--qj-primary) !important; font-weight: 700; }
+.el-tabs__active-bar { background: var(--qj-gradient) !important; height: 3px; border-radius: 2px; }
+.el-table { background: var(--qj-card) !important; }
+.el-table th.el-table__cell { background: var(--qj-bg) !important; }
 
 /* 导航栏 */
 .hd {
@@ -282,29 +327,50 @@ h1, h2, h3, h4, h5 {
   align-items: center;
   gap: 4px;
   padding: 0 28px;
-  height: 60px;
+  height: 64px;
   background: var(--qj-nav-bg);
   border-bottom: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-.hd .el-button { color: var(--qj-nav-text) !important; font-size: 14px; font-weight: 600; font-family: 'Nunito', sans-serif; border-radius: 8px !important; padding: 8px 14px !important; }
-.hd .el-button:hover { color: #fff !important; background: rgba(245,108,46,0.2) !important; }
+.hd .el-button {
+  color: var(--qj-nav-text) !important;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Nunito', sans-serif;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+  transition: all 0.2s ease;
+}
+.hd .el-button:hover { color: #fff !important; background: rgba(255,255,255,0.12) !important; transform: translateY(-1px); }
 .logo {
   font-family: 'Fredoka', sans-serif;
   font-weight: 700;
-  font-size: 22px;
+  font-size: 24px;
   cursor: pointer;
-  color: var(--qj-primary);
-  letter-spacing: -0.5px;
-  margin-right: 12px;
+  background: var(--qj-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-right: 16px;
 }
 .spacer { flex: 1; }
 .notify-badge { margin-left: 4px; vertical-align: middle; }
+.theme-toggle { font-size: 18px !important; }
 
 /* 全局 main 区域 */
 .el-main { padding: 24px 28px; }
 
 /* 链接样式 */
-a { color: var(--qj-primary); text-decoration: none; }
+a { color: var(--qj-primary); text-decoration: none; transition: color 0.2s; }
 a:hover { color: var(--qj-primary-hover); }
+
+/* 暗色模式下 Element Plus 组件 */
+html.dark .el-button:not(.el-button--primary) { color: var(--qj-text) !important; border-color: var(--qj-border) !important; }
+html.dark .el-input__wrapper { border-color: var(--qj-border) !important; }
+html.dark .el-dialog { color: var(--qj-text); }
+html.dark .el-message-box { background: var(--qj-card); color: var(--qj-text); }
+html.dark .el-descriptions__cell { background: var(--qj-card) !important; color: var(--qj-text) !important; }
 </style>
