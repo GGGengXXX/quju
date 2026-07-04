@@ -620,8 +620,11 @@ async function openLocationPicker(target: 'query' | 'form') {
 
 function confirmLocationPicker() {
   locationPickerVisible.value = false
-  ElMessage.success('位置已更新')
-  if (locationPickerTarget.value === 'query') loadActivities()
+  ElMessage.success('位置已更新，已切换到"附近"模式')
+  if (locationPickerTarget.value === 'query') {
+    query.tab = 'NEARBY'
+    loadActivities()
+  }
 }
 
 async function submitCheckin() {
@@ -1013,7 +1016,7 @@ onMounted(async () => {
           <div class="activity-list">
             <button v-for="item in activities" :key="String(item.id)" type="button" class="activity-card" @click="openDetail(item.id as number)">
               <div class="title-row">
-                <h4>{{ item.name }} }}</h4>
+                <h4>{{ item.name }}</h4>
                 <el-tag v-if="item.creator?.userType === 'MERCHANT'" size="small" type="warning" effect="dark">商家</el-tag>
                 <el-tag size="small" :type="activityStatusTagType(item.status)">{{ activityStatusLabel(item.status) }}</el-tag>
               </div>
