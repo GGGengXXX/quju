@@ -603,7 +603,37 @@ async function requestAmapLocation() {
 }
 
 async function useCurrentLocation(target: 'query' | 'form' | 'checkin') {
-
+  let locationResult: { lng: number; lat: number } | null = null
+  let lastError = ''
+  try {
+    locationResult = await requestBrowserLocation()
+  } catch (error: any) {
+    lastError = error?.message || ''
+    try {
+      locationResult = await requestAmapLocation()
+    } catch (fallbackError: any) {
+      lastError = fallbackError?.message || lastError
+    }
+  }
+  if (!locationResult) {
+    ElMessage.warning(resolveLocationFailureMessage(lastError))
+    return
+  }
+  const { lng, lat } = locationResult
+  if (target === 'query') {
+    query.lng = lng
+    query.lat = lat
+    query.tab = 'NEARBY'
+    if (amap) amap.setCenter([lng, lat])
+  } else if (target === 'form') {
+    form.lng = lng
+    form.lat = lat
+    setPickerMarker(lng, lat)
+  } else {
+    checkinForm.lng = lng
+    checkinForm.lat = lat
+  }
+  ElMessage.success('已读取当前位置')
 }
 
 async function openLocationPicker(target: 'query' | 'form') {
