@@ -965,7 +965,7 @@ onMounted(async () => {
           <div class="activity-list">
             <button v-for="item in activities" :key="String(item.id)" type="button" class="activity-card" @click="openDetail(item.id as number)">
               <div class="title-row">
-                <h4>{{ item.name }}</h4>
+                <h4>{{ item.name }} }}</h4>
                 <el-tag v-if="item.creator?.userType === 'MERCHANT'" size="small" type="warning" effect="dark">商家</el-tag>
                 <el-tag size="small" :type="activityStatusTagType(item.status)">{{ activityStatusLabel(item.status) }}</el-tag>
               </div>
@@ -983,38 +983,33 @@ onMounted(async () => {
           </div>
         </el-skeleton>
       </section>
-    </section>
 
-    <section class="mine-grid" v-if="auth.token">
-      <section class="panel mine-panel">
+      <!-- 右侧栏：我的活动 -->
+      <aside class="panel sidebar-mine" v-if="auth.token">
         <div class="section-head">
-          <h3>我发起的活动</h3>
-          <span class="muted">{{ mineActivities.length }} 条</span>
+          <h3>我发起的</h3>
+          <span class="muted">{{ mineActivities.length }}</span>
         </div>
-        <el-empty v-if="!mineActivities.length" description="还没有活动" />
-        <div v-else class="mine-list">
+        <div v-if="mineActivities.length" class="mine-list">
           <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
-            <span>{{ activityStatusLabel(item.status) }} / {{ activityPhaseLabel(item.phase) }}</span>
-            <span>{{ formatTime(item.startTime) }}</span>
+            <span>{{ activityStatusLabel(item.status) }}</span>
           </button>
         </div>
-      </section>
+        <div v-else class="empty-hint">暂无</div>
 
-      <section class="panel mine-panel">
-        <div class="section-head">
-          <h3>我报名的活动</h3>
-          <span class="muted">{{ joinedActivities.length }} 条</span>
+        <div class="section-head" style="margin-top: 16px">
+          <h3>我报名的</h3>
+          <span class="muted">{{ joinedActivities.length }}</span>
         </div>
-        <el-empty v-if="!joinedActivities.length" description="暂未报名活动" />
-        <div v-else class="mine-list">
+        <div v-if="joinedActivities.length" class="mine-list">
           <button v-for="item in joinedActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
-            <span>{{ activityStatusLabel(item.status) }} / {{ activityPhaseLabel(item.phase) }}</span>
-            <span>{{ formatTime(item.startTime) }}</span>
+            <span>{{ activityStatusLabel(item.status) }}</span>
           </button>
         </div>
-      </section>
+        <div v-else class="empty-hint">暂无</div>
+      </aside>
     </section>
 
     <el-dialog v-model="createVisible" title="创建活动" width="980px" destroy-on-close @closed="resetCreateForm">
@@ -1325,8 +1320,12 @@ onMounted(async () => {
 
 .layout-grid {
   --row-h: 560px;
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: 1.2fr 1fr 0.7fr;
   align-items: start;
+}
+
+.layout-grid.no-map {
+  grid-template-columns: 1fr 0.7fr;
 }
 
 .layout-grid .map-panel,
@@ -1336,6 +1335,14 @@ onMounted(async () => {
   flex-direction: column;
   min-height: 0;
 }
+
+.sidebar-mine {
+  height: var(--row-h);
+  overflow-y: auto;
+  padding: 16px;
+}
+.sidebar-mine .section-head h3 { font-size: 14px; margin: 0; }
+.sidebar-mine .empty-hint { font-size: 13px; color: #999; padding: 8px 0; }
 
 .layout-grid .section-head {
   flex: 0 0 auto;
