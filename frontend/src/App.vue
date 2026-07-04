@@ -226,9 +226,55 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
-body { margin: 0; background: #f7f8fa; }
-.hd { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e5e7eb; background: #fff; }
-.logo { font-weight: 700; cursor: pointer; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --qj-primary: #f56c2e;
+  --qj-primary-light: #fff3ed;
+  --qj-primary-hover: #e05a1f;
+  --qj-text: #1f2937;
+  --qj-text-secondary: #6b7280;
+  --qj-bg: #faf9f7;
+  --qj-card: #ffffff;
+  --qj-border: #e8e5e0;
+  --qj-nav-bg: #1f2937;
+  --qj-nav-text: #f9fafb;
+  --qj-radius: 12px;
+  --qj-shadow: 0 2px 8px rgba(31, 41, 55, 0.06);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--qj-bg); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--qj-text); }
+
+/* Element Plus 主题覆盖 */
+.el-button--primary { background: var(--qj-primary) !important; border-color: var(--qj-primary) !important; }
+.el-button--primary:hover { background: var(--qj-primary-hover) !important; border-color: var(--qj-primary-hover) !important; }
+.el-tag { border-radius: 6px; }
+.el-card { border-radius: var(--qj-radius); border: 1px solid var(--qj-border); box-shadow: var(--qj-shadow); }
+.el-dialog { border-radius: var(--qj-radius); }
+
+/* 导航栏 */
+.hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--qj-nav-bg);
+  border-bottom: none;
+}
+.hd .el-button { color: var(--qj-nav-text) !important; font-size: 14px; font-weight: 500; }
+.hd .el-button:hover { color: var(--qj-primary) !important; }
+.logo {
+  font-weight: 700;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--qj-primary);
+  letter-spacing: -0.5px;
+}
 .spacer { flex: 1; }
-.notify-badge { margin-left: 6px; vertical-align: middle; }
+.notify-badge { margin-left: 4px; vertical-align: middle; }
+
+/* 全局 main 区域 */
+.el-main { padding: 20px 24px; }
 </style>
