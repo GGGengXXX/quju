@@ -31,10 +31,19 @@ export interface ActivityItem {
   teamId?: number
 }
 
+export interface LatestAudit {
+  result?: string
+  reason?: string | null
+  auditType?: string
+  createdAt?: string
+}
+
 export interface ActivityDetail extends ActivityItem {
   mySignupStatus?: string
   waitlistCount?: number
   checkinCode?: string | null
+  // 最近一次审核结果（AI/人工），仅活动发起人本人可见，非本人为 null
+  latestAudit?: LatestAudit | null
 }
 
 export interface PageResult<T> {

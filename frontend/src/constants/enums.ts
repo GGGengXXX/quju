@@ -32,6 +32,39 @@ export const ACTIVITY_PHASE_LABELS: Record<string, string> = {
   ENDED: '已结束',
 }
 
+// ActivityAuditType（AI / 人工审核）
+export const ACTIVITY_AUDIT_TYPE_LABELS: Record<string, string> = {
+  AI: 'AI 审核',
+  MANUAL: '人工审核',
+}
+
+// ActivityAuditResult（审核结果）
+export const ACTIVITY_AUDIT_RESULT_LABELS: Record<string, string> = {
+  PASSED: '通过',
+  REJECTED: '驳回',
+  NEEDS_REVISION: '要求修改',
+  TO_MANUAL: '转人工复核',
+}
+
+export const ACTIVITY_AUDIT_RESULT_TAG_TYPE: Record<string, ElTagType> = {
+  PASSED: 'success',
+  REJECTED: 'danger',
+  NEEDS_REVISION: 'warning',
+  TO_MANUAL: 'warning',
+}
+
+export function activityAuditTypeLabel(value?: string): string {
+  return (value && ACTIVITY_AUDIT_TYPE_LABELS[value]) || value || '审核'
+}
+
+export function activityAuditResultLabel(value?: string): string {
+  return (value && ACTIVITY_AUDIT_RESULT_LABELS[value]) || value || '-'
+}
+
+export function activityAuditResultTagType(value?: string): ElTagType {
+  return (value && ACTIVITY_AUDIT_RESULT_TAG_TYPE[value]) || 'info'
+}
+
 // 未知值兜底返回原值，模仿 ActivityDiscover.vue 里现有的 categoryLabel。
 export function activityStatusLabel(value?: string): string {
   return (value && ACTIVITY_STATUS_LABELS[value]) || value || '未知'

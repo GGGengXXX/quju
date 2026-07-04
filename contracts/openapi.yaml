@@ -424,6 +424,8 @@ paths:
     post: { tags: [admin], summary: 下架违规活动(必填原因), parameters: [{ $ref: '#/components/parameters/PathId' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
   /admin/activities/{id}/restore:
     post: { tags: [admin], summary: 恢复活动, parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/activities/{id}/audit-logs:
+    get: { tags: [admin], summary: 活动审核流水时间线(AI/人工，供审核员参考), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/AuditLogListResp' } } }
   /admin/teams:
     get: { tags: [admin], summary: 查询小队, parameters: [{ name: keyword, in: query, schema: { type: string } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Size' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
   /admin/teams/{id}/suspend:
@@ -474,6 +476,9 @@ components:
     SignupResultResp:
       description: 报名结果（成功 / 进入候补）
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/SignupResult' } } }] } } }
+    AuditLogListResp:
+      description: 活动审核流水时间线(AI/人工，按时间正序)
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/AuditLog' } } } }] } } }
 
   schemas:
     ApiResponse:
@@ -501,6 +506,8 @@ components:
     ActivityStatus: { type: string, enum: [DRAFT, PENDING_REVIEW, PUBLISHED, REJECTED, TAKEN_DOWN, CANCELLED] }
     ActivityPhase: { type: string, enum: [NOT_STARTED, SIGNUP_OPEN, SIGNUP_CLOSED, ONGOING, ENDED], description: 由时间计算 }
     ActivityImageCategory: { type: string, enum: [GROUP_PHOTO, VENUE, PROCESS, MATERIAL, RESULT] }
+    ActivityAuditType: { type: string, enum: [AI, MANUAL] }
+    ActivityAuditResult: { type: string, enum: [PASSED, REJECTED, NEEDS_REVISION, TO_MANUAL] }
     SignupStatus: { type: string, enum: [REGISTERED, CANCELLED, WAITLISTED] }
     TeamRole: { type: string, enum: [OWNER, ADMIN, MEMBER] }
     TeamJoinType: { type: string, enum: [PUBLIC, APPROVAL] }
@@ -592,6 +599,27 @@ components:
           properties:
             mySignupStatus: { $ref: '#/components/schemas/SignupStatus' }
             waitlistCount: { type: integer }
+            latestAudit:
+              description: 最近一次审核结果(AI/人工)，仅活动发起人本人可见，非本人为 null
+              allOf: [{ $ref: '#/components/schemas/LatestAudit' }]
+    LatestAudit:
+      type: object
+      description: 最近一次审核的结果与理由(不含审核管理员标识)
+      properties:
+        result: { $ref: '#/components/schemas/ActivityAuditResult' }
+        reason: { type: string }
+        auditType: { $ref: '#/components/schemas/ActivityAuditType' }
+        createdAt: { type: string, format: date-time }
+    AuditLog:
+      type: object
+      description: 活动审核流水(AI/人工)
+      properties:
+        id: { type: integer, format: int64 }
+        auditType: { $ref: '#/components/schemas/ActivityAuditType' }
+        result: { $ref: '#/components/schemas/ActivityAuditResult' }
+        reason: { type: string }
+        auditorAdminId: { type: integer, format: int64, description: 人工审核管理员 ID，AI 审核为 null }
+        createdAt: { type: string, format: date-time }
     ActivityUpsertRequest:
       type: object
       required: [name]
