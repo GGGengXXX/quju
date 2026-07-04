@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import jsQR from 'jsqr'
 import { useAuthStore } from '../../stores/auth'
 import {
   socialApi,
@@ -221,6 +222,35 @@ function goProfile(userId: number) {
   router.push(`/social/user/${userId}`)
 }
 
+function scanQrFromImage(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0)
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const code = jsQR(imageData.data, imageData.width, imageData.height)
+    if (code?.data) {
+      // 尝试解析 URL 中的用户 ID
+      const match = code.data.match(/\/social\/user\/(\d+)/)
+      if (match) {
+        router.push(`/social/user/${match[1]}`)
+      } else {
+        ElMessage.info(`识别到内容: ${code.data}`)
+      }
+    } else {
+      ElMessage.warning('未识别到二维码，请选择清晰的二维码图片')
+    }
+  }
+  img.src = URL.createObjectURL(file)
+  input.value = ''
+}
+
 onMounted(() => {
   if (tab.value === 'requests') loadRequests()
   else if (tab.value === 'following') loadFollows()
@@ -235,7 +265,13 @@ onMounted(() => {
   <div class="social-hub">
     <div class="hub-header">
       <h2>社交</h2>
-      <el-button type="primary" size="small" @click="openAdd">搜索用户</el-button>
+      <div class="hub-actions">
+        <label class="scan-btn">
+          <span>📷 扫码加好友</span>
+          <input type="file" accept="image/*" hidden @change="scanQrFromImage" />
+        </label>
+        <el-button type="primary" size="small" @click="openAdd">搜索用户</el-button>
+      </div>
     </div>
 
     <el-tabs v-model="tab" @tab-change="onTabChange">
@@ -401,6 +437,9 @@ onMounted(() => {
 .social-hub { max-width: 700px; margin: 0 auto; padding: 16px; }
 .hub-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .hub-header h2 { margin: 0; }
+.hub-actions { display: flex; align-items: center; gap: 8px; }
+.scan-btn { cursor: pointer; font-size: 13px; color: #409eff; padding: 6px 12px; border: 1px solid #dcdfe6; border-radius: 4px; }
+.scan-btn:hover { background: #ecf5ff; }
 .list { min-height: 100px; }
 .empty { text-align: center; color: #999; padding: 32px 0; }
 .card { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
