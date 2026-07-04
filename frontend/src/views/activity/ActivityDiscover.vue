@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { useAuthStore } from '../../stores/auth'
 import { merchantApi } from '../../api/merchant'
 import http from '../../api/http'
+import ReportDialog from '../../components/ReportDialog.vue'
 import {
   activityApi,
   type ActivityDetail,
@@ -64,6 +65,7 @@ const signups = ref<SignupManageItem[]>([])
 const waitlist = ref<WaitlistPage | null>(null)
 const total = ref(0)
 const detailVisible = ref(false)
+const reportVisible = ref(false)
 const createVisible = ref(false)
 const detailTab = ref('overview')
 const aiTheme = ref('')
@@ -1057,8 +1059,11 @@ onMounted(async () => {
             <el-button v-if="detail.status === 'PUBLISHED'" @click="cloneCurrent">克隆活动</el-button>
             <el-button v-if="isOwner && detail.status === 'DRAFT'" type="primary" :loading="actionLoading" @click="submitDraft">提交审核</el-button>
             <el-button v-if="isOwner" type="danger" plain :loading="actionLoading" @click="deleteCurrent">删除/取消</el-button>
+            <el-button v-if="auth.user && !isOwner" text type="danger" @click="reportVisible = true">举报</el-button>
           </div>
         </div>
+
+        <ReportDialog v-model="reportVisible" target-type="ACTIVITY" :target-id="detail.id as number" :target-name="detail.name" />
 
         <el-tabs v-model="detailTab">
           <el-tab-pane label="概览" name="overview">

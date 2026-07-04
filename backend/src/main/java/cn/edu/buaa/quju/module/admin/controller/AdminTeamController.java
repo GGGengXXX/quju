@@ -4,7 +4,6 @@ import cn.edu.buaa.quju.common.AdminContext;
 import cn.edu.buaa.quju.common.R;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ReasonReq;
-import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ReportVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.TeamListVO;
 import cn.edu.buaa.quju.module.admin.service.AdminTeamService;
 import jakarta.validation.Valid;
@@ -42,14 +41,5 @@ public class AdminTeamController {
     public R<Void> restoreTeam(@PathVariable Long id) {
         teamService.restoreTeam(AdminContext.require(), id);
         return R.<Void>ok(null);
-    }
-
-    @GetMapping("/reports")
-    public R<PageResult<ReportVO>> listReports(
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        AdminContext.require();
-        return R.ok(teamService.listReports(status, page, size));
     }
 }

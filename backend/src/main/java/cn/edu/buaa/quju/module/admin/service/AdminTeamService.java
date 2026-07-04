@@ -4,13 +4,10 @@ import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ReasonReq;
-import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ReportVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.TeamListVO;
 import cn.edu.buaa.quju.module.admin.entity.ModerationAction;
-import cn.edu.buaa.quju.module.admin.entity.Report;
 import cn.edu.buaa.quju.module.admin.entity.Team;
 import cn.edu.buaa.quju.module.admin.mapper.ModerationActionMapper;
-import cn.edu.buaa.quju.module.admin.mapper.ReportMapper;
 import cn.edu.buaa.quju.module.admin.mapper.TeamMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -26,13 +23,10 @@ import java.util.stream.Collectors;
 public class AdminTeamService {
     private final TeamMapper teamMapper;
     private final ModerationActionMapper moderationMapper;
-    private final ReportMapper reportMapper;
 
-    public AdminTeamService(TeamMapper teamMapper, ModerationActionMapper moderationMapper,
-                            ReportMapper reportMapper) {
+    public AdminTeamService(TeamMapper teamMapper, ModerationActionMapper moderationMapper) {
         this.teamMapper = teamMapper;
         this.moderationMapper = moderationMapper;
-        this.reportMapper = reportMapper;
     }
 
     public PageResult<TeamListVO> listTeams(String keyword, String status, int page, int size) {
@@ -64,17 +58,6 @@ public class AdminTeamService {
         t.setStatus("ACTIVE");
         teamMapper.updateById(t);
         logModeration(adminId, teamId, "RESTORE", "管理员恢复");
-    }
-
-    public PageResult<ReportVO> listReports(String status, int page, int size) {
-        LambdaQueryWrapper<Report> q = Wrappers.lambdaQuery();
-        if (status != null && !status.isBlank()) q.eq(Report::getStatus, status);
-        IPage<Report> p = reportMapper.selectPage(new Page<>(page, size), q);
-        List<ReportVO> list = p.getRecords().stream()
-                .map(r -> new ReportVO(r.getId(), r.getReporterId(), r.getTargetType(),
-                        r.getTargetId(), r.getReason(), r.getDetail(), r.getStatus(), r.getCreatedAt()))
-                .collect(Collectors.toList());
-        return new PageResult<>(p.getTotal(), page, size, list);
     }
 
     private Team requireTeam(long id) {
