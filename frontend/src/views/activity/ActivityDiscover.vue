@@ -57,6 +57,11 @@ const loading = ref(false)
 const mapLoading = ref(false)
 const showMapPanel = ref(true)
 const saving = ref(false)
+const locationPickerVisible = ref(false)
+const locationPickerTarget = ref<'query' | 'form'>('query')
+const locationPickerMapRef = ref<HTMLDivElement | null>(null)
+let locationPickerMap: any = null
+let locationPickerMarker: any = null
 const actionLoading = ref(false)
 const activities = ref<ActivityItem[]>([])
 const mineActivities = ref<ActivityItem[]>([])
@@ -303,6 +308,8 @@ function fillFromTemplate(template: TemplateItem) {
   form.category = template.category
   form.intro = template.defaultIntro || ''
   form.capacity = template.defaultCapacity || 20
+  form.name = template.name + '活动'
+  createVisible.value = true
 }
 
 function applyAiPlan(plan: ActivityItem) {
@@ -575,40 +582,46 @@ async function requestAmapLocation() {
 }
 
 async function useCurrentLocation(target: 'query' | 'form' | 'checkin') {
-  let locationResult: { lng: number; lat: number } | null = null
-  let lastError = ''
-  try {
-    locationResult = await requestBrowserLocation()
-  } catch (error: any) {
-    lastError = error?.message || ''
-    try {
-      locationResult = await requestAmapLocation()
-    } catch (fallbackError: any) {
-      lastError = fallbackError?.message || lastError
-    }
-  }
-  if (!locationResult) {
-    ElMessage.warning(resolveLocationFailureMessage(lastError))
+
+}
+
+async function openLocationPicker(target: 'query' | 'form') {
+  locationPickerTarget.value = target
+  locationPickerVisible.value = true
+  await nextTick()
+  if (!locationPickerMapRef.value || !amapKey) {
+    ElMessage.warning('地图未配置')
+    locationPickerVisible.value = false
     return
   }
-  const { lng, lat } = locationResult
-  if (target === 'query') {
-    query.lng = lng
-    query.lat = lat
-    query.tab = 'NEARBY'
-    if (amap) {
-      amap.setCenter([lng, lat])
-      setMyLocationMarker(lng, lat)
-    }
-  } else if (target === 'form') {
-    form.lng = lng
-    form.lat = lat
-    setPickerMarker(lng, lat)
-  } else {
-    checkinForm.lng = lng
-    checkinForm.lat = lat
+  const AMap = await ensureAmap()
+  if (!AMap) return
+  if (!locationPickerMap) {
+    locationPickerMap = new AMap.Map(locationPickerMapRef.value, {
+      zoom: 12,
+      center: [query.lng, query.lat],
+    })
+    locationPickerMap.on('click', (e: any) => {
+      const lng = e.lnglat.getLng()
+      const lat = e.lnglat.getLat()
+      if (locationPickerMarker) locationPickerMarker.setPosition(e.lnglat)
+      else locationPickerMarker = new AMap.Marker({ map: locationPickerMap, position: e.lnglat })
+      // 立即更新目标
+      if (locationPickerTarget.value === 'query') {
+        query.lng = lng
+        query.lat = lat
+      } else {
+        form.lng = lng
+        form.lat = lat
+      }
+    })
   }
-  ElMessage.success('已读取当前位置')
+}
+
+function confirmLocationPicker() {
+  locationPickerVisible.value = false
+  ElMessage.success('位置已更新')
+  if (locationPickerTarget.value === 'query') loadActivities()
 }
 
 async function submitCheckin() {
@@ -945,7 +958,7 @@ onMounted(async () => {
           <el-radio-button label="NEARBY">附近</el-radio-button>
         </el-radio-group>
         <div class="toolbar-actions">
-          <el-button @click="useCurrentLocation('query')">使用我的位置</el-button>
+          <el-button @click="openLocationPicker('query')">选择位置</el-button>
           <el-button type="primary" @click="openCreate">创建活动</el-button>
         </div>
       </div>
@@ -1046,6 +1059,16 @@ onMounted(async () => {
         <div v-else class="empty-hint">暂无</div>
       </aside>
     </section>
+
+    <!-- 地图选点弹窗 -->
+    <el-dialog v-model="locationPickerVisible" title="在地图上选择位置" width="560px">
+      <div ref="locationPickerMapRef" style="width:100%;height:350px;border-radius:8px"></div>
+      <p style="font-size:12px;color:#999;margin:8px 0 0">点击地图选择位置，当前：{{ query.lng.toFixed(4) }}, {{ query.lat.toFixed(4) }}</p>
+      <template #footer>
+        <el-button @click="locationPickerVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmLocationPicker">确认</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="createVisible" :title="editingId ? '编辑活动' : '创建活动'" width="980px" destroy-on-close @closed="resetCreateForm">
       <div class="dialog-grid">
