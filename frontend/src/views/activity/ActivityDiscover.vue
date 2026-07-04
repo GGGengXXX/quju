@@ -157,6 +157,27 @@ const canReview = computed(() => !!detail.value && detail.value.phase === 'ENDED
 const canManageSummary = computed(() => !!detail.value && isOwner.value && detail.value.phase === 'ENDED')
 const visibleCheckinCode = computed(() => detail.value?.checkinCode || generatedCode.value || '')
 
+// 审核结果横幅：仅发起人本人可见（后端也只对本人返回 latestAudit），让 AI/人工审核结果可见。
+const auditBanner = computed<{ type: 'success' | 'warning' | 'error'; text: string } | null>(() => {
+  const audit = detail.value?.latestAudit
+  if (!isOwner.value || !audit || !audit.result) return null
+  const isAi = audit.auditType === 'AI'
+  const who = isAi ? 'AI' : '人工'
+  const reason = audit.reason ? `：${audit.reason}` : ''
+  switch (audit.result) {
+    case 'PASSED':
+      return { type: 'success', text: `${who}审核通过${isAi ? reason : ''}` }
+    case 'REJECTED':
+      return { type: 'error', text: `${who}审核驳回${reason}` }
+    case 'NEEDS_REVISION':
+      return { type: 'warning', text: `审核要求修改${reason}` }
+    case 'TO_MANUAL':
+      return { type: 'warning', text: `AI 已转人工复核${reason}` }
+    default:
+      return null
+  }
+})
+
 function formatTime(value?: string) {
   return value ? value.replace('T', ' ') : '未设置'
 }
@@ -1162,6 +1183,14 @@ onMounted(async () => {
               <span v-if="detail.creator.userType === 'MERCHANT'" class="merchant-badge">· 商家</span>
             </p>
             <p>{{ detail.intro || '暂无简介' }}</p>
+            <el-alert
+              v-if="auditBanner"
+              class="audit-banner"
+              :type="auditBanner.type"
+              :title="auditBanner.text"
+              :closable="false"
+              show-icon
+            />
             <div class="tag-row">
               <el-tag v-for="tag in detail.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
             </div>
@@ -1580,6 +1609,10 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.audit-banner {
+  margin: 8px 0 4px;
 }
 
 .intro,

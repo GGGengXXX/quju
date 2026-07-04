@@ -10,6 +10,7 @@ import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.ActivityPointVO;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.ActivityUpsertReq;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.ActivityVO;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.CheckinCodeVO;
+import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.LatestAuditVO;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.CheckinReq;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.ReviewUpsertReq;
 import cn.edu.buaa.quju.module.activity.dto.ActivityDtos.ReviewVO;
@@ -286,7 +287,24 @@ public class ActivityService {
                 activity.getSignupDeadline(), activity.getCity(), activity.getAddress(), activity.getLng(), activity.getLat(),
                 activity.getCapacity(), activity.getFee(), activity.getStatus(), calcPhase(activity), signupCounts.getOrDefault(id, 0),
                 creator, activity.getTeamId(), mySignupStatus, waitlistCounts.getOrDefault(id, 0),
-                exposeCheckinCode(activity, mySignupStatus, UserContext.get()));
+                exposeCheckinCode(activity, mySignupStatus, UserContext.get()),
+                resolveLatestAudit(activity, UserContext.get()));
+    }
+
+    /** 最近一次审核结果仅对活动发起人本人可见，其他访问者返回 null，避免已发布活动泄露审核理由 */
+    private LatestAuditVO resolveLatestAudit(Activity activity, Long viewerId) {
+        if (viewerId == null || !viewerId.equals(activity.getCreatorId())) {
+            return null;
+        }
+        ActivityAuditLog log = activityAuditLogMapper.selectOne(Wrappers.<ActivityAuditLog>lambdaQuery()
+                .eq(ActivityAuditLog::getActivityId, activity.getId())
+                .orderByDesc(ActivityAuditLog::getCreatedAt)
+                .orderByDesc(ActivityAuditLog::getId)
+                .last("LIMIT 1"));
+        if (log == null) {
+            return null;
+        }
+        return new LatestAuditVO(log.getResult(), log.getReason(), log.getAuditType(), log.getCreatedAt());
     }
 
     @Transactional

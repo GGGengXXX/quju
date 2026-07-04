@@ -4,10 +4,12 @@ import cn.edu.buaa.quju.common.AdminContext;
 import cn.edu.buaa.quju.common.R;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityListVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ActivityReviewReq;
+import cn.edu.buaa.quju.module.admin.dto.AdminDtos.AuditLogVO;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.PageResult;
 import cn.edu.buaa.quju.module.admin.dto.AdminDtos.ReasonReq;
 import cn.edu.buaa.quju.module.admin.service.AdminActivityService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +42,12 @@ public class AdminActivityController {
             @RequestParam(defaultValue = "20") int size) {
         AdminContext.require();
         return R.ok(activityService.listPendingReview(page, size));
+    }
+
+    @GetMapping("/{id}/audit-logs")
+    public R<List<AuditLogVO>> auditLogs(@PathVariable Long id) {
+        AdminContext.require();
+        return R.ok(activityService.getAuditLogs(id));
     }
 
     @PostMapping("/{id}/review")

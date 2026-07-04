@@ -71,7 +71,16 @@ public final class ActivityDtos {
             Long teamId,
             String mySignupStatus,
             Integer waitlistCount,
-            String checkinCode
+            String checkinCode,
+            LatestAuditVO latestAudit
+    ) {}
+
+    /** 最近一次审核结果，仅活动发起人本人可见（不含审核管理员标识） */
+    public record LatestAuditVO(
+            String result,
+            String reason,
+            String auditType,
+            LocalDateTime createdAt
     ) {}
 
     public record ActivityPointVO(
