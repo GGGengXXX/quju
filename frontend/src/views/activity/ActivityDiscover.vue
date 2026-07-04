@@ -8,6 +8,11 @@ import { merchantApi } from '../../api/merchant'
 import http from '../../api/http'
 import ReportDialog from '../../components/ReportDialog.vue'
 import {
+  activityStatusLabel,
+  activityStatusTagType,
+  activityPhaseLabel,
+} from '../../constants/enums'
+import {
   activityApi,
   type ActivityDetail,
   type ActivityItem,
@@ -892,7 +897,7 @@ onMounted(async () => {
           <button v-for="point in mapPoints" :key="point.id" type="button" class="point-card" @click="openDetail(point.id)">
             <strong>{{ point.name }}</strong>
             <span>{{ categoryLabel(point.category) }} / {{ point.city || '未设置城市' }}</span>
-            <span>{{ point.status }} / {{ point.phase }}</span>
+            <span>{{ activityStatusLabel(point.status) }} / {{ activityPhaseLabel(point.phase) }}</span>
           </button>
         </div>
       </section>
@@ -911,13 +916,13 @@ onMounted(async () => {
               <div class="title-row">
                 <h4>{{ item.name }}</h4>
                 <el-tag v-if="item.creator?.userType === 'MERCHANT'" size="small" type="warning" effect="dark">商家</el-tag>
-                <el-tag size="small">{{ item.status }}</el-tag>
+                <el-tag size="small" :type="activityStatusTagType(item.status)">{{ activityStatusLabel(item.status) }}</el-tag>
               </div>
               <p class="intro">{{ item.intro || '暂无简介' }}</p>
               <div class="meta-grid">
                 <span>{{ categoryLabel(item.category) }}</span>
                 <span>{{ item.city || '未设置城市' }}</span>
-                <span>{{ item.phase }}</span>
+                <span>{{ activityPhaseLabel(item.phase) }}</span>
                 <span>{{ item.signupCount }}/{{ item.capacity || '-' }}</span>
               </div>
               <div class="tag-row">
@@ -927,8 +932,10 @@ onMounted(async () => {
           </div>
         </el-skeleton>
       </section>
+    </section>
 
-      <section class="panel mine-panel" v-if="auth.token">
+    <section class="mine-grid" v-if="auth.token">
+      <section class="panel mine-panel">
         <div class="section-head">
           <h3>我发起的活动</h3>
           <span class="muted">{{ mineActivities.length }} 条</span>
@@ -937,13 +944,13 @@ onMounted(async () => {
         <div v-else class="mine-list">
           <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
-            <span>{{ item.status }} / {{ item.phase }}</span>
+            <span>{{ activityStatusLabel(item.status) }} / {{ activityPhaseLabel(item.phase) }}</span>
             <span>{{ formatTime(item.startTime) }}</span>
           </button>
         </div>
       </section>
 
-      <section class="panel mine-panel" v-if="auth.token">
+      <section class="panel mine-panel">
         <div class="section-head">
           <h3>我报名的活动</h3>
           <span class="muted">{{ joinedActivities.length }} 条</span>
@@ -952,7 +959,7 @@ onMounted(async () => {
         <div v-else class="mine-list">
           <button v-for="item in joinedActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
             <strong>{{ item.name }}</strong>
-            <span>{{ item.status }} / {{ item.phase }}</span>
+            <span>{{ activityStatusLabel(item.status) }} / {{ activityPhaseLabel(item.phase) }}</span>
             <span>{{ formatTime(item.startTime) }}</span>
           </button>
         </div>
@@ -1040,8 +1047,8 @@ onMounted(async () => {
             <div class="title-row">
               <h2>{{ detail.name }}</h2>
               <el-tag v-if="detail.creator?.userType === 'MERCHANT'" type="warning" effect="dark">商家</el-tag>
-              <el-tag>{{ detail.status }}</el-tag>
-              <el-tag type="info">{{ detail.phase }}</el-tag>
+              <el-tag :type="activityStatusTagType(detail.status)">{{ activityStatusLabel(detail.status) }}</el-tag>
+              <el-tag type="info">{{ activityPhaseLabel(detail.phase) }}</el-tag>
             </div>
             <p class="creator-line" v-if="detail.creator">
               主办方：{{ detail.creator.nickname || '未知用户' }}
@@ -1253,6 +1260,7 @@ onMounted(async () => {
 
 .page-toolbar,
 .layout-grid,
+.mine-grid,
 .dialog-grid,
 .manage-grid,
 .checkin-grid,
@@ -1265,8 +1273,29 @@ onMounted(async () => {
 }
 
 .layout-grid {
-  grid-template-columns: 1.2fr 1fr 0.8fr;
+  --row-h: 560px;
+  grid-template-columns: 1.2fr 1fr;
   align-items: start;
+}
+
+.layout-grid .map-panel,
+.layout-grid .list-panel {
+  height: var(--row-h);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.layout-grid .section-head {
+  flex: 0 0 auto;
+}
+
+/* 内部滚动区：地图点位列表 / 活动发现列表吃剩余高度独立滚动 */
+.map-panel .map-side-list,
+.list-panel .activity-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .layout-grid.no-map {
@@ -1275,6 +1304,17 @@ onMounted(async () => {
 
 .layout-grid.no-map .map-panel {
   display: none;
+}
+
+/* 收起地图后活动发现占满宽，卡片改多列网格利用宽度，仍保持固定高滚动 */
+.layout-grid.no-map .activity-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-content: start;
+}
+
+.mine-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .toolbar-top,
@@ -1329,10 +1369,6 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
-}
-
-.map-panel {
-  grid-column: span 2;
 }
 
 .map-canvas,
@@ -1514,6 +1550,7 @@ onMounted(async () => {
 
 @media (max-width: 1200px) {
   .layout-grid,
+  .mine-grid,
   .dialog-grid,
   .manage-grid,
   .checkin-grid,
@@ -1521,8 +1558,19 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .map-panel {
-    grid-column: span 1;
+  /* 窄屏放开固定高度，改回自然堆叠滚动 */
+  .layout-grid .map-panel,
+  .layout-grid .list-panel {
+    height: auto;
+  }
+
+  .map-panel .map-side-list,
+  .list-panel .activity-list {
+    overflow-y: visible;
+  }
+
+  .layout-grid.no-map .activity-list {
+    grid-template-columns: 1fr;
   }
 
   .toolbar-grid,
