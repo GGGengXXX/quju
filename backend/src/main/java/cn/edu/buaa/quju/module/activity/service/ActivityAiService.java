@@ -87,7 +87,8 @@ public class ActivityAiService {
                     规则：
                     1. 涉及违法、色情、暴力煽动、危险挑战、诈骗引流，返回 REJECTED。
                     2. 难以确认风险、存在灰区、涉及大规模组织风险，返回 TO_MANUAL。
-                    3. 普通正常活动返回 PASSED。
+                    3. 标题无实际含义/像乱码或测试文字，或简介、时间、地点等关键信息严重缺失、无法确认活动真实性，返回 TO_MANUAL。
+                    4. 普通正常活动返回 PASSED。
                     活动内容：%s
                     """.formatted(payload)
             );
