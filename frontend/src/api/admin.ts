@@ -120,6 +120,11 @@ export interface ReportVO {
   createdAt?: string
 }
 
+export interface ReportHandleReq {
+  action: 'DISMISS' | 'RESOLVE' | 'TAKEDOWN'
+  reason?: string
+}
+
 export interface PageResult<T> {
   total: number
   page: number
@@ -185,4 +190,7 @@ export const adminApi = {
   // 举报
   getReports: (params: { status?: string; page?: number; size?: number }) =>
     http.get<any, PageResult<ReportVO>>('/admin/reports', { params }),
+
+  handleReport: (id: number, data: ReportHandleReq) =>
+    http.post<any, void>(`/admin/reports/${id}/handle`, data),
 }

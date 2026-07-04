@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'v
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { teamApi, type TeamDetail, type TeamSummary, type TeamMemberItem, type TeamJoinRequestItem, type TeamAnnouncementItem, type TeamVoteItem, type TeamFileItem, type TeamAlbumPhotoItem, type TeamMomentItem, type TeamPointItem, type ActivityItem } from '../../api/team'
+import ReportDialog from '../../components/ReportDialog.vue'
 
 const loading = ref(false)
 const keyword = ref('')
@@ -13,6 +14,7 @@ const total = ref(0)
 const teams = ref<TeamSummary[]>([])
 const selectedTeam = ref<TeamDetail | null>(null)
 const drawerVisible = ref(false)
+const reportVisible = ref(false)
 const detailsLoading = ref(false)
 const activeTab = ref('members')
 
@@ -591,8 +593,11 @@ onBeforeUnmount(() => {
             <el-button v-if="selectedTeam.joined" type="primary" @click="$router.push(`/social/team-chat/${selectedTeam.id}`)">群聊</el-button>
             <el-button v-if="selectedTeam.joined && !isOwner" @click="leaveTeam">退出小队</el-button>
             <el-button v-if="isOwner" type="danger" @click="dissolveTeam">解散小队</el-button>
+            <el-button v-if="!isOwner" text type="danger" @click="reportVisible = true">举报</el-button>
           </div>
         </div>
+
+        <ReportDialog v-model="reportVisible" target-type="TEAM" :target-id="selectedTeam.id" :target-name="selectedTeam.name" />
 
         <el-tabs v-model="activeTab">
           <el-tab-pane label="成员" name="members">

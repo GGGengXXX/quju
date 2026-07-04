@@ -48,6 +48,8 @@ public final class AdminDtos {
     // ---- 举报 ----
     public record ReportVO(Long id, Long reporterId, String targetType, Long targetId,
                             String reason, String detail, String status, LocalDateTime createdAt) {}
+    /** 管理员处理举报：action = DISMISS(驳回) | RESOLVE(标记已处理) | TAKEDOWN(处理并下架/停用目标) */
+    public record ReportHandleReq(@NotBlank String action, String reason) {}
 
     // ---- 通用分页 ----
     public record PageResult<T>(long total, int page, int size, java.util.List<T> list) {}
