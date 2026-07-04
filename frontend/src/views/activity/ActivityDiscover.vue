@@ -72,6 +72,7 @@ const total = ref(0)
 const detailVisible = ref(false)
 const reportVisible = ref(false)
 const createVisible = ref(false)
+const editingId = ref<number | null>(null)
 const detailTab = ref('overview')
 const aiTheme = ref('')
 const tagText = ref('')
@@ -142,6 +143,8 @@ const tagPreview = computed(() =>
 )
 
 const isOwner = computed(() => !!detail.value && !!auth.user && detail.value.creator?.id === auth.user.id)
+// 仅草稿 / 被驳回的活动允许发起人编辑（与契约「编辑活动（草稿/被要求修改时）」一致）
+const canEdit = computed(() => isOwner.value && ['DRAFT', 'REJECTED'].includes(detail.value?.status || ''))
 const canSignup = computed(() => !!detail.value && detail.value.status === 'PUBLISHED' && !detail.value.mySignupStatus)
 const canCancelSignup = computed(() => detail.value?.mySignupStatus === 'REGISTERED')
 const canConfirmWaitlist = computed(() => detail.value?.mySignupStatus === 'WAITLISTED')
@@ -176,7 +179,9 @@ function resetCreateForm() {
   form.startTime = ''
   form.endTime = ''
   form.signupDeadline = ''
+  form.teamId = undefined
   form.submit = false
+  editingId.value = null
   tagText.value = ''
   aiTheme.value = ''
 }
@@ -348,13 +353,45 @@ async function openCreate() {
   createVisible.value = true
 }
 
+// 用现有活动信息填充表单并进入编辑模式（复用创建弹窗）
+function openEditFromDetail() {
+  const src = detail.value
+  if (!src) return
+  editingId.value = src.id as number
+  form.name = src.name || ''
+  form.intro = src.intro || ''
+  form.category = src.category || 'OTHER'
+  form.tags = [...(src.tags || [])]
+  form.city = src.city || ''
+  form.address = src.address || ''
+  form.lng = src.lng ?? query.lng
+  form.lat = src.lat ?? query.lat
+  form.capacity = src.capacity ?? 20
+  form.fee = src.fee ?? 0
+  form.coverImage = src.coverImage || ''
+  form.startTime = src.startTime || ''
+  form.endTime = src.endTime || ''
+  form.signupDeadline = src.signupDeadline || ''
+  form.teamId = src.teamId
+  form.submit = false
+  tagText.value = (src.tags || []).join(',')
+  aiTheme.value = ''
+  detailVisible.value = false
+  createVisible.value = true
+}
+
 async function submitCreate(submit: boolean) {
   saving.value = true
   try {
     form.tags = tagPreview.value
     form.submit = submit
-    await activityApi.create({ ...form })
-    ElMessage.success(submit ? '活动已提交，系统会先进行 AI 审核' : '活动草稿已保存')
+    if (editingId.value != null) {
+      await activityApi.update(editingId.value, { ...form })
+      ElMessage.success(submit ? '活动已提交，系统会先进行 AI 审核' : '活动已保存')
+    } else {
+      await activityApi.create({ ...form })
+      ElMessage.success(submit ? '活动已提交，系统会先进行 AI 审核' : '活动草稿已保存')
+    }
     createVisible.value = false
     resetCreateForm()
     await Promise.allSettled([loadActivities(), loadMine(), refreshMapPoints(false)])
@@ -1012,7 +1049,7 @@ onMounted(async () => {
       </aside>
     </section>
 
-    <el-dialog v-model="createVisible" title="创建活动" width="980px" destroy-on-close @closed="resetCreateForm">
+    <el-dialog v-model="createVisible" :title="editingId ? '编辑活动' : '创建活动'" width="980px" destroy-on-close @closed="resetCreateForm">
       <div class="dialog-grid">
         <section class="dialog-panel">
           <div class="section-head compact">
@@ -1081,7 +1118,7 @@ onMounted(async () => {
       </div>
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
-        <el-button :loading="saving" @click="submitCreate(false)">保存草稿</el-button>
+        <el-button :loading="saving" @click="submitCreate(false)">{{ editingId ? '保存' : '保存草稿' }}</el-button>
         <el-button type="primary" :loading="saving" @click="submitCreate(true)">提交发布</el-button>
       </template>
     </el-dialog>
@@ -1110,6 +1147,7 @@ onMounted(async () => {
             <el-button v-if="canCancelSignup" :loading="actionLoading" @click="cancelSignup">取消报名</el-button>
             <el-button v-if="canConfirmWaitlist" type="warning" :loading="actionLoading" @click="confirmWaitlist">确认候补名额</el-button>
             <el-button v-if="detail.status === 'PUBLISHED'" @click="cloneCurrent">克隆活动</el-button>
+            <el-button v-if="canEdit" :loading="actionLoading" @click="openEditFromDetail">编辑</el-button>
             <el-button v-if="isOwner && detail.status === 'DRAFT'" type="primary" :loading="actionLoading" @click="submitDraft">提交审核</el-button>
             <el-button v-if="isOwner" type="danger" plain :loading="actionLoading" @click="deleteCurrent">删除/取消</el-button>
             <el-button v-if="auth.user && !isOwner" text type="danger" @click="reportVisible = true">举报</el-button>
