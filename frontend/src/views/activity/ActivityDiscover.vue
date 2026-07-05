@@ -210,6 +210,9 @@ function resetCreateForm() {
   editingId.value = null
   tagText.value = ''
   aiTheme.value = ''
+  // 重置地图实例，下次打开重新初始化
+  pickerMap = null
+  pickerMarker = null
 }
 
 async function ensureCurrentUser() {
