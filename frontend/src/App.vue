@@ -368,9 +368,35 @@ a { color: var(--qj-primary); text-decoration: none; transition: color 0.2s; }
 a:hover { color: var(--qj-primary-hover); }
 
 /* 暗色模式下 Element Plus 组件 */
-html.dark .el-button:not(.el-button--primary) { color: var(--qj-text) !important; border-color: var(--qj-border) !important; }
-html.dark .el-input__wrapper { border-color: var(--qj-border) !important; }
-html.dark .el-dialog { color: var(--qj-text); }
+html.dark .el-button:not(.el-button--primary) { color: var(--qj-text) !important; border-color: var(--qj-border) !important; background: var(--qj-card) !important; }
+html.dark .el-input__wrapper { border-color: var(--qj-border) !important; background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-input__inner { color: var(--qj-text) !important; }
+html.dark .el-dialog { color: var(--qj-text); background: var(--qj-card) !important; }
+html.dark .el-dialog__header { color: var(--qj-text); }
 html.dark .el-message-box { background: var(--qj-card); color: var(--qj-text); }
 html.dark .el-descriptions__cell { background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-card { background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-card__body { color: var(--qj-text) !important; }
+html.dark .el-tabs__header { background: transparent; }
+html.dark .el-tabs__item { color: var(--qj-text-secondary) !important; }
+html.dark .el-tabs__item.is-active { color: var(--qj-primary) !important; }
+html.dark .el-table { background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-table th.el-table__cell { background: var(--qj-bg) !important; color: var(--qj-text) !important; }
+html.dark .el-table td.el-table__cell { background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell { background: var(--qj-bg) !important; }
+html.dark .el-table__empty-text { color: var(--qj-text-secondary) !important; }
+html.dark .el-select__wrapper { background: var(--qj-card) !important; border-color: var(--qj-border) !important; color: var(--qj-text) !important; }
+html.dark .el-tag { background: var(--qj-bg) !important; color: var(--qj-text) !important; border-color: var(--qj-border) !important; }
+html.dark .el-form-item__label { color: var(--qj-text) !important; }
+html.dark .el-empty__description p { color: var(--qj-text-secondary) !important; }
+html.dark .el-pagination button, html.dark .el-pagination .el-pager li { background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-drawer { background: var(--qj-card) !important; color: var(--qj-text) !important; }
+html.dark .el-drawer__header { color: var(--qj-text) !important; }
+html.dark .el-radio__label, html.dark .el-checkbox__label { color: var(--qj-text) !important; }
+html.dark .el-switch__label { color: var(--qj-text-secondary) !important; }
+html.dark .el-divider__text { background: var(--qj-bg) !important; color: var(--qj-text-secondary) !important; }
+html.dark .el-skeleton__item { background: var(--qj-border) !important; }
+html.dark .panel, html.dark .dialog-panel, html.dark .mine-panel, html.dark .sidebar-mine { background: var(--qj-card) !important; color: var(--qj-text) !important; border-color: var(--qj-border) !important; }
+html.dark .section-head h3 { color: var(--qj-text) !important; }
+html.dark .muted { color: var(--qj-text-secondary) !important; }
 </style>
