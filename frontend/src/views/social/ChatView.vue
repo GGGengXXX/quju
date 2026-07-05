@@ -237,6 +237,38 @@ function cancelLocation() {
   showLocationPicker.value = false
 }
 
+function useChatCurrentLocation() {
+  if (!navigator.geolocation) {
+    ElMessage.warning('浏览器不支持定位')
+    return
+  }
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lng = pos.coords.longitude.toFixed(6)
+      const lat = pos.coords.latitude.toFixed(6)
+      pickedLocation.lng = lng
+      pickedLocation.lat = lat
+      if (locationMap) {
+        locationMap.setCenter([Number(lng), Number(lat)])
+        const AMap = window.AMap
+        if (locationMarker) locationMarker.setPosition([Number(lng), Number(lat)])
+        else if (AMap) locationMarker = new AMap.Marker({ map: locationMap, position: [Number(lng), Number(lat)] })
+      }
+      // 逆地理编码
+      try {
+        const res = await fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${amapKey}&location=${lng},${lat}`)
+        const data = await res.json()
+        if (data.status === '1' && data.regeocode?.formatted_address) {
+          pickedLocation.address = data.regeocode.formatted_address
+        }
+      } catch {}
+      ElMessage.success('已定位到当前位置')
+    },
+    () => { ElMessage.warning('定位失败，请在地图上点选') },
+    { timeout: 8000 }
+  )
+}
+
 async function sendImage(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
@@ -441,8 +473,11 @@ onBeforeUnmount(() => {
     <el-dialog v-model="showLocationPicker" title="选择位置" width="500px" @close="cancelLocation">
       <div ref="locationPickerRef" class="location-map"></div>
       <div class="location-form">
-        <p class="location-hint">点击地图选择位置，坐标：{{ pickedLocation.lng }}, {{ pickedLocation.lat }}</p>
-        <el-input v-model="pickedLocation.address" placeholder="输入位置描述（如：北航主楼）" />
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <p class="location-hint">坐标：{{ pickedLocation.lng }}, {{ pickedLocation.lat }}</p>
+          <el-button size="small" @click="useChatCurrentLocation">📍 当前位置</el-button>
+        </div>
+        <el-input v-model="pickedLocation.address" placeholder="位置描述（选点后自动填充）" />
       </div>
       <template #footer>
         <el-button @click="cancelLocation">取消</el-button>

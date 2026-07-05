@@ -678,6 +678,35 @@ function confirmLocationPicker() {
   }
 }
 
+function useMyLocation() {
+  if (!navigator.geolocation) {
+    ElMessage.warning('浏览器不支持定位，请在地图上点击选择')
+    return
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lng = pos.coords.longitude
+      const lat = pos.coords.latitude
+      if (locationPickerTarget.value === 'query') {
+        query.lng = lng
+        query.lat = lat
+      } else {
+        form.lng = lng
+        form.lat = lat
+      }
+      if (locationPickerMap) {
+        const AMap = window.AMap
+        locationPickerMap.setCenter([lng, lat])
+        if (locationPickerMarker) locationPickerMarker.setPosition([lng, lat])
+        else if (AMap) locationPickerMarker = new AMap.Marker({ map: locationPickerMap, position: [lng, lat] })
+      }
+      ElMessage.success('已定位到当前位置')
+    },
+    () => { ElMessage.warning('定位失败，请确认已授权位置权限或在地图上点选') },
+    { timeout: 8000 }
+  )
+}
+
 async function submitCheckin() {
   if (!detail.value) return
   if (!checkinForm.code) {
@@ -1117,7 +1146,10 @@ onMounted(async () => {
     <!-- 地图选点弹窗 -->
     <el-dialog v-model="locationPickerVisible" title="在地图上选择位置" width="560px">
       <div ref="locationPickerMapRef" style="width:100%;height:350px;border-radius:8px"></div>
-      <p style="font-size:12px;color:#999;margin:8px 0 0">点击地图选择位置，当前：{{ query.lng.toFixed(4) }}, {{ query.lat.toFixed(4) }}</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+        <p style="font-size:12px;color:#999;margin:0">点击地图或使用当前位置，坐标：{{ query.lng.toFixed(4) }}, {{ query.lat.toFixed(4) }}</p>
+        <el-button size="small" @click="useMyLocation">📍 使用当前位置</el-button>
+      </div>
       <template #footer>
         <el-button @click="locationPickerVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmLocationPicker">确认</el-button>
