@@ -16,6 +16,7 @@ const form = reactive({
   gender: 'UNKNOWN',
   birthday: '',
   signature: '',
+  interestTags: [] as string[],
   privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean>,
 })
 const merchantForm = reactive({ merchantName: '', nickname: '', focusFields: '', licenseUrl: '' })
@@ -35,6 +36,7 @@ onMounted(async () => {
   form.gender = auth.user?.gender || 'UNKNOWN'
   form.birthday = auth.user?.birthday || ''
   form.signature = auth.user?.signature || ''
+  form.interestTags = (auth.user as any)?.interestTags || []
   if ((auth.user as any)?.privacySettings) {
     form.privacySettings = { showActivities: true, showTeams: true, ...(auth.user as any).privacySettings }
   }
@@ -191,7 +193,12 @@ async function handleAvatarChange(e: Event) {
       <el-form-item label="生日">
         <el-date-picker v-model="form.birthday" type="date" value-format="YYYY-MM-DD" placeholder="请选择出生日期" style="width: 100%" />
       </el-form-item>
-      <el-form-item label="签名"><el-input v-model="form.signature" type="textarea" :rows="2" /></el-form-item>
+      <el-form-item label="签名"><el-input v-model="form.signature" type="textarea" :rows="2" placeholder="写一句个性签名" /></el-form-item>
+      <el-form-item label="兴趣标签">
+        <el-select v-model="form.interestTags" multiple filterable allow-create default-first-option placeholder="输入后回车添加标签" style="width:100%">
+          <el-option v-for="tag in ['运动','徒步','桌游','读书','音乐','摄影','美食','旅行','编程','电影','游戏','公益']" :key="tag" :label="tag" :value="tag" />
+        </el-select>
+      </el-form-item>
 
       <el-divider content-position="left">隐私设置</el-divider>
       <el-form-item label="展示活动">
