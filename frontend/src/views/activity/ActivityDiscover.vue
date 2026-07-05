@@ -86,6 +86,8 @@ const checkinQrDataUrl = ref('')
 const summaryFiles = ref<File[]>([])
 const mapRef = ref<HTMLDivElement | null>(null)
 const pickerMapRef = ref<HTMLDivElement | null>(null)
+const locating = ref(false)
+const myLocation = ref<{ lng: number; lat: number } | null>(null)
 
 let amap: any = null
 let pickerMap: any = null
@@ -933,6 +935,33 @@ function renderMapMarkers() {
     })
 }
 
+async function locateMe(opts: { center: boolean; silent?: boolean }) {
+  if (!amap) return
+  locating.value = true
+  let result: { lng: number; lat: number } | null = null
+  let lastError = ''
+  try {
+    result = await requestBrowserLocation()
+  } catch (error: any) {
+    lastError = error?.message || ''
+    try {
+      result = await requestAmapLocation()
+    } catch (fallbackError: any) {
+      lastError = fallbackError?.message || lastError
+    }
+  } finally {
+    locating.value = false
+  }
+  if (!result) {
+    if (!opts.silent) ElMessage.warning(resolveLocationFailureMessage(lastError))
+    return
+  }
+  myLocation.value = result
+  setMyLocationMarker(result.lng, result.lat)
+  if (opts.center) amap.setCenter([result.lng, result.lat])
+  if (!opts.silent) ElMessage.success('已定位到当前位置')
+}
+
 function setMyLocationMarker(lng: number, lat: number) {
   if (!amap || !window.AMap) return
   if (!myLocationMarker) {
@@ -961,6 +990,8 @@ async function initMainMap() {
     amap.on('moveend', scheduleMapRefresh)
     amap.on('zoomend', scheduleMapRefresh)
     await refreshMapPoints(false)
+    // 进入地图模式时自动定位并居中；静默失败（拒权/HTTP）不打扰用户
+    locateMe({ center: true, silent: true })
   } catch {
     ElMessage.warning('地图脚本加载失败，已保留列表模式')
   }
@@ -1092,7 +1123,24 @@ onMounted(async () => {
             <el-button text @click="showMapPanel = false">收起地图</el-button>
           </div>
         </div>
-        <div v-if="amapKey" ref="mapRef" class="map-canvas" />
+        <div v-if="amapKey" class="map-canvas-wrap">
+          <div ref="mapRef" class="map-canvas" />
+          <button
+            class="map-locate-btn"
+            :class="{ 'is-loading': locating }"
+            type="button"
+            title="回到我的位置"
+            @click="locateMe({ center: true })"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <line x1="12" y1="2" x2="12" y2="5" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+              <line x1="2" y1="12" x2="5" y2="12" />
+              <line x1="19" y1="12" x2="22" y2="12" />
+            </svg>
+          </button>
+        </div>
         <el-empty v-else description="未配置地图 Key，仍可使用列表发现活动" />
       </section>
 
@@ -1514,10 +1562,48 @@ onMounted(async () => {
 }
 
 /* 地图 canvas 填满面板剩余高度；活动发现列表吃剩余高度独立滚动 */
-.map-panel .map-canvas,
+.map-panel .map-canvas-wrap,
 .list-panel .activity-list {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* 地图容器包裹层：承载右下角定位按钮的绝对定位 */
+.map-canvas-wrap {
+  position: relative;
+}
+
+.map-canvas-wrap .map-canvas {
+  height: 100%;
+}
+
+/* 右下角"回到我的位置"按钮，走 --qj-* 变量以适配暗色模式 */
+.map-locate-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--qj-card);
+  color: var(--qj-text);
+  border: 1px solid var(--qj-border);
+  box-shadow: var(--qj-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.map-locate-btn:hover {
+  color: var(--qj-primary);
+}
+
+.map-locate-btn.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .list-panel .activity-list {
