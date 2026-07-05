@@ -1197,16 +1197,16 @@ onMounted(async () => {
               <el-form-item label="详细地址"><el-input v-model="form.address" placeholder="例：香山公园东门" /></el-form-item>
             </div>
             <div class="form-row">
-              <el-form-item label="人数上限"><el-input-number v-model="form.capacity" :min="1" :max="500" /></el-form-item>
+              <el-form-item label="人数上限" required><el-input-number v-model="form.capacity" :min="1" :max="500" /></el-form-item>
               <el-form-item label="费用（元）"><el-input-number v-model="form.fee" :min="0" :step="10" /></el-form-item>
               <el-form-item label="标签"><el-input v-model="tagText" placeholder="逗号分隔，如：户外,徒步" /></el-form-item>
             </div>
             <div class="form-row">
               <el-form-item label="开始时间" required><el-date-picker v-model="form.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择开始时间" /></el-form-item>
-              <el-form-item label="结束时间"><el-date-picker v-model="form.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择结束时间" /></el-form-item>
-              <el-form-item label="报名截止"><el-date-picker v-model="form.signupDeadline" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择截止时间" /></el-form-item>
+              <el-form-item label="结束时间" required><el-date-picker v-model="form.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择结束时间" /></el-form-item>
+              <el-form-item label="报名截止" required><el-date-picker v-model="form.signupDeadline" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择截止时间" /></el-form-item>
             </div>
-            <el-form-item label="活动简介"><el-input v-model="form.intro" type="textarea" :rows="4" placeholder="活动简介、注意事项等" /></el-form-item>
+            <el-form-item label="活动简介" required><el-input v-model="form.intro" type="textarea" :rows="4" placeholder="活动简介、注意事项等" /></el-form-item>
           </el-form>
         </section>
 
