@@ -415,6 +415,8 @@ async function submitCreate(submit: boolean) {
   // 提交发布时校验必填字段
   if (submit) {
     if (!form.name.trim()) { ElMessage.warning('请填写活动名称'); return }
+    if (!form.intro || !form.intro.trim()) { ElMessage.warning('请填写活动简介'); return }
+    if (!form.capacity || form.capacity < 1) { ElMessage.warning('人数上限必须大于等于1'); return }
     if (!form.startTime) { ElMessage.warning('请选择活动开始时间'); return }
     if (!form.endTime) { ElMessage.warning('请选择活动结束时间'); return }
     if (!form.signupDeadline) { ElMessage.warning('请选择报名截止时间'); return }
