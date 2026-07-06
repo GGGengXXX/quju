@@ -70,6 +70,8 @@ public final class ActivityDtos {
             UserBrief creator,
             Long teamId,
             String mySignupStatus,
+            // 当前用户的候补原始状态：WAITING(排队中,无空位) / NOTIFIED(空位已保留,可确认) / null(非候补)
+            String myWaitlistStatus,
             Integer waitlistCount,
             String checkinCode,
             LatestAuditVO latestAudit
