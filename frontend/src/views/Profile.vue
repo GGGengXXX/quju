@@ -52,7 +52,7 @@ onMounted(async () => {
   // 生成个人二维码
   if (auth.user?.id) {
     const url = `${window.location.origin}/social/user/${auth.user.id}`
-    qrDataUrl.value = await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#17170f', light: '#f2f1ea' } })
+    qrDataUrl.value = await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#1b1c18', light: '#ffffff' } })
   }
 })
 
@@ -243,25 +243,25 @@ const auditTagType = computed(() => {
 
 <style scoped>
 .profile { max-width: 640px; margin: 28px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 18px; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 /* —— 通行证 —— */
 .pass {
   position: relative;
   border-radius: var(--radius);
   overflow: hidden;
-  background: #17170f;
-  color: #f2f1ea;
+  background: linear-gradient(158deg, #fff7f3 0%, #fdf4e7 58%, #f4f7f2 100%);
+  color: var(--ink);
   padding: 22px 24px 24px;
-  background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-hover);
+  animation: qj-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 .pass::before {
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
   background: var(--signal);
 }
-.pass-top { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: rgba(255,255,255,0.55); }
+.pass-top { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--ink-faint); }
 .pass-serial { color: var(--stamp); }
 .pass-body { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-top: 18px; }
 .pass-id { display: flex; gap: 16px; align-items: center; min-width: 0; }
@@ -270,30 +270,30 @@ const auditTagType = computed(() => {
 .avatar-btn {
   position: absolute; right: -4px; bottom: -4px;
   width: 26px; height: 26px; border-radius: 50%;
-  background: var(--signal); color: #fff;
+  background: var(--signal); color: var(--ink);
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; cursor: pointer; border: 2px solid #17170f;
+  font-size: 12px; cursor: pointer; border: 2px solid var(--ink);
   transition: transform 0.15s ease;
 }
 .avatar-btn:hover { transform: scale(1.08); }
 .avatar-btn.busy { opacity: 0.7; }
 .pass-who { min-width: 0; }
-.pass-who h2 { margin: 0; font-size: 24px; color: #fff; letter-spacing: 0.01em; }
-.pass-sign { margin: 6px 0 10px; font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.5; }
+.pass-who h2 { margin: 0; font-size: 24px; color: var(--ink); letter-spacing: 0.01em; }
+.pass-sign { margin: 6px 0 10px; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
 .pass-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   font-size: 12px; padding: 3px 9px; border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.85);
+  border: 1px solid var(--line-strong); color: var(--ink);
 }
 .chip.mono { font-family: var(--font-mono); font-size: 11px; }
-.chip.stamp { border-color: transparent; background: rgba(200,134,13,0.22); color: var(--stamp); }
-.chip.audit-success { border-color: transparent; background: rgba(21,122,110,0.28); color: #6fd3c3; }
-.chip.audit-warning { border-color: transparent; background: rgba(200,134,13,0.22); color: var(--stamp); }
-.chip.audit-danger { border-color: transparent; background: rgba(255,67,36,0.22); color: #ff9077; }
+.chip.stamp { border-color: transparent; background: var(--stamp-wash); color: var(--stamp); }
+.chip.audit-success { border-color: transparent; background: var(--route-wash); color: var(--route); }
+.chip.audit-warning { border-color: transparent; background: var(--stamp-wash); color: var(--stamp); }
+.chip.audit-danger { border-color: transparent; background: var(--signal-wash); color: var(--signal-ink); }
 .pass-qr { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.pass-qr img { width: 78px; height: 78px; border-radius: 8px; display: block; background: #f2f1ea; padding: 3px; }
-.pass-qr span { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: rgba(255,255,255,0.5); }
-.pass-reject { margin: 16px 0 0; font-size: 12.5px; color: #ff9077; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 12px; }
+.pass-qr img { width: 78px; height: 78px; border-radius: 8px; display: block; background: #ffffff; padding: 3px; }
+.pass-qr span { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-faint); }
+.pass-reject { margin: 16px 0 0; font-size: 12.5px; color: var(--signal-ink); border-top: 1px dashed var(--line); padding-top: 12px; }
 
 /* —— 编辑区 —— */
 .editor {
@@ -302,6 +302,8 @@ const auditTagType = computed(() => {
   border-radius: var(--radius);
   padding: 24px;
   box-shadow: var(--shadow);
+  animation: qj-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: 90ms;
 }
 .editor-head { margin-bottom: 18px; }
 .editor-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
@@ -326,5 +328,8 @@ const auditTagType = computed(() => {
 @media (max-width: 560px) {
   .grid-2 { grid-template-columns: 1fr; }
   .pass-qr { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pass, .editor { animation: none; }
 }
 </style>

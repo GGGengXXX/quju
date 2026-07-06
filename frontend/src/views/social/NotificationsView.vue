@@ -161,13 +161,21 @@ onMounted(load)
 .allread-btn:hover { border-color: var(--signal); color: var(--signal); }
 .list { min-height: 100px; }
 .empty { text-align: center; color: var(--ink-faint); padding: 40px 0; font-size: 13px; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .notify-item {
-  padding: 13px 14px; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  padding: 13px 14px; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.18s ease;
   border-radius: var(--radius-sm); margin-bottom: 8px;
   background: var(--surface); border: 1px solid var(--line);
   box-shadow: inset 3px 0 0 var(--line-strong);
+  animation: qj-rise 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-.notify-item:hover { border-color: var(--line-strong); }
+.notify-item:nth-child(1) { animation-delay: 30ms; }
+.notify-item:nth-child(2) { animation-delay: 75ms; }
+.notify-item:nth-child(3) { animation-delay: 120ms; }
+.notify-item:nth-child(4) { animation-delay: 165ms; }
+.notify-item:nth-child(5) { animation-delay: 210ms; }
+.notify-item:nth-child(n+6) { animation-delay: 250ms; }
+.notify-item:hover { border-color: var(--line-strong); transform: translateX(3px); }
 .notify-item.unread { box-shadow: inset 3px 0 0 var(--signal); }
 .notify-item.expanded { background: var(--surface-2); }
 .item-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -185,4 +193,8 @@ onMounted(load)
 .item-detail { margin-top: 12px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); }
 .detail-content { font-size: 13px; color: var(--ink-soft); margin: 0 0 10px 0; line-height: 1.55; }
 .empty-content { color: var(--ink-faint); font-style: italic; }
+@media (prefers-reduced-motion: reduce) {
+  .notify-item { animation: none; }
+  .notify-item:hover { transform: none; }
+}
 </style>

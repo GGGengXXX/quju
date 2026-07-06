@@ -484,13 +484,26 @@ onBeforeUnmount(() => {
 
 .list { min-height: 100px; padding-top: 4px; }
 .empty { text-align: center; color: var(--ink-faint); padding: 40px 0; font-size: 13px; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .card {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 13px 14px; margin-bottom: 8px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  box-shadow: inset 3px 0 0 var(--line-strong); transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: inset 3px 0 0 var(--line-strong);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  animation: qj-rise 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-.card:hover { border-color: var(--line-strong); box-shadow: inset 3px 0 0 var(--signal); }
+.card:nth-child(1) { animation-delay: 40ms; }
+.card:nth-child(2) { animation-delay: 90ms; }
+.card:nth-child(3) { animation-delay: 140ms; }
+.card:nth-child(4) { animation-delay: 190ms; }
+.card:nth-child(5) { animation-delay: 240ms; }
+.card:nth-child(n+6) { animation-delay: 290ms; }
+.card:hover { border-color: var(--line-strong); box-shadow: inset 3px 0 0 var(--signal); transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .card:hover { transform: none; }
+}
 .info { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .text strong { font-size: 14.5px; color: var(--ink); }

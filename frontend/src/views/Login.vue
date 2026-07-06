@@ -71,6 +71,8 @@ onMounted(async () => {
   <div class="auth">
     <!-- 左：身份/寻趣海报 -->
     <aside class="auth-poster">
+      <div class="poster-aura"><span class="blob b1" /><span class="blob b2" /></div>
+      <span class="deco-pin p1" /><span class="deco-pin p2" />
       <div class="poster-top">
         <span class="poster-eyebrow">QUJU · 城市寻趣</span>
         <span class="poster-coord">N39.90 · E116.40</span>
@@ -127,22 +129,36 @@ onMounted(async () => {
   border-radius: 20px;
   overflow: hidden;
   box-shadow: var(--shadow-hover);
+  animation: qj-deck-in 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
+@keyframes qj-deck-in { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: none; } }
 
 /* 海报面 */
 .auth-poster {
   position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 28px;
   padding: 34px 32px;
-  background: #17170f; /* 固定深色"墨板"，两种主题下保持白字高对比 */
-  color: #f2f1ea;
-  background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background: linear-gradient(158deg, #fff7f3 0%, #fdf4e7 58%, #f4f7f2 100%);
+  color: var(--ink);
+  
+  
 }
-.poster-top { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: rgba(255,255,255,0.55); }
+.poster-aura { position: absolute; inset: 0; z-index: 0; }
+.poster-aura .blob { position: absolute; border-radius: 50%; filter: blur(48px); opacity: 0.55; }
+.poster-aura .b1 { width: 240px; height: 240px; background: rgba(255,67,36,0.16); top: -70px; left: -50px; animation: qj-float-a 15s ease-in-out infinite; }
+.poster-aura .b2 { width: 210px; height: 210px; background: rgba(200,134,13,0.16); bottom: -80px; right: -40px; animation: qj-float-b 19s ease-in-out infinite; }
+@keyframes qj-float-a { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px, 24px); } }
+@keyframes qj-float-b { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-26px, -20px); } }
+.deco-pin { position: absolute; z-index: 1; width: 12px; height: 12px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); opacity: 0.7; }
+.deco-pin.p1 { top: 24%; right: 16%; background: var(--signal); animation: qj-bob 6.5s ease-in-out infinite; }
+.deco-pin.p2 { top: 70%; right: 26%; background: var(--stamp); width: 9px; height: 9px; animation: qj-bob 8s ease-in-out infinite 0.6s; }
+@keyframes qj-bob { 0%,100% { transform: rotate(-45deg) translateY(0); } 50% { transform: rotate(-45deg) translateY(-8px); } }
+.poster-top, .poster-mid, .poster-list { position: relative; z-index: 2; }
+.poster-top { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-faint); }
 .poster-coord { color: var(--signal); }
 .poster-mid { margin-top: 8px; }
 .poster-pin {
@@ -154,10 +170,10 @@ onMounted(async () => {
   margin-bottom: 22px;
   box-shadow: inset -3px -3px 0 rgba(0,0,0,0.15);
 }
-.auth-poster h1 { font-size: 58px; margin: 0 0 14px; letter-spacing: 0.04em; color: #fff; }
-.auth-poster p { margin: 0; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,0.75); }
-.poster-list { list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px dashed rgba(255,255,255,0.18); display: flex; flex-direction: column; gap: 11px; }
-.poster-list li { font-size: 13.5px; color: rgba(255,255,255,0.82); display: flex; gap: 12px; }
+.auth-poster h1 { font-size: 58px; margin: 0 0 14px; letter-spacing: 0.04em; color: var(--ink); }
+.auth-poster p { margin: 0; font-size: 17px; line-height: 1.6; color: var(--ink-soft); }
+.poster-list { list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 11px; }
+.poster-list li { font-size: 13.5px; color: var(--ink-soft); display: flex; gap: 12px; }
 .poster-list span { font-family: var(--font-mono); font-size: 12px; color: var(--stamp); min-width: 76px; }
 
 /* 表单面 */
@@ -188,5 +204,8 @@ onMounted(async () => {
   .auth-poster h1 { font-size: 44px; }
   .poster-list { display: none; }
   .auth-form { padding: 28px 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth, .poster-aura .blob, .deco-pin { animation: none; }
 }
 </style>

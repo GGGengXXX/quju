@@ -147,6 +147,7 @@ onMounted(load)
 
 <style scoped>
 .visitor { max-width: 640px; margin: 24px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 .back {
   align-self: flex-start; background: none; border: none; cursor: pointer;
   font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); padding: 4px 0;
@@ -156,39 +157,41 @@ onMounted(load)
 /* —— 访客通行证 —— */
 .pass {
   position: relative; overflow: hidden;
-  background: #17170f; color: #f2f1ea;
+  background: linear-gradient(158deg, #fff7f3 0%, #fdf4e7 58%, #f4f7f2 100%); color: var(--ink);
   border-radius: var(--radius); padding: 22px 24px;
-  background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-hover);
+  animation: qj-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 .pass::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--route); }
-.pass-top { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: rgba(255,255,255,0.55); }
+.pass-top { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--ink-faint); }
 .pass-serial { color: var(--stamp); }
 .pass-body { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
 .pass-avatar { border: 2px solid rgba(255,255,255,0.9); flex: 0 0 auto; }
 .pass-who { min-width: 0; }
 .who-name { display: flex; align-items: center; gap: 10px; }
-.who-name h2 { margin: 0; font-size: 24px; color: #fff; }
-.mutual { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: rgba(21,122,110,0.28); color: #6fd3c3; }
-.pass-sign { margin: 6px 0 0; font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.5; }
+.who-name h2 { margin: 0; font-size: 24px; color: var(--ink); }
+.mutual { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--route-wash); color: var(--route); }
+.pass-sign { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
 .pass-acts { display: flex; gap: 8px; margin-top: 18px; }
 .act {
   font-size: 13px; padding: 8px 16px; border-radius: 22px; cursor: pointer;
-  border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #f2f1ea;
+  border: 1px solid var(--line-strong); background: transparent; color: var(--ink);
   transition: all 0.15s ease;
 }
-.act:hover { border-color: #fff; }
-.act.primary { background: var(--signal); border-color: var(--signal); color: #fff; }
+.act:hover { border-color: var(--ink); }
+.act.primary { background: var(--signal); border-color: var(--signal); color: var(--ink); }
 .act.primary:hover { background: var(--signal-ink); }
 .act.primary:disabled { opacity: 0.6; cursor: default; }
-.act.on { background: rgba(255,255,255,0.12); }
+.act.on { background: var(--surface-2); }
 
 /* —— 足迹 —— */
 .record {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow);
+  animation: qj-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
+.record:nth-of-type(2) { animation-delay: 90ms; }
+.record:nth-of-type(3) { animation-delay: 160ms; }
 .record-head { margin-bottom: 4px; }
 .record-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
 .record-head h3 { margin: 3px 0 0; font-size: 18px; color: var(--ink); display: flex; align-items: baseline; gap: 8px; }
@@ -212,5 +215,8 @@ onMounted(load)
 
 @media (max-width: 560px) {
   .pass-acts { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pass, .record { animation: none; }
 }
 </style>

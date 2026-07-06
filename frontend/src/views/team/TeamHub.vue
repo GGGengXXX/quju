@@ -509,6 +509,11 @@ onBeforeUnmount(() => {
 <template>
   <div class="team-page">
     <section class="hero">
+      <div class="hero-aura">
+        <span class="blob b1" />
+        <span class="blob b2" />
+        <span class="blob b3" />
+      </div>
       <div class="hero-copy">
         <p class="eyebrow">QUJU · 小队 / SQUADS</p>
         <h1>找到你的<span>同好小队</span></h1>
@@ -524,8 +529,8 @@ onBeforeUnmount(() => {
     </div>
 
     <el-row :gutter="16" v-loading="loading">
-      <el-col v-for="team in teams" :key="team.id" :xs="24" :md="12" :lg="8">
-        <el-card class="team-card" shadow="hover">
+      <el-col v-for="(team, idx) in teams" :key="team.id" :xs="24" :md="12" :lg="8">
+        <el-card class="team-card" shadow="hover" :style="{ '--i': idx % 9 }">
           <div class="team-header">
             <div>
               <h3>{{ team.name }}</h3>
@@ -842,19 +847,28 @@ onBeforeUnmount(() => {
   display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;
   padding: 32px 30px; border-radius: var(--radius); margin-bottom: 18px;
   background: var(--surface); border: 1px solid var(--line);
-  background-image: radial-gradient(rgba(27,28,24,0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-hover);
+  animation: qj-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-.hero::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--signal); }
-.hero-copy { min-width: 0; }
+.hero::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--signal); z-index: 3; }
+.hero-aura { position: absolute; inset: 0; z-index: 1; }
+.hero-aura .blob { position: absolute; border-radius: 50%; filter: blur(46px); opacity: 0.7; }
+.hero-aura .b1 { width: 300px; height: 300px; background: rgba(255,67,36,0.15); top: -100px; left: 4%; animation: qj-float-a 15s ease-in-out infinite; }
+.hero-aura .b2 { width: 260px; height: 260px; background: rgba(21,122,110,0.13); top: -50px; left: 40%; animation: qj-float-b 18s ease-in-out infinite; }
+.hero-aura .b3 { width: 240px; height: 240px; background: rgba(200,134,13,0.13); bottom: -130px; right: 8%; animation: qj-float-c 21s ease-in-out infinite; }
+.hero-copy { position: relative; z-index: 2; min-width: 0; }
+.hero-cta { position: relative; z-index: 2; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes qj-float-a { 0%,100% { transform: translate(0,0); } 50% { transform: translate(40px, 30px); } }
+@keyframes qj-float-b { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-34px, 26px); } }
+@keyframes qj-float-c { 0%,100% { transform: translate(0,0); } 50% { transform: translate(24px, -30px); } }
 .eyebrow { margin: 0 0 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); font-size: 11.5px; }
 .hero h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.12; color: var(--ink); letter-spacing: 0.01em; }
 .hero h1 span { color: var(--signal); }
 .sub { margin: 0; color: var(--ink-soft); max-width: 640px; font-size: 14px; line-height: 1.6; }
 .hero-cta {
   flex: 0 0 auto; cursor: pointer; font-size: 15px; padding: 12px 22px; border-radius: 26px;
-  background: var(--signal); color: #fff; border: none; transition: background 0.15s ease, transform 0.15s ease;
+  background: var(--signal); color: var(--ink); border: none; transition: background 0.15s ease, transform 0.15s ease;
 }
 .hero-cta:hover { background: var(--signal-ink); transform: translateY(-1px); }
 
@@ -865,9 +879,12 @@ onBeforeUnmount(() => {
 .team-card {
   margin-bottom: 16px; min-height: 200px;
   border: 1px solid var(--line) !important; border-radius: var(--radius) !important;
-  box-shadow: inset 3px 0 0 var(--line-strong) !important; transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: inset 3px 0 0 var(--line-strong) !important;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  animation: qj-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 80ms);
 }
-.team-card:hover { border-color: var(--line-strong) !important; box-shadow: inset 3px 0 0 var(--signal), var(--shadow) !important; }
+.team-card:hover { border-color: var(--line-strong) !important; box-shadow: inset 3px 0 0 var(--signal), var(--shadow-hover) !important; transform: translateY(-3px); }
 .team-header, .meta-line, .actions, .detail-hero { display: flex; justify-content: space-between; gap: 12px; }
 .team-header h3 { margin: 0 0 8px; font-size: 17px; color: var(--ink); }
 .team-header p, .detail-intro { margin: 0; color: var(--ink-soft); font-size: 13.5px; line-height: 1.5; }
@@ -879,12 +896,11 @@ onBeforeUnmount(() => {
 /* —— Detail drawer —— */
 .detail-hero {
   position: relative; overflow: hidden;
-  background: #17170f; color: #f2f1ea; border-radius: var(--radius); padding: 22px; margin-bottom: 18px; align-items: flex-start;
-  background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 20px 20px;
+  background: linear-gradient(158deg, #fff7f3 0%, #fdf4e7 58%, #f4f7f2 100%); color: var(--ink); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; align-items: flex-start;
 }
 .detail-hero::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--signal); }
-.detail-hero .detail-intro { color: rgba(255,255,255,0.75); }
-.detail-hero .meta-line { color: rgba(255,255,255,0.55); }
+.detail-hero .detail-intro { color: var(--ink-soft); }
+.detail-hero .meta-line { color: var(--ink-faint); }
 .detail-hero .actions { flex-wrap: wrap; }
 .mini-card { margin-bottom: 14px; border: 1px solid var(--line) !important; border-radius: var(--radius) !important; box-shadow: none !important; }
 .section-btn { margin-top: 12px; }
@@ -934,4 +950,8 @@ onBeforeUnmount(() => {
 }
 .member-link { color: var(--ink); cursor: pointer; transition: color 0.15s ease; }
 .member-link:hover { color: var(--signal); }
+@media (prefers-reduced-motion: reduce) {
+  .hero, .team-card, .hero-aura .blob { animation: none; }
+  .team-card:hover { transform: none; }
+}
 </style>
