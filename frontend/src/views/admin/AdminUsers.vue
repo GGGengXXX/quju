@@ -75,9 +75,15 @@ onMounted(load)
 
 <template>
   <div class="page">
-    <h3>用户管理</h3>
+    <div class="page-head">
+      <div>
+        <p class="page-eyebrow">CONSOLE · 01 / USERS</p>
+        <h3>用户管理</h3>
+      </div>
+      <span class="page-count">共 <em>{{ total }}</em> 名用户</span>
+    </div>
 
-    <el-form inline style="margin-bottom: 16px">
+    <el-form inline class="filter-bar">
       <el-form-item>
         <el-input v-model="query.keyword" placeholder="搜索昵称/邮箱" clearable @clear="load" @keyup.enter="load" />
       </el-form-item>

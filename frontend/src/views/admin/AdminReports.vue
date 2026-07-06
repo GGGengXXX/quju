@@ -65,9 +65,15 @@ onMounted(load)
 
 <template>
   <div class="page">
-    <h3>举报管理</h3>
+    <div class="page-head">
+      <div>
+        <p class="page-eyebrow">CONSOLE · 05 / REPORTS</p>
+        <h3>举报管理</h3>
+      </div>
+      <span class="page-count">共 <em>{{ total }}</em> 条举报</span>
+    </div>
 
-    <el-form inline style="margin-bottom: 16px">
+    <el-form inline class="filter-bar">
       <el-form-item>
         <el-select v-model="query.status" placeholder="状态" clearable @change="load">
           <el-option label="待处理" value="PENDING" />
