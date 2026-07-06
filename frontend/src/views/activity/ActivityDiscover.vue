@@ -245,6 +245,18 @@ const activeFilterCount = computed(() => {
 
 function switchTab(tab: string) {
   query.tab = tab
+  query.page = 1
+  loadActivities()
+}
+
+// 搜索/筛选变更后回到第 1 页再加载，避免停留在越界页看不到结果
+function searchActivities() {
+  query.page = 1
+  loadActivities()
+}
+
+function changePage(page: number) {
+  query.page = page
   loadActivities()
 }
 
@@ -1123,8 +1135,8 @@ onMounted(async () => {
 
         <div class="hero-search">
           <span class="hs-icon">🔍</span>
-          <input v-model="query.keyword" placeholder="搜索活动标题、标签或简介" @keyup.enter="loadActivities" />
-          <button type="button" class="hs-go" @click="loadActivities">搜索</button>
+          <input v-model="query.keyword" placeholder="搜索活动标题、标签或简介" @keyup.enter="searchActivities" />
+          <button type="button" class="hs-go" @click="searchActivities">搜索</button>
         </div>
 
         <div class="hero-tools">
@@ -1206,6 +1218,16 @@ onMounted(async () => {
             </button>
             <div v-if="!activities.length" class="list-empty">附近暂时没有匹配的活动，换个关键词或筛选试试。</div>
           </div>
+          <el-pagination
+            v-if="total > query.size"
+            class="list-pager"
+            layout="total, prev, pager, next"
+            background
+            :current-page="query.page"
+            :page-size="query.size"
+            :total="total"
+            @current-change="changePage"
+          />
         </el-skeleton>
 
         <!-- 我发起 / 我报名 -->
@@ -1273,7 +1295,7 @@ onMounted(async () => {
       </div>
       <template #footer>
         <el-button @click="resetFilters">重置</el-button>
-        <el-button type="primary" @click="filterDrawer = false; loadActivities()">应用筛选</el-button>
+        <el-button type="primary" @click="filterDrawer = false; searchActivities()">应用筛选</el-button>
       </template>
     </el-drawer>
 
@@ -1791,6 +1813,7 @@ onMounted(async () => {
 .compact-pass { padding: 12px 14px 12px 16px; }
 .compact-pass .title-row h4 { font-size: 15.5px; }
 .list-empty { padding: 40px 16px; text-align: center; color: var(--ink-faint); font-size: 14px; line-height: 1.6; }
+.list-pager { justify-content: center; margin-top: 16px; }
 
 /* ── 高级筛选抽屉 ─────────────────────────────── */
 .filter-body { display: flex; flex-direction: column; gap: 20px; padding: 2px; }
