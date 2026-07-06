@@ -12,16 +12,8 @@ const router = useRouter()
 const minimalLayout = computed(() => Boolean(route.meta.minimalLayout))
 let notificationTimer: number | null = null
 const unreadCount = ref(0)
-const isDark = ref(localStorage.getItem('quju_dark') === 'true')
-
-function toggleDark() {
-  isDark.value = !isDark.value
-  localStorage.setItem('quju_dark', isDark.value ? 'true' : 'false')
-  document.documentElement.classList.toggle('dark', isDark.value)
-}
-
-// 初始化暗色模式
-if (isDark.value) document.documentElement.classList.add('dark')
+// 暗色模式暂时下线：强制浅色主题，忽略历史偏好
+document.documentElement.classList.remove('dark')
 
 async function pollUnreadCount() {
   if (!auth.token) {
@@ -47,6 +39,10 @@ provide('refreshUnread', pollUnreadCount)
 
 function goNotifications() {
   router.push('/notifications')
+}
+
+function isNav(prefix: string) {
+  return route.path.startsWith(prefix)
 }
 
 watch(() => router.currentRoute.value.path, (newPath, oldPath) => {
@@ -212,160 +208,304 @@ onBeforeUnmount(() => {
   <template v-if="minimalLayout">
     <router-view />
   </template>
-  <el-container v-else>
-    <el-header class="hd">
-      <span class="logo" @click="router.push('/')">🎯 趣聚</span>
+  <div v-else class="app-shell">
+    <header class="topbar">
+      <a class="brand" @click="router.push('/')">
+        <span class="brand-pin" aria-hidden="true"></span>
+        <span class="brand-name">趣聚</span>
+        <span class="brand-sub">QUJU / 城市寻趣</span>
+      </a>
+      <nav v-if="auth.token" class="nav">
+        <a class="nav-link" :class="{ active: isNav('/activities') }" @click="router.push('/activities')">活动</a>
+        <a class="nav-link" :class="{ active: isNav('/social') }" @click="router.push('/social')">社交</a>
+        <a class="nav-link" :class="{ active: isNav('/notifications') }" @click="goNotifications">
+          通知<span v-if="unreadCount > 0" class="nav-dot">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        </a>
+        <a class="nav-link" :class="{ active: isNav('/teams') }" @click="router.push('/teams')">小队</a>
+        <a class="nav-link" :class="{ active: isNav('/profile') }" @click="router.push('/profile')">我的</a>
+      </nav>
       <span class="spacer" />
-      <el-button text class="theme-toggle" @click="toggleDark">{{ isDark ? '☀️' : '🌙' }}</el-button>
       <template v-if="auth.token">
-        <el-button text @click="router.push('/activities')">活动</el-button>
-        <el-button text @click="router.push('/social')">社交</el-button>
-        <el-button text @click="goNotifications">
-          通知<el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99" class="notify-badge" />
-        </el-button>
-        <el-button text @click="router.push('/teams')">小队</el-button>
-        <el-button text @click="router.push('/profile')">我的</el-button>
-        <el-button text @click="logout">退出</el-button>
+        <button class="ghost-btn" @click="logout">退出</button>
       </template>
       <template v-else>
-        <el-button text @click="router.push('/login')">登录</el-button>
-        <el-button text @click="router.push('/register')">注册</el-button>
+        <button class="ghost-btn" @click="router.push('/login')">登录</button>
+        <button class="signal-btn" @click="router.push('/register')">注册</button>
       </template>
-    </el-header>
-    <el-main><router-view /></el-main>
-  </el-container>
+    </header>
+    <main class="app-main"><router-view /></main>
+  </div>
 </template>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Fredoka:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Space+Mono:wght@400;700&display=swap');
 
+/* ── 城市寻趣 · Wayfinding design tokens ──────────────────────────────
+   信号朱红(pin/CTA) · 等高线墨(text) · 纸面(bg) · 路线青(secondary) · 邮戳琥珀(badge) */
 :root {
-  --qj-primary: #f56c2e;
-  --qj-primary-light: #fff7ed;
-  --qj-primary-hover: #ea580c;
-  --qj-secondary: #8b5cf6;
-  --qj-accent: #06b6d4;
-  --qj-text: #1e293b;
-  --qj-text-secondary: #64748b;
-  --qj-bg: #fefcfa;
-  --qj-card: #ffffff;
-  --qj-border: #f0ece6;
-  --qj-nav-bg: linear-gradient(135deg, #1e293b 0%, #312e81 100%);
-  --qj-nav-text: #f8fafc;
-  --qj-success: #10b981;
-  --qj-danger: #ef4444;
-  --qj-radius: 16px;
-  --qj-radius-sm: 10px;
-  --qj-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.02);
-  --qj-shadow-hover: 0 8px 32px rgba(245,108,46,0.15), 0 2px 8px rgba(0,0,0,0.04);
-  --qj-gradient: linear-gradient(135deg, #f56c2e, #8b5cf6);
+  --ink: #1b1c18;
+  --ink-soft: #5c5f56;
+  --ink-faint: #8b8d82;
+  --paper: #f2f1ea;
+  --surface: #ffffff;
+  --surface-2: #faf9f3;
+  --line: #e2e0d5;
+  --line-strong: #d3d0c2;
+  --signal: #ff4324;
+  --signal-ink: #d6300f;
+  --signal-wash: #fff0ec;
+  --route: #157a6e;
+  --route-wash: #e6f2ef;
+  --stamp: #c8860d;
+  --stamp-wash: #fbf1dc;
+
+  --font-display: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(27,28,24,0.05), 0 8px 24px rgba(27,28,24,0.05);
+  --shadow-hover: 0 2px 6px rgba(27,28,24,0.08), 0 16px 40px rgba(27,28,24,0.10);
+
+  /* Legacy --qj-* aliases (existing views reference these) */
+  --qj-primary: var(--signal);
+  --qj-primary-light: var(--signal-wash);
+  --qj-primary-hover: var(--signal-ink);
+  --qj-secondary: var(--route);
+  --qj-accent: var(--route);
+  --qj-text: var(--ink);
+  --qj-text-secondary: var(--ink-soft);
+  --qj-bg: var(--paper);
+  --qj-card: var(--surface);
+  --qj-border: var(--line);
+  --qj-nav-bg: var(--surface);
+  --qj-nav-text: var(--ink);
+  --qj-success: var(--route);
+  --qj-danger: var(--signal);
+  --qj-radius: var(--radius);
+  --qj-radius-sm: var(--radius-sm);
+  --qj-shadow: var(--shadow);
+  --qj-shadow-hover: var(--shadow-hover);
+  --qj-gradient: var(--signal);
+
+  /* Element Plus 主色 → 信号朱红：一处改动，全站组件（单选/多选/开关/日期/加载）统一 */
+  --el-color-primary: #ff4324;
+  --el-color-primary-light-3: #ff7050;
+  --el-color-primary-light-5: #ff9077;
+  --el-color-primary-light-7: #ffbfb2;
+  --el-color-primary-light-8: #ffd5cc;
+  --el-color-primary-light-9: #ffe9e3;
+  --el-color-primary-dark-2: #d6300f;
+  --el-color-success: #157a6e;
+  --el-color-success-light-9: #e6f2ef;
+  --el-border-radius-base: 9px;
 }
 
 html.dark {
-  --qj-primary: #fb923c;
-  --qj-primary-light: #1c1917;
-  --qj-primary-hover: #f97316;
-  --qj-secondary: #a78bfa;
-  --qj-accent: #22d3ee;
-  --qj-text: #f1f5f9;
-  --qj-text-secondary: #94a3b8;
-  --qj-bg: #0f172a;
-  --qj-card: #1e293b;
-  --qj-border: #334155;
-  --qj-nav-bg: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-  --qj-nav-text: #f1f5f9;
-  --qj-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.2);
-  --qj-shadow-hover: 0 8px 32px rgba(251,146,60,0.2), 0 2px 8px rgba(0,0,0,0.3);
-  --qj-gradient: linear-gradient(135deg, #fb923c, #a78bfa);
+  --ink: #ecebe1;
+  --ink-soft: #a3a498;
+  --ink-faint: #74766b;
+  --paper: #13140f;
+  --surface: #1d1e17;
+  --surface-2: #24261d;
+  --line: #34362b;
+  --line-strong: #43463a;
+  --signal: #ff5c3d;
+  --signal-ink: #ff7a60;
+  --signal-wash: #2a1611;
+  --route: #3ba593;
+  --route-wash: #12241f;
+  --stamp: #e0a11b;
+  --stamp-wash: #2a2110;
+  --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  --shadow-hover: 0 2px 6px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.45);
+
+  --el-color-primary: #ff5c3d;
+  --el-color-primary-light-3: #cc4028;
+  --el-color-primary-light-5: #9e3320;
+  --el-color-primary-light-7: #6b2417;
+  --el-color-primary-light-8: #4d1c12;
+  --el-color-primary-light-9: #2a1611;
+  --el-color-primary-dark-2: #ff7a60;
+  --el-bg-color: #1d1e17;
+  --el-bg-color-overlay: #24261d;
+  --el-fill-color-blank: #1d1e17;
+  --el-text-color-primary: #ecebe1;
+  --el-text-color-regular: #c9c9bd;
+  --el-border-color: #34362b;
+  --el-border-color-light: #34362b;
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: var(--qj-bg);
-  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--qj-text);
+  background: var(--paper);
+  /* 极淡的地图网点纹理，营造"纸面/等高线"的寻趣氛围 */
+  background-image: radial-gradient(rgba(27,28,24,0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+  font-family: var(--font-body);
+  color: var(--ink);
   line-height: 1.6;
-  transition: background 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
+html.dark body { background-image: radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px); }
 
 h1, h2, h3, h4, h5 {
-  font-family: 'Fredoka', 'Nunito', sans-serif;
-  font-weight: 600;
-  line-height: 1.3;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 /* Element Plus 主题覆盖 */
 .el-button--primary {
-  background: var(--qj-gradient) !important;
-  border: none !important;
-  border-radius: var(--qj-radius-sm) !important;
+  background: var(--signal) !important;
+  border: 1px solid var(--signal) !important;
+  border-radius: var(--radius-sm) !important;
   color: #fff !important;
   font-weight: 600;
 }
-.el-button--primary:hover { transform: translateY(-2px); box-shadow: var(--qj-shadow-hover); opacity: 0.9; }
-.el-button { border-radius: var(--qj-radius-sm) !important; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
-.el-tag { border-radius: 20px; font-weight: 600; padding: 2px 12px; }
-.el-card {
-  border-radius: var(--qj-radius) !important;
-  border: 1px solid var(--qj-border) !important;
-  background: var(--qj-card) !important;
-  box-shadow: var(--qj-shadow) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.el-button--primary:hover { background: var(--signal-ink) !important; border-color: var(--signal-ink) !important; box-shadow: var(--shadow-hover); }
+.el-button { border-radius: var(--radius-sm) !important; font-weight: 600; transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1); }
+.el-button:not(.el-button--primary):not(.is-text):hover { color: var(--signal) !important; border-color: var(--signal) !important; }
+.el-tag { border-radius: 6px; font-weight: 600; padding: 2px 9px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.02em; }
+.el-radio-button__inner { font-weight: 600; }
+.el-radio-button.is-active .el-radio-button__inner {
+  background: var(--ink) !important;
+  border-color: var(--ink) !important;
+  box-shadow: -1px 0 0 0 var(--ink) !important;
+  color: var(--paper) !important;
 }
-.el-card:hover { box-shadow: var(--qj-shadow-hover) !important; transform: translateY(-3px); }
-.el-dialog { border-radius: var(--qj-radius) !important; background: var(--qj-card) !important; }
-.el-input__wrapper { border-radius: var(--qj-radius-sm) !important; background: var(--qj-card) !important; }
-.el-tabs__item.is-active { color: var(--qj-primary) !important; font-weight: 700; }
-.el-tabs__active-bar { background: var(--qj-gradient) !important; height: 3px; border-radius: 2px; }
-.el-table { background: var(--qj-card) !important; }
-.el-table th.el-table__cell { background: var(--qj-bg) !important; }
+.el-card {
+  border-radius: var(--radius) !important;
+  border: 1px solid var(--line) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow) !important;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.el-card:hover { box-shadow: var(--shadow-hover) !important; }
+.el-dialog { border-radius: var(--radius) !important; background: var(--surface) !important; }
+.el-dialog__title { font-family: var(--font-display); font-weight: 700; }
+.el-input__wrapper, .el-textarea__inner { border-radius: var(--radius-sm) !important; background: var(--surface) !important; }
+.el-input__wrapper.is-focus { box-shadow: 0 0 0 1px var(--signal) inset !important; }
+.el-tabs__item.is-active { color: var(--signal) !important; font-weight: 700; }
+.el-tabs__item:hover { color: var(--ink) !important; }
+.el-tabs__active-bar { background: var(--signal) !important; height: 2px; }
+.el-table { background: var(--surface) !important; }
+.el-table th.el-table__cell { background: var(--surface-2) !important; font-weight: 700; color: var(--ink); }
 
-/* 导航栏 */
-.hd {
+/* ── 导航栏：寻趣路牌 ───────────────────────────── */
+.app-shell { min-height: 100vh; }
+.topbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 28px;
-  height: 64px;
-  background: var(--qj-nav-bg);
-  border-bottom: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  gap: 6px;
+  padding: 0 26px;
+  height: 62px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   z-index: 100;
 }
-.hd .el-button {
-  color: var(--qj-nav-text) !important;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: 'Nunito', sans-serif;
-  border-radius: 10px !important;
-  padding: 8px 14px !important;
-  transition: all 0.2s ease;
-}
-.hd .el-button:hover { color: #fff !important; background: rgba(255,255,255,0.12) !important; transform: translateY(-1px); }
-.logo {
-  font-family: 'Fredoka', sans-serif;
-  font-weight: 700;
-  font-size: 24px;
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   cursor: pointer;
-  background: var(--qj-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-right: 16px;
+  margin-right: 26px;
+  color: var(--ink) !important;
+  white-space: nowrap;
+}
+.brand-pin {
+  align-self: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--signal);
+  transform: rotate(-45deg);
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,0.12);
+}
+.brand-name { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: 0.02em; }
+.brand-sub { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--ink-faint); text-transform: uppercase; }
+.nav { display: flex; align-items: center; gap: 2px; }
+.nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-soft) !important;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.nav-link:hover { color: var(--ink) !important; background: var(--surface-2); }
+.nav-link.active { color: var(--ink) !important; }
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 14px; right: 14px; bottom: -1px;
+  height: 2px;
+  background: var(--signal);
+  border-radius: 2px;
+}
+.nav-dot {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 20px;
+  background: var(--signal);
+  color: #fff;
 }
 .spacer { flex: 1; }
-.notify-badge { margin-left: 4px; vertical-align: middle; }
-.theme-toggle { font-size: 18px !important; }
+.icon-btn {
+  width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover { border-color: var(--signal); color: var(--signal); }
+.ghost-btn, .signal-btn {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ghost-btn { border: 1px solid transparent; background: transparent; color: var(--ink-soft); }
+.ghost-btn:hover { color: var(--ink); background: var(--surface-2); }
+.signal-btn { border: 1px solid var(--signal); background: var(--signal); color: #fff; }
+.signal-btn:hover { background: var(--signal-ink); border-color: var(--signal-ink); }
 
 /* 全局 main 区域 */
-.el-main { padding: 24px 28px; }
+.app-main { padding: 26px 28px 56px; max-width: 1360px; margin: 0 auto; }
 
 /* 链接样式 */
-a { color: var(--qj-primary); text-decoration: none; transition: color 0.2s; }
-a:hover { color: var(--qj-primary-hover); }
+a { color: var(--signal); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--signal-ink); }
+
+@media (max-width: 720px) {
+  .topbar { padding: 0 14px; gap: 2px; overflow-x: auto; }
+  .brand { margin-right: 12px; }
+  .brand-sub { display: none; }
+  .nav-link { padding: 8px 10px; font-size: 14px; }
+  .app-main { padding: 18px 14px 48px; }
+}
 
 /* 暗色模式下 Element Plus 组件 */
 html.dark .el-button:not(.el-button--primary) { color: var(--qj-text) !important; border-color: var(--qj-border) !important; background: var(--qj-card) !important; }
