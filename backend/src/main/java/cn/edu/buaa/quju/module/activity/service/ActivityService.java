@@ -147,7 +147,7 @@ public class ActivityService {
                 .toList();
     }
 
-    public PageResult<ActivityVO> discover(String tab, String keyword, String category, String categories, String status, String city,
+    public PageResult<ActivityVO> discover(String tab, String keyword, String category, String categories, String status, String phase, String city,
                                            LocalDateTime startFrom, LocalDateTime startTo,
                                            BigDecimal feeMin, BigDecimal feeMax,
                                            BigDecimal lng, BigDecimal lat, BigDecimal distanceKm,
@@ -183,10 +183,13 @@ public class ActivityService {
                     .toList();
         }
         boolean nearbyMode = "NEARBY".equalsIgnoreCase(tab) || (lng != null && lat != null && distanceKm != null);
+        boolean phaseFilter = phase != null && !phase.isBlank();
         BigDecimal effectiveDistance = distanceKm == null ? new BigDecimal("10") : distanceKm;
         Map<Long, BigDecimal> distanceMap = new HashMap<>();
         List<Activity> filtered = new ArrayList<>();
         for (Activity activity : activities) {
+            // 时间相位(报名中/未开始/活动中...)为计算值，需在内存中按 calcPhase 结果过滤
+            if (phaseFilter && !phase.equals(calcPhase(activity))) continue;
             if (nearbyMode) {
                 if (lng == null || lat == null || activity.getLng() == null || activity.getLat() == null) continue;
                 BigDecimal currentDistance = distanceKm(activity.getLat(), activity.getLng(), lat, lng);
@@ -750,12 +753,15 @@ public class ActivityService {
         if (user == null || user.getReputation() == null || user.getReputation() < 60) {
             throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "信誉分低于报名要求");
         }
-        if (user.getBirthday() == null) {
-            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "请先完善生日信息后再报名");
-        }
-        int age = calcAge(user.getBirthday());
-        if (age < 16) {
-            throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "当前活动仅支持 16 岁及以上用户报名");
+        // 商家账号无生日/年龄概念，跳过生日与年龄校验；个人用户仍需完善生日且满 16 岁
+        if (!"MERCHANT".equals(user.getUserType())) {
+            if (user.getBirthday() == null) {
+                throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "请先完善生日信息后再报名");
+            }
+            int age = calcAge(user.getBirthday());
+            if (age < 16) {
+                throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "当前活动仅支持 16 岁及以上用户报名");
+            }
         }
         if (req == null || !Boolean.TRUE.equals(req.safetyConfirmed())) {
             throw new BizException(ErrorCode.SIGNUP_CHECK_FAILED, "请先确认安全须知");

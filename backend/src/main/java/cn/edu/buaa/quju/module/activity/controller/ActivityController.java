@@ -52,6 +52,7 @@ public class ActivityController {
                                               @RequestParam(required = false) String category,
                                               @RequestParam(required = false) String categories,
                                               @RequestParam(required = false) String status,
+                                              @RequestParam(required = false) String phase,
                                               @RequestParam(required = false) String city,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startFrom,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTo,
@@ -62,7 +63,7 @@ public class ActivityController {
                                               @RequestParam(required = false) BigDecimal distanceKm,
                                               @RequestParam(defaultValue = "1") int page,
                                               @RequestParam(defaultValue = "10") int size) {
-        return R.ok(activityService.discover(tab, keyword, category, categories, status, city,
+        return R.ok(activityService.discover(tab, keyword, category, categories, status, phase, city,
                 startFrom, startTo, feeMin, feeMax, lng, lat, distanceKm, page, size));
     }
 

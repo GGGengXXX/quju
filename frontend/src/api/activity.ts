@@ -101,6 +101,7 @@ export interface ActivityDiscoverParams {
   category?: string
   categories?: string
   status?: string
+  phase?: string
   city?: string
   startFrom?: string
   startTo?: string

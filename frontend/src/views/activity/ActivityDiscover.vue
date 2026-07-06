@@ -103,6 +103,8 @@ const query = reactive({
   tab: 'RECOMMEND',
   keyword: '',
   categories: [] as string[],
+  // 时间相位筛选，默认只看「报名中」；空字符串=全部
+  phase: 'SIGNUP_OPEN',
   city: '',
   feeMin: undefined as number | undefined,
   feeMax: undefined as number | undefined,
@@ -260,6 +262,22 @@ function changePage(page: number) {
   loadActivities()
 }
 
+// 时间相位筛选选项（对应后端 calcPhase）；空值=全部
+const phaseOptions = [
+  { value: 'SIGNUP_OPEN', label: '报名中' },
+  { value: 'NOT_STARTED', label: '未开始' },
+  { value: 'ONGOING', label: '活动中' },
+  { value: 'ENDED', label: '已结束' },
+  { value: '', label: '全部' },
+]
+
+function changePhase(phase: string) {
+  if (query.phase === phase) return
+  query.phase = phase
+  query.page = 1
+  loadActivities()
+}
+
 function resetFilters() {
   query.categories = []
   query.city = ''
@@ -276,6 +294,7 @@ async function loadActivities() {
       tab: query.tab,
       keyword: query.keyword || undefined,
       categories: query.categories.length ? query.categories.join(',') : undefined,
+      phase: query.phase || undefined,
       city: query.city || undefined,
       feeMin: query.feeMin,
       feeMax: query.feeMax,
@@ -1193,6 +1212,17 @@ onMounted(async () => {
           <button type="button" v-if="!showMapPanel" class="mini" @click="showMapPanel = true">显示地图</button>
         </div>
 
+        <!-- 时间相位筛选（仅发现模式） -->
+        <div v-if="listMode === 'discover'" class="phase-filter">
+          <button
+            v-for="opt in phaseOptions"
+            :key="opt.value || 'all'"
+            type="button"
+            :class="{ on: query.phase === opt.value }"
+            @click="changePhase(opt.value)"
+          >{{ opt.label }}</button>
+        </div>
+
         <!-- 发现 -->
         <el-skeleton v-if="listMode === 'discover'" :loading="loading" animated :rows="6">
           <div class="pass-list">
@@ -1207,6 +1237,7 @@ onMounted(async () => {
                 <h4>{{ item.name }}</h4>
                 <el-tag v-if="item.creator?.userType === 'MERCHANT'" size="small" type="warning" effect="dark">商家</el-tag>
               </div>
+              <div class="card-when">🕒 {{ item.startTime ? formatTime(item.startTime) : '时间待定' }}</div>
               <p class="intro">{{ item.intro || '暂无简介' }}</p>
               <div class="meta-strip">
                 <span class="ms"><b>{{ activityPhaseLabel(item.phase) }}</b><i>阶段</i></span>
@@ -1797,6 +1828,24 @@ onMounted(async () => {
 }
 .list-seg button i { font-style: normal; font-family: var(--font-mono); font-size: 11px; opacity: 0.65; }
 .list-seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+.phase-filter { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.phase-filter button {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.phase-filter button:hover { border-color: var(--signal); color: var(--signal); }
+.phase-filter button.on { background: var(--signal); border-color: var(--signal); color: #fff; }
+
+.card-when { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 
 .stage-map .map-canvas-wrap { flex: 1 1 auto; min-height: 0; }
 .stage-map .map-canvas { height: 100%; }
