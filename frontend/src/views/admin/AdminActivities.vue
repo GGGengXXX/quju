@@ -115,14 +115,20 @@ onMounted(load)
 
 <template>
   <div class="page">
-    <h3>活动管理</h3>
+    <div class="page-head">
+      <div>
+        <p class="page-eyebrow">CONSOLE · 03 / ACTIVITIES</p>
+        <h3>活动管理</h3>
+      </div>
+      <span class="page-count">共 <em>{{ total }}</em> 场活动</span>
+    </div>
 
     <el-radio-group v-model="tab" style="margin-bottom: 16px" @change="switchTab">
       <el-radio-button value="all">全部</el-radio-button>
       <el-radio-button value="pending">待审核</el-radio-button>
     </el-radio-group>
 
-    <el-form v-if="tab === 'all'" inline style="margin-bottom: 16px">
+    <el-form v-if="tab === 'all'" inline class="filter-bar">
       <el-form-item>
         <el-input v-model="query.keyword" placeholder="搜索活动名称" clearable @clear="load" @keyup.enter="load" />
       </el-form-item>

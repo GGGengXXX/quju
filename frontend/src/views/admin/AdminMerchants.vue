@@ -68,9 +68,15 @@ onMounted(load)
 
 <template>
   <div class="page">
-    <h3>商家审核</h3>
+    <div class="page-head">
+      <div>
+        <p class="page-eyebrow">CONSOLE · 02 / MERCHANTS</p>
+        <h3>商家审核</h3>
+      </div>
+      <span class="page-count">共 <em>{{ total }}</em> 份申请</span>
+    </div>
 
-    <el-form inline style="margin-bottom: 16px">
+    <el-form inline class="filter-bar">
       <el-form-item>
         <el-select v-model="query.status" placeholder="审核状态" clearable @change="load">
           <el-option label="待审核" value="PENDING" />

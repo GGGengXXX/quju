@@ -14,11 +14,11 @@ const routes = [
   { path: '/social/team-chat/:id', component: () => import('../views/social/ChatView.vue'), meta: { auth: true } },
   { path: '/social/user/:id', component: () => import('../views/social/UserProfile.vue'), meta: { auth: true } },
   { path: '/notifications', component: () => import('../views/social/NotificationsView.vue'), meta: { auth: true } },
-  { path: '/admin/login', component: () => import('../views/admin/AdminLogin.vue') },
+  { path: '/admin/login', component: () => import('../views/admin/AdminLogin.vue'), meta: { minimalLayout: true } },
   {
     path: '/admin',
     component: () => import('../views/admin/AdminLayout.vue'),
-    meta: { adminAuth: true },
+    meta: { adminAuth: true, minimalLayout: true },
     redirect: '/admin/dashboard',
     children: [
       { path: 'dashboard', component: () => import('../views/admin/AdminDashboard.vue') },

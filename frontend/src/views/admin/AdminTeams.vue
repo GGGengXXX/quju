@@ -78,9 +78,15 @@ onMounted(load)
 
 <template>
   <div class="page">
-    <h3>小队管理</h3>
+    <div class="page-head">
+      <div>
+        <p class="page-eyebrow">CONSOLE · 04 / TEAMS</p>
+        <h3>小队管理</h3>
+      </div>
+      <span class="page-count">共 <em>{{ total }}</em> 支小队</span>
+    </div>
 
-    <el-form inline style="margin-bottom: 16px">
+    <el-form inline class="filter-bar">
       <el-form-item>
         <el-input v-model="query.keyword" placeholder="搜索小队名称" clearable @clear="load" @keyup.enter="load" />
       </el-form-item>

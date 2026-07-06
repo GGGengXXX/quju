@@ -289,16 +289,20 @@ onBeforeUnmount(() => {
 <template>
   <div class="social-hub">
     <div class="hub-header">
-      <h2>社交</h2>
+      <div class="hub-lead">
+        <span class="hub-eyebrow">QUJU · 同行者</span>
+        <h2>你的社交名册</h2>
+        <p class="hub-sub">好友、关注与小队，都是一起出发的人。</p>
+      </div>
       <div class="hub-actions">
         <label class="scan-btn">
-          <span>📷 扫码加好友</span>
+          <span>扫码加好友</span>
           <input type="file" accept="image/*" hidden @change="scanQrFromImage" />
         </label>
-        <el-button type="primary" size="small" @click="openAdd">搜索用户</el-button>
+        <button class="add-btn" @click="openAdd">＋ 搜索用户</button>
       </div>
     </div>
-    <p class="paste-hint">💡 也可以直接 Ctrl+V / Cmd+V 粘贴二维码截图识别</p>
+    <p class="paste-hint">也可直接 Ctrl+V / Cmd+V 粘贴二维码截图识别</p>
 
     <el-tabs v-model="tab" @tab-change="onTabChange">
       <el-tab-pane label="好友" name="friends">
@@ -460,23 +464,52 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.social-hub { max-width: 700px; margin: 0 auto; padding: 16px; }
-.hub-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.hub-header h2 { margin: 0; }
-.hub-actions { display: flex; align-items: center; gap: 8px; }
-.scan-btn { cursor: pointer; font-size: 13px; color: #409eff; padding: 6px 12px; border: 1px solid #dcdfe6; border-radius: 4px; }
-.scan-btn:hover { background: #ecf5ff; }
-.paste-hint { font-size: 12px; color: #999; margin: 0 0 12px 0; }
-.list { min-height: 100px; }
-.empty { text-align: center; color: #999; padding: 32px 0; }
-.card { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
-.card:last-child { border-bottom: none; }
-.info { display: flex; align-items: center; gap: 12px; }
-.text { display: flex; flex-direction: column; }
-.text strong { font-size: 14px; }
-.sub { font-size: 12px; color: #999; }
-.actions { display: flex; gap: 4px; }
+.social-hub { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+.hub-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+.hub-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.hub-lead h2 { margin: 4px 0 4px; font-size: 26px; color: var(--ink); }
+.hub-sub { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.hub-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.scan-btn {
+  cursor: pointer; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft);
+  padding: 7px 13px; border: 1px dashed var(--line-strong); border-radius: 22px; transition: all 0.15s ease;
+}
+.scan-btn:hover { border-color: var(--signal); color: var(--signal); }
+.add-btn {
+  cursor: pointer; font-size: 13px; padding: 8px 15px; border-radius: 22px;
+  background: var(--signal); color: #fff; border: none; transition: background 0.15s ease;
+}
+.add-btn:hover { background: var(--signal-ink); }
+.paste-hint { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); margin: 0 0 8px 0; }
+
+.list { min-height: 100px; padding-top: 4px; }
+.empty { text-align: center; color: var(--ink-faint); padding: 40px 0; font-size: 13px; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px 14px; margin-bottom: 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  box-shadow: inset 3px 0 0 var(--line-strong);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  animation: qj-rise 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.card:nth-child(1) { animation-delay: 40ms; }
+.card:nth-child(2) { animation-delay: 90ms; }
+.card:nth-child(3) { animation-delay: 140ms; }
+.card:nth-child(4) { animation-delay: 190ms; }
+.card:nth-child(5) { animation-delay: 240ms; }
+.card:nth-child(n+6) { animation-delay: 290ms; }
+.card:hover { border-color: var(--line-strong); box-shadow: inset 3px 0 0 var(--signal); transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .card:hover { transform: none; }
+}
+.info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.text strong { font-size: 14.5px; color: var(--ink); }
+.sub { font-size: 12px; color: var(--ink-faint); }
+.actions { display: flex; gap: 2px; flex: 0 0 auto; }
 .search-result { display: flex; align-items: center; gap: 8px; }
-.link-name { color: #409eff; }
-.link-name:hover { text-decoration: underline; }
+.link-name { color: var(--ink); transition: color 0.15s ease; }
+.card:hover .link-name, .link-name:hover { color: var(--signal); }
 </style>

@@ -106,12 +106,15 @@ onMounted(load)
 <template>
   <div class="notifications-page">
     <div class="header">
-      <h2>通知中心</h2>
-      <el-button text type="primary" @click="markAllRead">全部已读</el-button>
+      <div class="head-lead">
+        <span class="head-eyebrow">QUJU · 信号台</span>
+        <h2>通知中心</h2>
+      </div>
+      <button class="allread-btn" @click="markAllRead">全部已读</button>
     </div>
 
     <div v-loading="loading" class="list">
-      <div v-if="!list.length && !loading" class="empty">暂无通知</div>
+      <div v-if="!list.length && !loading" class="empty">此刻没有新信号</div>
       <div
         v-for="item in list"
         :key="item.id"
@@ -120,8 +123,8 @@ onMounted(load)
       >
         <div class="item-main">
           <div class="item-left">
-            <span v-if="!item.isRead" class="dot" />
-            <el-tag size="small" :type="item.isRead ? 'info' : ''">{{ typeLabel[item.type] || item.type }}</el-tag>
+            <span class="dot" :class="{ on: !item.isRead }" />
+            <span class="ntype">{{ typeLabel[item.type] || item.type }}</span>
             <span class="title">{{ item.title }}</span>
           </div>
           <span class="time">{{ item.createdAt?.slice(0, 16).replace('T', ' ') }}</span>
@@ -147,21 +150,51 @@ onMounted(load)
 </template>
 
 <style scoped>
-.notifications-page { max-width: 700px; margin: 0 auto; padding: 16px; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.header h2 { margin: 0; }
+.notifications-page { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+.header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+.head-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.header h2 { margin: 4px 0 0; font-size: 26px; color: var(--ink); }
+.allread-btn {
+  background: none; border: 1px solid var(--line-strong); border-radius: 22px; cursor: pointer;
+  font-size: 12.5px; padding: 7px 14px; color: var(--ink-soft); transition: all 0.15s ease;
+}
+.allread-btn:hover { border-color: var(--signal); color: var(--signal); }
 .list { min-height: 100px; }
-.empty { text-align: center; color: #999; padding: 32px 0; }
-.notify-item { padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; border-radius: 6px; margin-bottom: 4px; }
-.notify-item:hover { background: #f9f9f9; }
-.notify-item.unread { background: #ecf5ff; }
-.notify-item.expanded { background: #f5f7fa; }
-.item-main { display: flex; align-items: center; justify-content: space-between; }
-.item-left { display: flex; align-items: center; gap: 8px; }
-.title { font-size: 14px; font-weight: 500; }
-.time { font-size: 12px; color: #999; white-space: nowrap; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #f56c6c; flex-shrink: 0; }
-.item-detail { margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px; border: 1px solid #eee; }
-.detail-content { font-size: 13px; color: #666; margin: 0 0 8px 0; }
-.empty-content { color: #bbb; font-style: italic; }
+.empty { text-align: center; color: var(--ink-faint); padding: 40px 0; font-size: 13px; }
+@keyframes qj-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.notify-item {
+  padding: 13px 14px; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.18s ease;
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--line-strong);
+  animation: qj-rise 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.notify-item:nth-child(1) { animation-delay: 30ms; }
+.notify-item:nth-child(2) { animation-delay: 75ms; }
+.notify-item:nth-child(3) { animation-delay: 120ms; }
+.notify-item:nth-child(4) { animation-delay: 165ms; }
+.notify-item:nth-child(5) { animation-delay: 210ms; }
+.notify-item:nth-child(n+6) { animation-delay: 250ms; }
+.notify-item:hover { border-color: var(--line-strong); transform: translateX(3px); }
+.notify-item.unread { box-shadow: inset 3px 0 0 var(--signal); }
+.notify-item.expanded { background: var(--surface-2); }
+.item-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.item-left { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex-shrink: 0; }
+.dot.on { background: var(--signal); box-shadow: 0 0 0 3px var(--signal-wash); }
+.ntype {
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.03em;
+  padding: 2px 8px; border-radius: 6px; background: var(--surface-2);
+  border: 1px solid var(--line); color: var(--ink-soft);
+}
+.notify-item.unread .ntype { background: var(--signal-wash); border-color: transparent; color: var(--signal-ink); }
+.title { font-size: 14px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.time { flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+.item-detail { margin-top: 12px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); }
+.detail-content { font-size: 13px; color: var(--ink-soft); margin: 0 0 10px 0; line-height: 1.55; }
+.empty-content { color: var(--ink-faint); font-style: italic; }
+@media (prefers-reduced-motion: reduce) {
+  .notify-item { animation: none; }
+  .notify-item:hover { transform: none; }
+}
 </style>
