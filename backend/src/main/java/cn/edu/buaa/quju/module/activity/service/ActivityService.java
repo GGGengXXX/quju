@@ -282,11 +282,12 @@ public class ActivityService {
         Map<Long, Integer> signupCounts = getSignupCounts(List.of(id));
         Map<Long, Integer> waitlistCounts = getWaitlistCounts(List.of(id));
         String mySignupStatus = resolveMySignupStatus(id, UserContext.get());
+        String myWaitlistStatus = resolveMyWaitlistStatus(id, UserContext.get());
         return new ActivityDetailVO(activity.getId(), activity.getName(), activity.getIntro(), activity.getCategory(),
                 tags.getOrDefault(id, Collections.emptyList()), activity.getCoverImage(), activity.getStartTime(), activity.getEndTime(),
                 activity.getSignupDeadline(), activity.getCity(), activity.getAddress(), activity.getLng(), activity.getLat(),
                 activity.getCapacity(), activity.getFee(), activity.getStatus(), calcPhase(activity), signupCounts.getOrDefault(id, 0),
-                creator, activity.getTeamId(), mySignupStatus, waitlistCounts.getOrDefault(id, 0),
+                creator, activity.getTeamId(), mySignupStatus, myWaitlistStatus, waitlistCounts.getOrDefault(id, 0),
                 exposeCheckinCode(activity, mySignupStatus, UserContext.get()),
                 resolveLatestAudit(activity, UserContext.get()));
     }
@@ -495,11 +496,16 @@ public class ActivityService {
     @Transactional
     public void confirmWaitlist(long activityId) {
         long userId = UserContext.require();
-        ActivityWaitlist wait = waitlistMapper.selectOne(Wrappers.<ActivityWaitlist>lambdaQuery()
+        ActivityWaitlist active = waitlistMapper.selectOne(Wrappers.<ActivityWaitlist>lambdaQuery()
                 .eq(ActivityWaitlist::getActivityId, activityId)
                 .eq(ActivityWaitlist::getUserId, userId)
-                .eq(ActivityWaitlist::getStatus, "NOTIFIED")
+                .in(ActivityWaitlist::getStatus, List.of("WAITING", "NOTIFIED"))
                 .last("LIMIT 1"));
+        // 仍在排队(WAITING)且尚无空位释放，此时无名额可确认，给出明确提示而非"超时"
+        if (active != null && "WAITING".equals(active.getStatus())) {
+            throw new BizException(ErrorCode.WAITLIST_CONFIRM_EXPIRED, "当前暂无空位，轮到你时会通知你确认");
+        }
+        ActivityWaitlist wait = active != null && "NOTIFIED".equals(active.getStatus()) ? active : null;
         if (wait == null) throw new BizException(ErrorCode.WAITLIST_CONFIRM_EXPIRED);
         if (wait.getConfirmDeadline() != null && LocalDateTime.now().isAfter(wait.getConfirmDeadline())) {
             wait.setStatus("EXPIRED");
@@ -883,6 +889,17 @@ public class ActivityService {
                 .in(ActivityWaitlist::getStatus, List.of("WAITING", "NOTIFIED"))
                 .last("LIMIT 1"));
         return wait == null ? null : "WAITLISTED";
+    }
+
+    /** 返回当前用户在该活动的候补原始状态：WAITING(排队中) / NOTIFIED(空位已保留,可确认) / null(不在候补) */
+    private String resolveMyWaitlistStatus(long activityId, Long userId) {
+        if (userId == null) return null;
+        ActivityWaitlist wait = waitlistMapper.selectOne(Wrappers.<ActivityWaitlist>lambdaQuery()
+                .eq(ActivityWaitlist::getActivityId, activityId)
+                .eq(ActivityWaitlist::getUserId, userId)
+                .in(ActivityWaitlist::getStatus, List.of("WAITING", "NOTIFIED"))
+                .last("LIMIT 1"));
+        return wait == null ? null : wait.getStatus();
     }
 
     private int countRegistered(long activityId) {

@@ -40,6 +40,8 @@ export interface LatestAudit {
 
 export interface ActivityDetail extends ActivityItem {
   mySignupStatus?: string
+  // 候补原始状态：WAITING(排队中,无空位) / NOTIFIED(空位已保留,可确认) / 缺省(非候补)
+  myWaitlistStatus?: string | null
   waitlistCount?: number
   checkinCode?: string | null
   // 最近一次审核结果（AI/人工），仅活动发起人本人可见，非本人为 null

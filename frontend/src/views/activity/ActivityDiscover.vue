@@ -156,7 +156,10 @@ const isOwner = computed(() => !!detail.value && !!auth.user && detail.value.cre
 const canEdit = computed(() => isOwner.value && ['DRAFT', 'REJECTED'].includes(detail.value?.status || ''))
 const canSignup = computed(() => !!detail.value && detail.value.status === 'PUBLISHED' && !detail.value.mySignupStatus)
 const canCancelSignup = computed(() => detail.value?.mySignupStatus === 'REGISTERED')
-const canConfirmWaitlist = computed(() => detail.value?.mySignupStatus === 'WAITLISTED')
+// 仅当空位已释放并保留给本人(NOTIFIED)时才可确认；仅排队中(WAITING)无名额可确认
+const canConfirmWaitlist = computed(() => detail.value?.myWaitlistStatus === 'NOTIFIED')
+// 已进入候补但仍在排队、尚无空位
+const isWaitingInQueue = computed(() => detail.value?.myWaitlistStatus === 'WAITING')
 const canReview = computed(() => !!detail.value && detail.value.phase === 'ENDED' && !!auth.token)
 const canManageSummary = computed(() => !!detail.value && isOwner.value && detail.value.phase === 'ENDED')
 const visibleCheckinCode = computed(() => detail.value?.checkinCode || generatedCode.value || '')
@@ -1392,6 +1395,7 @@ onMounted(async () => {
             <el-button v-if="canSignup" type="primary" :loading="actionLoading" @click="signupCurrent">报名</el-button>
             <el-button v-if="canCancelSignup" :loading="actionLoading" @click="cancelSignup">取消报名</el-button>
             <el-button v-if="canConfirmWaitlist" type="warning" :loading="actionLoading" @click="confirmWaitlist">确认候补名额</el-button>
+            <el-tag v-if="isWaitingInQueue" type="info" effect="plain">候补中，有空位释放时将通知你确认</el-tag>
             <el-button v-if="detail.status === 'PUBLISHED'" @click="cloneCurrent">克隆活动</el-button>
             <el-button v-if="canEdit" :loading="actionLoading" @click="openEditFromDetail">编辑</el-button>
             <el-button v-if="isOwner && detail.status === 'DRAFT'" type="primary" :loading="actionLoading" @click="submitDraft">提交审核</el-button>
