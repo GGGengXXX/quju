@@ -77,6 +77,8 @@ const total = ref(0)
 const detailVisible = ref(false)
 const reportVisible = ref(false)
 const createVisible = ref(false)
+const filterDrawer = ref(false)
+const listMode = ref<'discover' | 'mine' | 'joined'>('discover')
 const editingId = ref<number | null>(null)
 const detailTab = ref('overview')
 const aiTheme = ref('')
@@ -225,6 +227,31 @@ async function ensureCurrentUser() {
       // ignore
     }
   }
+}
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (query.categories.length) n++
+  if (query.city) n++
+  if (query.feeMin != null) n++
+  if (query.feeMax != null) n++
+  if (query.startFrom) n++
+  if (query.startTo) n++
+  return n
+})
+
+function switchTab(tab: string) {
+  query.tab = tab
+  loadActivities()
+}
+
+function resetFilters() {
+  query.categories = []
+  query.city = ''
+  query.feeMin = undefined
+  query.feeMax = undefined
+  query.startFrom = ''
+  query.startTo = ''
 }
 
 async function loadActivities() {
@@ -1076,51 +1103,48 @@ onMounted(async () => {
 
 <template>
   <div class="activity-page">
-    <section class="page-toolbar panel">
-      <div class="toolbar-top">
-        <el-radio-group v-model="query.tab" size="large" @change="loadActivities">
-          <el-radio-button label="RECOMMEND">推荐</el-radio-button>
-          <el-radio-button label="LATEST">最新</el-radio-button>
-          <el-radio-button label="NEARBY">附近</el-radio-button>
-        </el-radio-group>
-        <div class="toolbar-actions">
-          <el-button @click="openLocationPicker('query')">选择位置</el-button>
-          <el-button type="primary" @click="openCreate">创建活动</el-button>
-        </div>
+    <!-- 命令台 · 发现活动 -->
+    <section class="discover-hero">
+      <div class="hero-lead">
+        <span class="hero-eyebrow">◍ 此刻 · 附近正在发生</span>
+        <h1>发现身边<br>正在发生的事</h1>
+        <p class="hero-sub">以兴趣为纽带，赴一场线下相遇。</p>
       </div>
 
-      <div class="toolbar-grid">
-        <el-input v-model="query.keyword" clearable placeholder="搜索标题、简介或标签" />
-        <el-select v-model="query.categories" multiple collapse-tags collapse-tags-tooltip placeholder="活动分类">
-          <el-option v-for="option in categoryOptions" :key="option.value" :label="option.label" :value="option.value" />
-        </el-select>
-        <el-input v-model="query.city" clearable placeholder="城市" />
-        <el-input-number v-model="query.feeMin" :min="0" :step="10" placeholder="最低费用(元)" controls-position="right" />
-        <el-input-number v-model="query.feeMax" :min="0" :step="10" placeholder="最高费用(元)" controls-position="right" />
-        <el-date-picker v-model="query.startFrom" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间(从)" />
-        <el-date-picker v-model="query.startTo" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间(到)" />
-        <el-input-number v-model="query.distanceKm" :min="1" :max="50" placeholder="附近范围(公里)" controls-position="right" />
-      </div>
-
-      <div class="toolbar-bottom">
-        <div class="template-actions">
-          <span class="muted">模板：</span>
-          <el-button v-for="template in templates" :key="template.id" text @click="fillFromTemplate(template)">
-            {{ template.name }}
-          </el-button>
+      <div class="hero-console">
+        <div class="seg">
+          <button type="button" :class="{ on: query.tab === 'RECOMMEND' }" @click="switchTab('RECOMMEND')">推荐</button>
+          <button type="button" :class="{ on: query.tab === 'LATEST' }" @click="switchTab('LATEST')">最新</button>
+          <button type="button" :class="{ on: query.tab === 'NEARBY' }" @click="switchTab('NEARBY')">附近</button>
         </div>
-        <el-button type="primary" @click="loadActivities">查询活动</el-button>
+
+        <div class="hero-search">
+          <span class="hs-icon">🔍</span>
+          <input v-model="query.keyword" placeholder="搜索活动标题、标签或简介" @keyup.enter="loadActivities" />
+          <button type="button" class="hs-go" @click="loadActivities">搜索</button>
+        </div>
+
+        <div class="hero-tools">
+          <button type="button" class="tool" @click="filterDrawer = true">
+            <span>筛选</span>
+            <span v-if="activeFilterCount" class="tool-badge">{{ activeFilterCount }}</span>
+          </button>
+          <button type="button" class="tool" @click="openLocationPicker('query')">📍 我的位置</button>
+          <span class="tool-flex"></span>
+          <button type="button" class="tool create" @click="openCreate">＋ 发起活动</button>
+        </div>
       </div>
     </section>
 
-    <section class="layout-grid" :class="{ 'no-map': !showMapPanel }">
-      <section v-show="showMapPanel" class="panel map-panel">
-        <div class="section-head">
-          <h3>地图模式</h3>
-          <div class="section-meta">
-            <el-button :loading="mapLoading" @click="refreshMapPoints(true)">刷新点位</el-button>
-            <span>{{ mapPoints.length }} 个点位</span>
-            <el-button text @click="showMapPanel = false">收起地图</el-button>
+    <!-- 舞台 · 地图 + 列表 -->
+    <section class="stage" :class="{ 'no-map': !showMapPanel }">
+      <section v-show="showMapPanel" class="stage-map">
+        <div class="stage-head">
+          <h3><span class="dot"></span>地图</h3>
+          <div class="stage-meta">
+            <span class="mono-count">{{ mapPoints.length }} 点位</span>
+            <button type="button" class="mini" :disabled="mapLoading" @click="refreshMapPoints(true)">刷新</button>
+            <button type="button" class="mini" @click="showMapPanel = false">收起</button>
           </div>
         </div>
         <div v-if="amapKey" class="map-canvas-wrap">
@@ -1144,64 +1168,111 @@ onMounted(async () => {
         <el-empty v-else description="未配置地图 Key，仍可使用列表发现活动" />
       </section>
 
-      <section class="panel list-panel">
-        <div class="section-head">
-          <h3>活动发现</h3>
-          <div class="section-meta">
-            <span class="muted">{{ total }} 条</span>
-            <el-button v-if="!showMapPanel" text type="primary" @click="showMapPanel = true">显示地图</el-button>
+      <section class="stage-list">
+        <div class="stage-head">
+          <div class="list-seg">
+            <button type="button" :class="{ on: listMode === 'discover' }" @click="listMode = 'discover'">发现<i>{{ total }}</i></button>
+            <button type="button" v-if="auth.token" :class="{ on: listMode === 'mine' }" @click="listMode = 'mine'">我发起<i>{{ mineActivities.length }}</i></button>
+            <button type="button" v-if="auth.token" :class="{ on: listMode === 'joined' }" @click="listMode = 'joined'">我报名<i>{{ joinedActivities.length }}</i></button>
           </div>
+          <button type="button" v-if="!showMapPanel" class="mini" @click="showMapPanel = true">显示地图</button>
         </div>
-        <el-skeleton :loading="loading" animated :rows="6">
-          <div class="activity-list">
+
+        <!-- 发现 -->
+        <el-skeleton v-if="listMode === 'discover'" :loading="loading" animated :rows="6">
+          <div class="pass-list">
             <button v-for="item in activities" :key="String(item.id)" type="button" class="activity-card" @click="openDetail(item.id as number)">
+              <div class="card-eyebrow">
+                <span class="ce-cat">{{ categoryLabel(item.category) }}</span>
+                <span class="ce-sep">/</span>
+                <span class="ce-city">{{ item.city || '未设城市' }}</span>
+                <span class="ce-stamp" :class="'st-' + activityStatusTagType(item.status)">{{ activityStatusLabel(item.status) }}</span>
+              </div>
               <div class="title-row">
                 <h4>{{ item.name }}</h4>
                 <el-tag v-if="item.creator?.userType === 'MERCHANT'" size="small" type="warning" effect="dark">商家</el-tag>
-                <el-tag size="small" :type="activityStatusTagType(item.status)">{{ activityStatusLabel(item.status) }}</el-tag>
               </div>
               <p class="intro">{{ item.intro || '暂无简介' }}</p>
-              <div class="meta-grid">
-                <span>{{ categoryLabel(item.category) }}</span>
-                <span>{{ item.city || '未设置城市' }}</span>
-                <span>{{ activityPhaseLabel(item.phase) }}</span>
-                <span>{{ item.signupCount }}/{{ item.capacity || '-' }}</span>
-              </div>
-              <div class="tag-row">
-                <el-tag v-for="tag in item.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+              <div class="meta-strip">
+                <span class="ms"><b>{{ activityPhaseLabel(item.phase) }}</b><i>阶段</i></span>
+                <span class="ms"><b>{{ item.signupCount }}<em>/{{ item.capacity || '∞' }}</em></b><i>报名</i></span>
+                <span class="ms-tags">
+                  <el-tag v-for="tag in item.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+                </span>
               </div>
             </button>
+            <div v-if="!activities.length" class="list-empty">附近暂时没有匹配的活动，换个关键词或筛选试试。</div>
           </div>
         </el-skeleton>
+
+        <!-- 我发起 / 我报名 -->
+        <div v-else class="pass-list">
+          <button
+            v-for="item in (listMode === 'mine' ? mineActivities : joinedActivities)"
+            :key="String(item.id)"
+            type="button"
+            class="activity-card compact-pass"
+            @click="openDetail(item.id as number)"
+          >
+            <div class="card-eyebrow">
+              <span class="ce-cat">{{ categoryLabel(item.category) }}</span>
+              <span class="ce-sep">/</span>
+              <span class="ce-city">{{ item.city || '未设城市' }}</span>
+              <span class="ce-stamp" :class="'st-' + activityStatusTagType(item.status)">{{ activityStatusLabel(item.status) }}</span>
+            </div>
+            <div class="title-row"><h4>{{ item.name }}</h4></div>
+          </button>
+          <div v-if="!(listMode === 'mine' ? mineActivities : joinedActivities).length" class="list-empty">
+            {{ listMode === 'mine' ? '你还没有发起活动，点「发起活动」开始第一场。' : '你还没有报名任何活动。' }}
+          </div>
+        </div>
       </section>
-
-      <!-- 右侧栏：我的活动 -->
-      <aside class="panel sidebar-mine" v-if="auth.token">
-        <div class="section-head">
-          <h3>我发起的</h3>
-          <span class="muted">{{ mineActivities.length }}</span>
-        </div>
-        <div v-if="mineActivities.length" class="mine-list">
-          <button v-for="item in mineActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
-            <strong>{{ item.name }}</strong>
-            <span>{{ activityStatusLabel(item.status) }}</span>
-          </button>
-        </div>
-        <div v-else class="empty-hint">暂无</div>
-
-        <div class="section-head" style="margin-top: 16px">
-          <h3>我报名的</h3>
-          <span class="muted">{{ joinedActivities.length }}</span>
-        </div>
-        <div v-if="joinedActivities.length" class="mine-list">
-          <button v-for="item in joinedActivities" :key="String(item.id)" type="button" class="mine-card" @click="openDetail(item.id as number)">
-            <strong>{{ item.name }}</strong>
-            <span>{{ activityStatusLabel(item.status) }}</span>
-          </button>
-        </div>
-        <div v-else class="empty-hint">暂无</div>
-      </aside>
     </section>
+
+    <!-- 高级筛选抽屉 -->
+    <el-drawer v-model="filterDrawer" title="高级筛选" size="384px">
+      <div class="filter-body">
+        <div class="filter-field">
+          <label>活动分类</label>
+          <el-select v-model="query.categories" multiple collapse-tags collapse-tags-tooltip placeholder="全部分类" style="width:100%">
+            <el-option v-for="option in categoryOptions" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+        </div>
+        <div class="filter-field">
+          <label>城市</label>
+          <el-input v-model="query.city" clearable placeholder="不限城市" />
+        </div>
+        <div class="filter-field">
+          <label>费用范围（元）</label>
+          <div class="filter-inline">
+            <el-input-number v-model="query.feeMin" :min="0" :step="10" placeholder="最低" controls-position="right" />
+            <span class="dash">–</span>
+            <el-input-number v-model="query.feeMax" :min="0" :step="10" placeholder="最高" controls-position="right" />
+          </div>
+        </div>
+        <div class="filter-field">
+          <label>开始时间</label>
+          <el-date-picker v-model="query.startFrom" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="从" style="width:100%" />
+          <el-date-picker v-model="query.startTo" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="到" style="width:100%;margin-top:8px" />
+        </div>
+        <div v-if="query.tab === 'NEARBY'" class="filter-field">
+          <label>附近范围 · {{ query.distanceKm }} 公里</label>
+          <el-slider v-model="query.distanceKm" :min="1" :max="50" />
+        </div>
+        <div class="filter-field">
+          <label>从模板快速发起</label>
+          <div class="tpl-chips">
+            <button type="button" v-for="template in templates" :key="template.id" class="tpl-chip" @click="filterDrawer = false; fillFromTemplate(template)">
+              {{ template.name }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="resetFilters">重置</el-button>
+        <el-button type="primary" @click="filterDrawer = false; loadActivities()">应用筛选</el-button>
+      </template>
+    </el-drawer>
 
     <!-- 地图选点弹窗 -->
     <el-dialog v-model="locationPickerVisible" title="在地图上选择位置" width="560px">
@@ -1499,23 +1570,291 @@ onMounted(async () => {
 .activity-page {
   display: flex;
   flex-direction: column;
+  gap: 18px;
+}
+
+/* ── 命令台 Hero ─────────────────────────────── */
+.discover-hero {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) 1.7fr;
+  gap: 28px;
+  align-items: center;
+  padding: 6px 2px 2px;
+}
+.hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--signal);
+}
+.hero-lead h1 {
+  font-size: 34px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 8px 0 8px;
+}
+.hero-sub { margin: 0; color: var(--ink-soft); font-size: 14px; }
+
+.hero-console {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.seg {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+.seg button {
+  border: none;
+  background: transparent;
+  padding: 7px 20px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg button:hover { color: var(--ink); }
+.seg button.on { background: var(--ink); color: var(--paper); }
+
+.hero-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  transition: border-color 0.15s ease;
+}
+.hero-search:focus-within { border-color: var(--signal); }
+.hs-icon { font-size: 14px; opacity: 0.5; }
+.hero-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink);
+  padding: 9px 2px;
+}
+.hs-go {
+  border: none;
+  background: var(--signal);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.hs-go:hover { background: var(--signal-ink); }
+
+.hero-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.tool:hover { border-color: var(--signal); color: var(--signal); }
+.tool-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--signal);
+  color: #fff;
+  border-radius: 20px;
+  padding: 1px 6px;
+}
+.tool-flex { flex: 1; }
+.tool.create { background: var(--signal); border-color: var(--signal); color: #fff; }
+.tool.create:hover { background: var(--signal-ink); border-color: var(--signal-ink); color: #fff; }
+
+/* ── 舞台 · 地图 + 列表 ────────────────────────── */
+.stage {
+  --stage-h: 648px;
+  display: grid;
+  grid-template-columns: 1.12fr 1fr;
   gap: 16px;
+  align-items: stretch;
+}
+.stage.no-map { grid-template-columns: 1fr; }
+.stage-map,
+.stage-list {
+  height: var(--stage-h);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.stage-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.stage-head h3 { margin: 0; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.stage-head h3 .dot {
+  width: 8px; height: 8px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--signal);
+  transform: rotate(-45deg);
+}
+.stage-meta { display: flex; align-items: center; gap: 10px; }
+.mono-count { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); }
+.mini {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.mini:hover { border-color: var(--signal); color: var(--signal); }
+.mini:disabled { opacity: 0.5; cursor: default; }
+
+.list-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.list-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.list-seg button i { font-style: normal; font-family: var(--font-mono); font-size: 11px; opacity: 0.65; }
+.list-seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+.stage-map .map-canvas-wrap { flex: 1 1 auto; min-height: 0; }
+.stage-map .map-canvas { height: 100%; }
+
+.pass-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+.compact-pass { padding: 12px 14px 12px 16px; }
+.compact-pass .title-row h4 { font-size: 15.5px; }
+.list-empty { padding: 40px 16px; text-align: center; color: var(--ink-faint); font-size: 14px; line-height: 1.6; }
+
+/* ── 高级筛选抽屉 ─────────────────────────────── */
+.filter-body { display: flex; flex-direction: column; gap: 20px; padding: 2px; }
+.filter-field label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+.filter-inline { display: flex; align-items: center; gap: 8px; }
+.filter-inline .dash { color: var(--ink-faint); }
+.tpl-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tpl-chip {
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  border-radius: 20px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.tpl-chip:hover { border-color: var(--signal); color: var(--signal); }
+
+@media (max-width: 1024px) {
+  .discover-hero { grid-template-columns: 1fr; gap: 16px; }
+  .stage { grid-template-columns: 1fr; }
+  .stage-map, .stage-list { height: auto; }
+  .stage-map { min-height: 380px; }
+  .pass-list { max-height: 72vh; }
 }
 
 .panel,
 .dialog-panel {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .panel {
-  padding: 16px;
+  padding: 18px;
 }
 
 .dialog-panel {
   padding: 16px;
 }
+
+.section-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-head h3::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--signal);
+  transform: rotate(-45deg);
+}
+.list-panel .section-head h3::before,
+.map-panel .section-head h3::before { display: inline-block; }
 
 .page-toolbar,
 .layout-grid,
@@ -1555,7 +1894,7 @@ onMounted(async () => {
   padding: 16px;
 }
 .sidebar-mine .section-head h3 { font-size: 14px; margin: 0; }
-.sidebar-mine .empty-hint { font-size: 13px; color: #999; padding: 8px 0; }
+.sidebar-mine .empty-hint { font-size: 13px; color: var(--ink-faint); padding: 8px 0; }
 
 .layout-grid .section-head {
   flex: 0 0 auto;
@@ -1688,7 +2027,7 @@ onMounted(async () => {
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line);
 }
 
 /* 主地图填满面板高度（配合 .map-panel .map-canvas 的 flex），并给窄屏兜底最小高度 */
@@ -1708,23 +2047,23 @@ onMounted(async () => {
 }
 
 .location-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px 14px;
-  background: #f8fbff;
+  background: var(--surface-2);
 }
 
 .location-label {
   display: block;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--ink-soft);
   margin-bottom: 6px;
 }
 
 .location-card strong {
   display: block;
   font-size: 14px;
-  color: #111827;
+  color: var(--ink);
   word-break: break-all;
 }
 
@@ -1740,25 +2079,85 @@ onMounted(async () => {
 
 .activity-card,
 .mine-card {
+  position: relative;
   width: 100%;
   text-align: left;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 14px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 15px 16px 15px 18px;
+  background: var(--surface);
   cursor: pointer;
+  /* 左侧类目脊 —— 用 inset 阴影，悬停点亮，像活动通行证的装订边 */
+  box-shadow: inset 3px 0 0 var(--line-strong);
+  transition: border-color 0.15s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
-
 .activity-card:hover,
 .mine-card:hover {
-  border-color: #409eff;
+  border-color: var(--line-strong);
+  box-shadow: inset 3px 0 0 var(--signal), var(--shadow);
+  transform: translateY(-1px);
+}
+.card-spine { display: none; }
+
+.card-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  margin-bottom: 7px;
+}
+.ce-cat { color: var(--ink); font-weight: 700; }
+.ce-sep { color: var(--ink-faint); }
+.ce-stamp {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  text-transform: uppercase;
+}
+/* 状态邮戳配色（映射 element tag type） */
+.ce-stamp.st-success { color: var(--route); background: var(--route-wash); }
+.ce-stamp.st-warning { color: var(--stamp); background: var(--stamp-wash); }
+.ce-stamp.st-danger  { color: var(--signal); background: var(--signal-wash); }
+.ce-stamp.st-info    { color: var(--ink-faint); background: var(--surface-2); }
+.ce-stamp.st-primary { color: var(--route); background: var(--route-wash); }
+.ce-stamp[class="ce-stamp"] { color: var(--ink-soft); background: var(--surface-2); }
+
+.activity-card .title-row h4 { margin: 0; font-size: 16.5px; font-weight: 700; }
+
+.meta-strip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.ms { flex: 0 0 auto; }
+.ms { display: flex; flex-direction: column; line-height: 1.25; }
+.ms b { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--ink); }
+.ms b em { font-style: normal; color: var(--ink-faint); font-weight: 400; }
+.ms i { font-style: normal; font-size: 11px; color: var(--ink-faint); }
+.ms-tags { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-end; overflow: hidden; max-height: 24px; }
+/* 卡片内标签走中性色，避免与状态邮戳争夺注意力 */
+.ms-tags .el-tag {
+  --el-tag-text-color: var(--ink-soft);
+  --el-tag-border-color: var(--line-strong);
+  --el-tag-bg-color: transparent;
 }
 
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  color: #4b5563;
+  color: var(--ink-soft);
   font-size: 14px;
 }
 
@@ -1778,11 +2177,11 @@ onMounted(async () => {
 .intro,
 .summary-content,
 .hint {
-  color: #4b5563;
+  color: var(--ink-soft);
   line-height: 1.6;
 }
 .creator-line {
-  color: #6b7280;
+  color: var(--ink-soft);
   font-size: 13px;
   margin: 4px 0 8px;
 }
@@ -1792,12 +2191,12 @@ onMounted(async () => {
 }
 
 .muted {
-  color: #6b7280;
+  color: var(--ink-soft);
   font-size: 14px;
 }
 
 .kv-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
   display: flex;
@@ -1811,7 +2210,7 @@ onMounted(async () => {
   letter-spacing: 1px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: #f3f4f6;
+  background: var(--surface-2);
 }
 
 .qr-image {
@@ -1827,7 +2226,7 @@ onMounted(async () => {
 }
 
 .image-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   display: flex;
@@ -1840,21 +2239,21 @@ onMounted(async () => {
   height: 160px;
   object-fit: cover;
   border-radius: 6px;
-  background: #f3f4f6;
+  background: var(--surface-2);
 }
 
 .image-meta {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  color: #4b5563;
+  color: var(--ink-soft);
   font-size: 14px;
 }
 
 .table-row {
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--line);
 }
 
 .wrap {
