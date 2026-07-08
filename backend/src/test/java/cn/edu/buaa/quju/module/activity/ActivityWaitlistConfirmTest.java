@@ -1,10 +1,12 @@
 package cn.edu.buaa.quju.module.activity;
 
 import cn.edu.buaa.quju.common.JwtUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -32,6 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ActivityWaitlistConfirmTest {
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
@@ -94,7 +98,9 @@ class ActivityWaitlistConfirmTest {
 
     private org.springframework.test.web.servlet.ResultActions signup(long activityId, long userId) throws Exception {
         return mockMvc.perform(post("/v1/activities/" + activityId + "/signup")
-                .header("Authorization", "Bearer " + jwtUtil.generate(userId)));
+                .header("Authorization", "Bearer " + jwtUtil.generate(userId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of("safetyConfirmed", true))));
     }
 
     private org.springframework.test.web.servlet.ResultActions confirm(long activityId, long userId) throws Exception {
