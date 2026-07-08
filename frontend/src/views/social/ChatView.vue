@@ -555,37 +555,46 @@ onBeforeUnmount(() => {
       <el-button type="primary" :loading="sending" :disabled="aiReplyLoading" @click="send">发送</el-button>
     </div>
 
-    <el-dialog v-model="showAiDialog" title="AI 回复助手" width="560px" @closed="closeAiAssistant">
-      <div class="ai-helper">
-        <p class="ai-hint">空着草稿就会先生成一版；已有草稿时会按下面的要求继续改写。按 <b>Ctrl/Cmd+J</b> 可打开，打开后再按一次会直接改写。</p>
-        <div v-if="aiFocusMessage" class="ai-focus">
-          <div class="ai-focus-head">
-            <span class="ai-focus-label">重点回复</span>
-            <el-button text size="small" @click="clearAiFocusMessage">清除</el-button>
+    <transition name="ai-sheet">
+      <section v-if="showAiDialog" class="ai-sheet" aria-label="AI 回复助手">
+        <div class="ai-sheet-head">
+          <div>
+            <div class="ai-sheet-title">AI 回复助手</div>
+            <div class="ai-sheet-subtitle">基于当前会话直接改写，保留页面语境，不打断聊天流。</div>
           </div>
-          <div class="ai-focus-meta">
-            {{ aiFocusMessage && isMine(aiFocusMessage) ? (auth.user?.nickname || '我') : getMemberName(aiFocusMessage.senderId) }}
-            · {{ aiFocusMessage.contentType }}
-            · {{ aiFocusMessage.createdAt?.slice(11, 16) }}
-          </div>
-          <div class="ai-focus-content">
-            {{ describeMessage(aiFocusMessage) }}
+          <div class="ai-sheet-actions">
+            <el-button text size="small" @click="showAiDialog = false">收起</el-button>
+            <el-button type="primary" :loading="aiReplyLoading" @click="executeAiReply">生成 / 改写</el-button>
           </div>
         </div>
-        <el-form label-position="top" @submit.prevent>
-          <el-form-item label="当前草稿">
-            <el-input v-model="aiDraftText" type="textarea" :rows="5" placeholder="AI 会基于这段内容继续改写；留空则生成新草稿" />
-          </el-form-item>
-          <el-form-item label="本次修改要求">
-            <el-input v-model="aiInstruction" type="textarea" :rows="4" placeholder="例如：更委婉一点 / 语气更像朋友 / 短一点，适合发给同事" />
-          </el-form-item>
-        </el-form>
-      </div>
-      <template #footer>
-        <el-button @click="showAiDialog = false">取消</el-button>
-        <el-button type="primary" :loading="aiReplyLoading" @click="executeAiReply">生成 / 改写</el-button>
-      </template>
-    </el-dialog>
+        <div class="ai-sheet-body">
+          <div v-if="aiFocusMessage" class="ai-focus">
+            <div class="ai-focus-head">
+              <span class="ai-focus-label">重点回复</span>
+              <el-button text size="small" @click="clearAiFocusMessage">清除</el-button>
+            </div>
+            <div class="ai-focus-meta">
+              {{ aiFocusMessage && isMine(aiFocusMessage) ? (auth.user?.nickname || '我') : getMemberName(aiFocusMessage.senderId) }}
+              · {{ aiFocusMessage.contentType }}
+              · {{ aiFocusMessage.createdAt?.slice(11, 16) }}
+            </div>
+            <div class="ai-focus-content">
+              {{ describeMessage(aiFocusMessage) }}
+            </div>
+          </div>
+          <div class="ai-sheet-grid">
+            <div class="ai-field">
+              <label class="ai-field-label">当前草稿</label>
+              <el-input v-model="aiDraftText" type="textarea" :rows="4" placeholder="留空则直接生成一版" />
+            </div>
+            <div class="ai-field">
+              <label class="ai-field-label">本次修改要求</label>
+              <el-input v-model="aiInstruction" type="textarea" :rows="4" placeholder="例如：更委婉一点 / 短一点 / 语气更像朋友" />
+            </div>
+          </div>
+        </div>
+      </section>
+    </transition>
 
     <div v-if="showEmoji" class="emoji-panel">
       <span v-for="e in emojis" :key="e" class="emoji-item" @click="insertEmoji(e)">{{ e }}</span>
@@ -701,7 +710,29 @@ onBeforeUnmount(() => {
 .at-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; color: var(--ink); }
 .at-menu-item:hover { background: var(--surface-2); }
 .at-all { font-weight: 600; color: var(--signal); }
-.ai-helper { display: flex; flex-direction: column; gap: 12px; }
+.ai-sheet {
+  margin: 0 16px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,247,244,0.98));
+  box-shadow: var(--shadow-hover);
+  overflow: hidden;
+}
+.ai-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ai-sheet-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.ai-sheet-subtitle { margin-top: 3px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+.ai-sheet-actions { display: flex; align-items: center; gap: 8px; }
+.ai-sheet-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px 14px; }
+.ai-sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ai-field { display: flex; flex-direction: column; gap: 6px; }
+.ai-field-label { font-size: 12px; color: var(--ink-soft); }
 .ai-hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--ink-soft); }
 .ai-focus {
   border: 1px solid var(--line);
@@ -721,4 +752,27 @@ onBeforeUnmount(() => {
 .ai-focus-label { font-size: 12px; font-weight: 600; color: var(--signal); }
 .ai-focus-meta { font-size: 11px; color: var(--ink-soft); }
 .ai-focus-content { font-size: 13px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+
+.ai-sheet-enter-active,
+.ai-sheet-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease, max-height 0.18s ease;
+}
+.ai-sheet-enter-from,
+.ai-sheet-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+  max-height: 0;
+}
+.ai-sheet-enter-to,
+.ai-sheet-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 420px;
+}
+
+@media (max-width: 720px) {
+  .ai-sheet { margin: 0 12px 10px; }
+  .ai-sheet-head { align-items: flex-start; flex-direction: column; }
+  .ai-sheet-grid { grid-template-columns: 1fr; }
+}
 </style>
