@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -57,7 +58,8 @@ class MessageAiReplyControllerTest {
                         .addValue("id", userId)
                         .addValue("settings", "{\"showActivities\":true,\"showTeams\":true,\"aiSettings\":{\"systemPrompt\":\"礼貌一点\"}}"));
 
-        when(chatAiService.generateReply(eq("礼貌一点"), contains("周六下午去吗"))).thenReturn("好的，那我周六两点见。");
+        when(chatAiService.generateReply(eq("礼貌一点"), contains("周六下午去吗"), isNull(), isNull()))
+                .thenReturn("好的，那我周六两点见。");
 
         mockMvc.perform(post("/v1/messages/ai-reply")
                         .header("Authorization", "Bearer " + jwtUtil.generate(userId))
@@ -68,7 +70,48 @@ class MessageAiReplyControllerTest {
                 .andExpect(jsonPath("$.data.suggestion").value("好的，那我周六两点见。"))
                 .andExpect(jsonPath("$.data.contextCount").value(2));
 
-        verify(chatAiService).generateReply(eq("礼貌一点"), contains("小王"));
+        verify(chatAiService).generateReply(eq("礼貌一点"), contains("小王"), isNull(), isNull());
+    }
+
+    @Test
+    void friendConversationCanRewriteExistingDraft() throws Exception {
+        long userId = insertUser("我");
+        long peerId = insertUser("小王");
+        insertFriendship(userId, peerId);
+        insertFriendship(peerId, userId);
+        insertMessage("FRIEND", userId, peerId, null, "TEXT", "周六下午去吗？");
+        insertMessage("FRIEND", peerId, userId, null, "TEXT", "可以，我两点到。");
+        namedJdbcTemplate.update(
+                "update user set privacy_settings = :settings where id = :id",
+                new MapSqlParameterSource()
+                        .addValue("id", userId)
+                        .addValue("settings", "{\"showActivities\":true,\"showTeams\":true,\"aiSettings\":{\"systemPrompt\":\"礼貌一点\"}}"));
+
+        when(chatAiService.generateReply(
+                eq("礼貌一点"),
+                contains("当前用户"),
+                eq("那我周六两点去接你"),
+                eq("更自然一点，顺便把语气放轻松")))
+                .thenReturn("那我周六两点去接你，路上见。");
+
+        mockMvc.perform(post("/v1/messages/ai-reply")
+                        .header("Authorization", "Bearer " + jwtUtil.generate(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "scope", "FRIEND",
+                                "peerId", peerId,
+                                "draftText", "那我周六两点去接你",
+                                "instruction", "更自然一点，顺便把语气放轻松"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.suggestion").value("那我周六两点去接你，路上见。"))
+                .andExpect(jsonPath("$.data.contextCount").value(2));
+
+        verify(chatAiService).generateReply(
+                eq("礼貌一点"),
+                contains("周六下午去吗"),
+                eq("那我周六两点去接你"),
+                eq("更自然一点，顺便把语气放轻松"));
     }
 
     @Test

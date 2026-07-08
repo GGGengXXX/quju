@@ -40,6 +40,10 @@ const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
 const aiReplyLoading = ref(false)
+const composerAutosize = { minRows: 2, maxRows: 6 }
+const showAiDialog = ref(false)
+const aiDraftText = ref('')
+const aiInstruction = ref('')
 const showEmoji = ref(false)
 const showLocationPicker = ref(false)
 const locationPickerRef = ref<HTMLElement | null>(null)
@@ -130,20 +134,44 @@ async function send() {
   }
 }
 
-async function requestAiReply() {
+function onComposerKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    send()
+  }
+}
+
+function openAiAssistant() {
+  aiDraftText.value = inputText.value.trim()
+  showAiDialog.value = true
+}
+
+function closeAiAssistant() {
+  showAiDialog.value = false
+}
+
+async function executeAiReply() {
   if (aiReplyLoading.value) return
   aiReplyLoading.value = true
   try {
-    const result = await socialApi.generateAiReply({ scope, peerId })
+    const draftText = aiDraftText.value.trim()
+    const instruction = aiInstruction.value.trim()
+    const result = await socialApi.generateAiReply({
+      scope,
+      peerId,
+      draftText: draftText || undefined,
+      instruction: instruction || undefined,
+    })
     const suggestion = result.suggestion?.trim()
     if (!suggestion) {
       ElMessage.warning('AI 暂时没有给出可用回复')
       return
     }
-    inputText.value = inputText.value.trim() ? `${inputText.value.trim()}\n${suggestion}` : suggestion
+    inputText.value = suggestion
+    aiDraftText.value = suggestion
     await nextTick()
-    inputRef.value?.focus?.()
-    ElMessage.success(`AI 已生成回复草稿，参考了最近 ${result.contextCount || 0} 条消息`)
+    ElMessage.success(`AI 已${draftText ? '改写' : '生成'}回复草稿，参考了最近 ${result.contextCount || 0} 条消息`)
   } catch {
     // handled by interceptor
   } finally {
@@ -417,7 +445,13 @@ function truncName(name: string) {
 function handleKeydown(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'j') {
     event.preventDefault()
-    requestAiReply()
+    if (showAiDialog.value) executeAiReply()
+    else openAiAssistant()
+    return
+  }
+  if (showAiDialog.value && (event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault()
+    executeAiReply()
   }
 }
 
@@ -478,9 +512,20 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="chat-input">
-      <el-input ref="inputRef" v-model="inputText" placeholder="输入消息...（群聊中输入@提醒成员）" @keyup.enter="send" @input="onInputChange" :disabled="sending || aiReplyLoading" />
-      <el-tooltip content="AI 回复草稿 (Ctrl/Cmd+J)" placement="top">
-        <el-button class="ai-btn" :loading="aiReplyLoading" @click="requestAiReply">AI</el-button>
+      <el-input
+        ref="inputRef"
+        v-model="inputText"
+        type="textarea"
+        :autosize="composerAutosize"
+        resize="none"
+        class="chat-composer"
+        placeholder="输入消息...（Enter 发送，Shift+Enter 换行）"
+        @keydown="onComposerKeydown"
+        @input="onInputChange"
+        :disabled="sending || aiReplyLoading"
+      />
+      <el-tooltip content="AI 改写/生成 (Ctrl/Cmd+J)" placement="top">
+        <el-button class="ai-btn" :loading="aiReplyLoading" @click="openAiAssistant">AI</el-button>
       </el-tooltip>
       <span class="emoji-btn" @click="showEmoji = !showEmoji">😊</span>
       <span class="img-btn" @click="sendLocation" title="发送位置">📍</span>
@@ -490,6 +535,25 @@ onBeforeUnmount(() => {
       </label>
       <el-button type="primary" :loading="sending" :disabled="aiReplyLoading" @click="send">发送</el-button>
     </div>
+
+    <el-dialog v-model="showAiDialog" title="AI 回复助手" width="560px" @closed="closeAiAssistant">
+      <div class="ai-helper">
+        <p class="ai-hint">空着草稿就会先生成一版；已有草稿时会按下面的要求继续改写。按 <b>Ctrl/Cmd+J</b> 可打开，打开后再按一次会直接改写。</p>
+        <el-form label-position="top" @submit.prevent>
+          <el-form-item label="当前草稿">
+            <el-input v-model="aiDraftText" type="textarea" :rows="5" placeholder="AI 会基于这段内容继续改写；留空则生成新草稿" />
+          </el-form-item>
+          <el-form-item label="本次修改要求">
+            <el-input v-model="aiInstruction" type="textarea" :rows="4" placeholder="例如：更委婉一点 / 语气更像朋友 / 短一点，适合发给同事" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="showAiDialog = false">取消</el-button>
+        <el-button type="primary" :loading="aiReplyLoading" @click="executeAiReply">生成 / 改写</el-button>
+      </template>
+    </el-dialog>
+
     <div v-if="showEmoji" class="emoji-panel">
       <span v-for="e in emojis" :key="e" class="emoji-item" @click="insertEmoji(e)">{{ e }}</span>
     </div>
@@ -562,15 +626,21 @@ onBeforeUnmount(() => {
 .read-status.read { color: var(--route); }
 .bubble {
   display: inline-block; padding: 10px 14px; border-radius: 14px; font-size: 14px;
-  word-break: break-word; line-height: 1.5; box-shadow: var(--shadow);
+  white-space: pre-wrap; word-break: break-word; line-height: 1.5; box-shadow: var(--shadow);
 }
 .mine .bubble { background: var(--ink); color: var(--paper); border-bottom-right-radius: 5px; }
 .theirs .bubble { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
 .recalled { font-size: 12px; color: var(--ink-faint); font-style: italic; padding: 4px 0; }
 .msg-img { max-width: 220px; border-radius: 10px; display: block; }
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface); }
-.chat-input .el-input { flex: 1; }
-.ai-btn { min-width: 56px; }
+.chat-input .chat-composer { flex: 1; }
+.chat-input .chat-composer :deep(textarea) {
+  min-height: 52px;
+  max-height: 168px;
+  line-height: 1.55;
+  overflow-y: auto;
+}
+.ai-btn { min-width: 72px; }
 .img-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 8px; }
 .img-btn:hover { background: var(--surface-2); }
 .emoji-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 8px; }
@@ -597,4 +667,6 @@ onBeforeUnmount(() => {
 .at-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; color: var(--ink); }
 .at-menu-item:hover { background: var(--surface-2); }
 .at-all { font-weight: 600; color: var(--signal); }
+.ai-helper { display: flex; flex-direction: column; gap: 12px; }
+.ai-hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--ink-soft); }
 </style>

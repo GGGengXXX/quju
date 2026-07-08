@@ -297,6 +297,12 @@ paths:
       responses: { '200': { $ref: '#/components/responses/Ok' } }
   /messages/read:
     post: { tags: [chat], summary: 标记已读, requestBody: { content: { application/json: { schema: { type: object, properties: { scope: { type: string }, peerId: { type: integer, format: int64 } } } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /messages/ai-reply:
+    post:
+      tags: [chat]
+      summary: 基于会话上下文生成或改写 AI 回复草稿
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GenerateAiReplyRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/AiReplySuggestionResp' } }
   /messages/{id}/recall:
     post: { tags: [chat], summary: 撤回(2分钟内), parameters: [{ $ref: '#/components/parameters/PathId' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
   /messages/{id}/forward:
@@ -464,6 +470,9 @@ components:
     LoginResp:
       description: 登录结果
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/LoginResult' } } }] } } }
+    AiReplySuggestionResp:
+      description: 聊天 AI 建议回复
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/AiReplySuggestion' } } }] } } }
     ActivityResp:
       description: 活动
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/Activity' } } }] } } }
@@ -512,6 +521,7 @@ components:
     TeamRole: { type: string, enum: [OWNER, ADMIN, MEMBER] }
     TeamJoinType: { type: string, enum: [PUBLIC, APPROVAL] }
     MessageContentType: { type: string, enum: [TEXT, EMOJI, IMAGE, LOCATION] }
+    MessageScope: { type: string, enum: [FRIEND, TEAM] }
 
     # ---- 实体 / DTO ----
     UserBrief:
@@ -532,6 +542,8 @@ components:
             signature: { type: string }
             interestTags: { type: array, items: { type: string } }
             reputation: { type: integer }
+            privacySettings: { type: object, additionalProperties: { type: boolean } }
+            aiSettings: { $ref: '#/components/schemas/UserAiSettings' }
     RegisterRequest:
       type: object
       required: [email, password, userType]
@@ -560,6 +572,12 @@ components:
         birthday: { type: string, format: date }
         signature: { type: string }
         interestTags: { type: array, items: { type: string } }
+        privacySettings: { type: object, additionalProperties: { type: boolean } }
+        aiSettings: { $ref: '#/components/schemas/UserAiSettings' }
+    UserAiSettings:
+      type: object
+      properties:
+        systemPrompt: { type: string, maxLength: 1000, description: 用户个人 AI 回复助手提示词 }
     MerchantApplyRequest:
       type: object
       required: [merchantName]
@@ -654,6 +672,19 @@ components:
         peerId: { type: integer, format: int64, description: FRIEND=对方userId / TEAM=teamId }
         contentType: { $ref: '#/components/schemas/MessageContentType' }
         content: { type: string }
+    GenerateAiReplyRequest:
+      type: object
+      required: [scope, peerId]
+      properties:
+        scope: { $ref: '#/components/schemas/MessageScope' }
+        peerId: { type: integer, format: int64, description: FRIEND=对方userId / TEAM=teamId }
+        draftText: { type: string, maxLength: 2000, description: 当前草稿；留空表示首次生成 }
+        instruction: { type: string, maxLength: 500, description: 本次修改要求；留空表示按上下文和草稿默认改写 }
+    AiReplySuggestion:
+      type: object
+      properties:
+        suggestion: { type: string, description: AI 生成的建议回复草稿 }
+        contextCount: { type: integer, description: 实际使用的上下文消息条数 }
     TeamUpsertRequest:
       type: object
       required: [name, joinType]

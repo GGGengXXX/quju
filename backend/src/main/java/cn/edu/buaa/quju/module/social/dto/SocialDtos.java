@@ -2,6 +2,7 @@ package cn.edu.buaa.quju.module.social.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 public final class SocialDtos {
@@ -50,7 +51,9 @@ public final class SocialDtos {
 
     public record GenerateAiReplyReq(
             @NotBlank String scope,
-            @NotNull Long peerId) {}
+            @NotNull Long peerId,
+            @Size(max = 2000) String draftText,
+            @Size(max = 500) String instruction) {}
 
     public record AiReplySuggestionVO(
             String suggestion,

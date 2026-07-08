@@ -58,6 +58,13 @@ export interface AiReplySuggestion {
   contextCount: number
 }
 
+export interface GenerateAiReplyRequest {
+  scope: string
+  peerId: number
+  draftText?: string
+  instruction?: string
+}
+
 export interface PageResult<T> {
   total: number
   page: number
@@ -141,7 +148,7 @@ export const socialApi = {
   markRead: (data: { scope: string; peerId: number }) =>
     http.post<any, void>('/messages/read', data),
 
-  generateAiReply: (data: { scope: string; peerId: number }) =>
+  generateAiReply: (data: GenerateAiReplyRequest) =>
     http.post<any, AiReplySuggestion>('/messages/ai-reply', data),
 
   recallMessage: (id: number) =>
