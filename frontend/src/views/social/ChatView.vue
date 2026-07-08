@@ -40,7 +40,7 @@ const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
 const aiReplyLoading = ref(false)
-const composerAutosize = { minRows: 2, maxRows: 6 }
+const composerAutosize = { minRows: 1, maxRows: 8 }
 const showAiDialog = ref(false)
 const aiDraftText = ref('')
 const aiInstruction = ref('')
@@ -669,8 +669,8 @@ onBeforeUnmount(() => {
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface); }
 .chat-input .chat-composer { flex: 1; }
 .chat-input .chat-composer :deep(textarea) {
-  min-height: 52px;
-  max-height: 168px;
+  min-height: 34px;
+  max-height: 212px;
   line-height: 1.55;
   overflow-y: auto;
 }
