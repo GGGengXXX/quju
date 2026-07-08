@@ -146,7 +146,7 @@ class AdminReportHandleTest {
         KeyHolder kh = new GeneratedKeyHolder();
         namedJdbcTemplate.update(
                 "insert into admin(username, password_hash) values (:username, 'noop')",
-                new MapSqlParameterSource().addValue("username", "admin-" + UUID.randomUUID()),
+                new MapSqlParameterSource().addValue("username", "adm-" + UUID.randomUUID().toString().substring(0, 8)),
                 kh, new String[]{"id"});
         return kh.getKey().longValue();
     }

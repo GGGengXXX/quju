@@ -53,6 +53,11 @@ export interface MessageVO {
   readCount?: number
 }
 
+export interface AiReplySuggestion {
+  suggestion: string
+  contextCount: number
+}
+
 export interface PageResult<T> {
   total: number
   page: number
@@ -135,6 +140,9 @@ export const socialApi = {
 
   markRead: (data: { scope: string; peerId: number }) =>
     http.post<any, void>('/messages/read', data),
+
+  generateAiReply: (data: { scope: string; peerId: number }) =>
+    http.post<any, AiReplySuggestion>('/messages/ai-reply', data),
 
   recallMessage: (id: number) =>
     http.post<any, void>(`/messages/${id}/recall`),

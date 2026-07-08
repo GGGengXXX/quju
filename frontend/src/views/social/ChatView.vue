@@ -39,6 +39,7 @@ const messages = ref<MessageVO[]>([])
 const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
+const aiReplyLoading = ref(false)
 const showEmoji = ref(false)
 const showLocationPicker = ref(false)
 const locationPickerRef = ref<HTMLElement | null>(null)
@@ -126,6 +127,27 @@ async function send() {
     scrollToBottom()
   } finally {
     sending.value = false
+  }
+}
+
+async function requestAiReply() {
+  if (aiReplyLoading.value) return
+  aiReplyLoading.value = true
+  try {
+    const result = await socialApi.generateAiReply({ scope, peerId })
+    const suggestion = result.suggestion?.trim()
+    if (!suggestion) {
+      ElMessage.warning('AI 暂时没有给出可用回复')
+      return
+    }
+    inputText.value = inputText.value.trim() ? `${inputText.value.trim()}\n${suggestion}` : suggestion
+    await nextTick()
+    inputRef.value?.focus?.()
+    ElMessage.success(`AI 已生成回复草稿，参考了最近 ${result.contextCount || 0} 条消息`)
+  } catch {
+    // handled by interceptor
+  } finally {
+    aiReplyLoading.value = false
   }
 }
 
@@ -392,15 +414,24 @@ function truncName(name: string) {
   return name
 }
 
+function handleKeydown(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'j') {
+    event.preventDefault()
+    requestAiReply()
+  }
+}
+
 onMounted(() => {
   loadPeerInfo()
   loadMessages()
   connectWebSocket()
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   ws?.close()
   ws = null
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -447,14 +478,17 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="chat-input">
-      <el-input ref="inputRef" v-model="inputText" placeholder="输入消息...（群聊中输入@提醒成员）" @keyup.enter="send" @input="onInputChange" :disabled="sending" />
+      <el-input ref="inputRef" v-model="inputText" placeholder="输入消息...（群聊中输入@提醒成员）" @keyup.enter="send" @input="onInputChange" :disabled="sending || aiReplyLoading" />
+      <el-tooltip content="AI 回复草稿 (Ctrl/Cmd+J)" placement="top">
+        <el-button class="ai-btn" :loading="aiReplyLoading" @click="requestAiReply">AI</el-button>
+      </el-tooltip>
       <span class="emoji-btn" @click="showEmoji = !showEmoji">😊</span>
       <span class="img-btn" @click="sendLocation" title="发送位置">📍</span>
       <label class="img-btn">
         <span>📷</span>
-        <input type="file" accept="image/*" hidden @change="sendImage" :disabled="sending" />
+        <input type="file" accept="image/*" hidden @change="sendImage" :disabled="sending || aiReplyLoading" />
       </label>
-      <el-button type="primary" :loading="sending" @click="send">发送</el-button>
+      <el-button type="primary" :loading="sending" :disabled="aiReplyLoading" @click="send">发送</el-button>
     </div>
     <div v-if="showEmoji" class="emoji-panel">
       <span v-for="e in emojis" :key="e" class="emoji-item" @click="insertEmoji(e)">{{ e }}</span>
@@ -536,6 +570,7 @@ onBeforeUnmount(() => {
 .msg-img { max-width: 220px; border-radius: 10px; display: block; }
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface); }
 .chat-input .el-input { flex: 1; }
+.ai-btn { min-width: 56px; }
 .img-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 8px; }
 .img-btn:hover { background: var(--surface-2); }
 .emoji-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 8px; }

@@ -3,6 +3,7 @@ package cn.edu.buaa.quju.module.user.service;
 import cn.edu.buaa.quju.common.BizException;
 import cn.edu.buaa.quju.common.ErrorCode;
 import cn.edu.buaa.quju.module.user.dto.UserDtos;
+import cn.edu.buaa.quju.module.user.dto.UserDtos.UserAiSettings;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UpdateProfileReq;
 import cn.edu.buaa.quju.module.user.dto.UserDtos.UserVO;
 import cn.edu.buaa.quju.module.user.entity.User;
@@ -10,21 +11,29 @@ import cn.edu.buaa.quju.module.user.entity.UserInterestTag;
 import cn.edu.buaa.quju.module.user.mapper.UserInterestTagMapper;
 import cn.edu.buaa.quju.module.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class UserService {
+    private static final Map<String, Boolean> DEFAULT_PRIVACY = Map.of("showActivities", true, "showTeams", true);
+
     private final UserMapper userMapper;
     private final UserInterestTagMapper tagMapper;
+    private final ObjectMapper objectMapper;
 
-    public UserService(UserMapper userMapper, UserInterestTagMapper tagMapper) {
+    public UserService(UserMapper userMapper, UserInterestTagMapper tagMapper, ObjectMapper objectMapper) {
         this.userMapper = userMapper;
         this.tagMapper = tagMapper;
+        this.objectMapper = objectMapper;
     }
 
     public UserVO getProfile(long userId) {
@@ -58,10 +67,8 @@ public class UserService {
         if (req.gender() != null) u.setGender(req.gender());
         if (req.birthday() != null) u.setBirthday(req.birthday());
         if (req.signature() != null) u.setSignature(req.signature());
-        if (req.privacySettings() != null) {
-            try {
-                u.setPrivacySettings(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(req.privacySettings()));
-            } catch (Exception ignored) {}
+        if (req.privacySettings() != null || req.aiSettings() != null) {
+            u.setPrivacySettings(mergeSettingsJson(u.getPrivacySettings(), req.privacySettings(), req.aiSettings()));
         }
         userMapper.updateById(u);
 
@@ -95,19 +102,39 @@ public class UserService {
                 Wrappers.<UserInterestTag>lambdaQuery().eq(UserInterestTag::getUserId, u.getId()))
                 .stream().map(UserInterestTag::getTag).collect(Collectors.toList());
         Map<String, Boolean> privacy = parsePrivacy(u.getPrivacySettings());
+        UserAiSettings aiSettings = parseAiSettings(u.getPrivacySettings());
         return new UserVO(u.getId(), u.getAccountId(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getUserType(),
-                u.getStatus(), u.getGender(), u.getBirthday(), u.getSignature(), u.getReputation(), tags, privacy);
+                u.getStatus(), u.getGender(), u.getBirthday(), u.getSignature(), u.getReputation(), tags, privacy, aiSettings);
     }
 
     Map<String, Boolean> parsePrivacy(String json) {
-        if (json == null || json.isBlank()) return Map.of("showActivities", true, "showTeams", true);
+        if (json == null || json.isBlank()) return DEFAULT_PRIVACY;
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Boolean> map = new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Map.class);
-            return map;
+            JsonNode root = objectMapper.readTree(json);
+            Map<String, Boolean> privacy = new LinkedHashMap<>(DEFAULT_PRIVACY);
+            if (root.has("showActivities")) privacy.put("showActivities", root.path("showActivities").asBoolean(true));
+            if (root.has("showTeams")) privacy.put("showTeams", root.path("showTeams").asBoolean(true));
+            return privacy;
         } catch (Exception e) {
-            return Map.of("showActivities", true, "showTeams", true);
+            return DEFAULT_PRIVACY;
         }
+    }
+
+    UserAiSettings parseAiSettings(String json) {
+        if (json == null || json.isBlank()) return new UserAiSettings(null);
+        try {
+            JsonNode node = objectMapper.readTree(json).path("aiSettings");
+            if (node.isMissingNode() || node.isNull()) return new UserAiSettings(null);
+            String systemPrompt = node.path("systemPrompt").asText(null);
+            return new UserAiSettings(normalizeSystemPrompt(systemPrompt));
+        } catch (Exception e) {
+            return new UserAiSettings(null);
+        }
+    }
+
+    public UserAiSettings getAiSettings(long userId) {
+        User u = requireUser(userId);
+        return parseAiSettings(u.getPrivacySettings());
     }
 
     public boolean isPrivacyAllowed(long userId, String key) {
@@ -122,5 +149,46 @@ public class UserService {
                 .eq(User::getAccountId, accountId).isNull(User::getDeletedAt));
         if (u == null) throw new BizException(ErrorCode.NOT_FOUND);
         return new UserDtos.UserBrief(u.getId(), u.getAccountId(), u.getNickname(), u.getAvatar(), u.getUserType(), u.getStatus());
+    }
+
+    private String mergeSettingsJson(String currentJson, Map<String, Boolean> privacySettings, UserAiSettings aiSettings) {
+        ObjectNode root = readSettingsNode(currentJson);
+        if (privacySettings != null) {
+            root.put("showActivities", privacySettings.getOrDefault("showActivities", true));
+            root.put("showTeams", privacySettings.getOrDefault("showTeams", true));
+        } else {
+            Map<String, Boolean> privacy = parsePrivacy(currentJson);
+            root.put("showActivities", privacy.getOrDefault("showActivities", true));
+            root.put("showTeams", privacy.getOrDefault("showTeams", true));
+        }
+        if (aiSettings != null) {
+            String systemPrompt = normalizeSystemPrompt(aiSettings.systemPrompt());
+            ObjectNode aiNode = root.with("aiSettings");
+            if (systemPrompt == null) aiNode.remove("systemPrompt");
+            else aiNode.put("systemPrompt", systemPrompt);
+            if (aiNode.isEmpty()) root.remove("aiSettings");
+        }
+        try {
+            return objectMapper.writeValueAsString(root);
+        } catch (Exception e) {
+            throw new BizException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
+    private ObjectNode readSettingsNode(String currentJson) {
+        if (currentJson == null || currentJson.isBlank()) return objectMapper.createObjectNode();
+        try {
+            JsonNode root = objectMapper.readTree(currentJson);
+            if (root instanceof ObjectNode objectNode) return objectNode.deepCopy();
+        } catch (Exception ignored) {}
+        return objectMapper.createObjectNode();
+    }
+
+    private String normalizeSystemPrompt(String systemPrompt) {
+        if (systemPrompt == null) return null;
+        String normalized = systemPrompt.trim();
+        if (normalized.isEmpty()) return null;
+        if (normalized.length() > 1000) throw new BizException(ErrorCode.BAD_REQUEST, "system_prompt_too_long");
+        return normalized;
     }
 }
