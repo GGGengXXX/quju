@@ -4,10 +4,6 @@
 # 部署分支可用 DEPLOY_BRANCH 覆盖（默认 master）。也可手动执行：bash deploy/deploy.sh
 set -euo pipefail
 
-# 启用 BuildKit 以支持 Dockerfile 的 cache mount，加速重复部署。
-export DOCKER_BUILDKIT=1
-export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
-
 REPO_DIR="${REPO_DIR:-/srv/quju/main}"
 COMPOSE="docker compose -f deploy/docker-compose.yml --env-file deploy/.env"
 
