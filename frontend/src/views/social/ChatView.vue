@@ -40,6 +40,7 @@ const loading = ref(false)
 const inputText = ref('')
 const sending = ref(false)
 const aiReplyLoading = ref(false)
+const composerAutosize = { minRows: 2, maxRows: 6 }
 const showAiDialog = ref(false)
 const aiDraftText = ref('')
 const aiInstruction = ref('')
@@ -130,6 +131,14 @@ async function send() {
     scrollToBottom()
   } finally {
     sending.value = false
+  }
+}
+
+function onComposerKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    send()
   }
 }
 
@@ -503,7 +512,18 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="chat-input">
-      <el-input ref="inputRef" v-model="inputText" placeholder="输入消息...（群聊中输入@提醒成员）" @keyup.enter="send" @input="onInputChange" :disabled="sending || aiReplyLoading" />
+      <el-input
+        ref="inputRef"
+        v-model="inputText"
+        type="textarea"
+        :autosize="composerAutosize"
+        resize="none"
+        class="chat-composer"
+        placeholder="输入消息...（Enter 发送，Shift+Enter 换行）"
+        @keydown="onComposerKeydown"
+        @input="onInputChange"
+        :disabled="sending || aiReplyLoading"
+      />
       <el-tooltip content="AI 改写/生成 (Ctrl/Cmd+J)" placement="top">
         <el-button class="ai-btn" :loading="aiReplyLoading" @click="openAiAssistant">AI</el-button>
       </el-tooltip>
@@ -606,14 +626,20 @@ onBeforeUnmount(() => {
 .read-status.read { color: var(--route); }
 .bubble {
   display: inline-block; padding: 10px 14px; border-radius: 14px; font-size: 14px;
-  word-break: break-word; line-height: 1.5; box-shadow: var(--shadow);
+  white-space: pre-wrap; word-break: break-word; line-height: 1.5; box-shadow: var(--shadow);
 }
 .mine .bubble { background: var(--ink); color: var(--paper); border-bottom-right-radius: 5px; }
 .theirs .bubble { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
 .recalled { font-size: 12px; color: var(--ink-faint); font-style: italic; padding: 4px 0; }
 .msg-img { max-width: 220px; border-radius: 10px; display: block; }
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface); }
-.chat-input .el-input { flex: 1; }
+.chat-input .chat-composer { flex: 1; }
+.chat-input .chat-composer :deep(textarea) {
+  min-height: 52px;
+  max-height: 168px;
+  line-height: 1.55;
+  overflow-y: auto;
+}
 .ai-btn { min-width: 72px; }
 .img-btn { cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 8px; }
 .img-btn:hover { background: var(--surface-2); }
