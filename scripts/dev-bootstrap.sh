@@ -3,11 +3,11 @@
 # 用法: scripts/dev-bootstrap.sh <dev-name> <feature-slug> [module]
 # 例:   scripts/dev-bootstrap.sh zhangsan activity-map activity
 #
-# 个人 CodeArts push 凭证(每人不同)——运行前先 export(只需一次/会话):
-#   export CODEARTS_USER='你的账号/用户名'   # 形如 DeNeRATe-cool/DeNeRATe-cool
-#   export CODEARTS_PASS='你的代码托管HTTPS密码'
+# 个人 GitHub push 凭证(每人不同)——运行前先 export(只需一次/会话):
+#   export GITHUB_USER='你的 GitHub 用户名'
+#   export GITHUB_TOKEN='你的 GitHub Personal Access Token'
 #   export GIT_EMAIL='你的邮箱'              # 提交归属
-# 不设也能跑：push 回退到服务器共享凭证(提交作者仍按 user.name/email)。
+# 不设也能跑：但 push 前你需要自行配置凭证。
 #
 # 设计: 每 feature 一个独立 clone(CentOS7 git 1.8 无 worktree)；从 origin/dev 切分支；
 #   建独立库 quju_dev_* 并导入 contracts/schema.sql；.env 的共享密钥自动取自 /root/quju/project-secrets.env。
@@ -20,8 +20,8 @@ MODULE="${3:-misc}"
 BRANCH="feat/${MODULE}-${FEATURE}"
 CLONE_DIR="../dev-${DEV}-${FEATURE}"
 DB_NAME="quju_dev_${DEV}_${FEATURE//-/_}"
-REPO_URL="${QUJU_REPO_URL:-https://codehub.devcloud.cn-north-4.huaweicloud.com/5c09170aa96c46008547da02db15afa0/quju.git}"
-HOST="codehub.devcloud.cn-north-4.huaweicloud.com"
+REPO_URL="${QUJU_REPO_URL:-https://github.com/GGGengXXX/quju.git}"
+HOST="github.com"
 
 BASE_PORT=$(( 8081 + ($(echo -n "$DEV" | cksum | cut -d' ' -f1) % 50) * 10 ))
 BACKEND_PORT="$BASE_PORT"; FRONTEND_PORT=$(( BASE_PORT + 100 ))
@@ -42,15 +42,15 @@ git config user.name "$DEV"
 [ -n "${GIT_EMAIL:-}" ] && git config user.email "$GIT_EMAIL"
 
 # --- 1b. 个人 push 凭证(本 clone 专属) ---
-if [ -n "${CODEARTS_USER:-}" ] && [ -n "${CODEARTS_PASS:-}" ]; then
+if [ -n "${GITHUB_USER:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
   git config --local --unset-all credential.helper 2>/dev/null || true
   git config --local --add credential.helper ''
-  git config --local --add credential.helper "store --file=$(pwd)/.git/.codearts-cred"
-  printf 'protocol=https\nhost=%s\nusername=%s\npassword=%s\n\n' "$HOST" "$CODEARTS_USER" "$CODEARTS_PASS" | git credential approve
-  chmod 600 "$(pwd)/.git/.codearts-cred" 2>/dev/null || true
-  echo "==> 已配置你个人的 CodeArts push 凭证(本 clone 专属)"
+  git config --local --add credential.helper "store --file=$(pwd)/.git/.github-cred"
+  printf 'protocol=https\nhost=%s\nusername=%s\npassword=%s\n\n' "$HOST" "$GITHUB_USER" "$GITHUB_TOKEN" | git credential approve
+  chmod 600 "$(pwd)/.git/.github-cred" 2>/dev/null || true
+  echo "==> 已配置你个人的 GitHub push 凭证(本 clone 专属)"
 else
-  echo "==> 未设 CODEARTS_USER/CODEARTS_PASS：push 将用服务器共享凭证(提交作者仍按你的 user.name/email)"
+  echo "==> 未设 GITHUB_USER/GITHUB_TOKEN：push 前请自行配置 GitHub 凭证"
 fi
 
 # --- 2. 创建隔离 DB + 导入表结构 ---
@@ -107,5 +107,5 @@ echo "下一步:"
 echo "  cd $CLONE_DIR"
 echo "  (后端) cd backend && mvn spring-boot:run    # 直接可连 DB/OSS/AI/邮件"
 echo "  (前端) cd frontend && npm install && npm run dev"
-echo "  完成后: git push -u origin $BRANCH ，到 CodeArts 建 MR 合并到 dev"
-echo "  （要部署：把 dev 合并到 master → CodeArts 流水线自动部署）"
+echo "  完成后: git push -u origin $BRANCH ，到 GitHub 建 PR 合并到 dev"
+echo "  （要部署：把 dev 合并到 master → GitHub Actions 自动部署）"

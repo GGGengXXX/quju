@@ -8,13 +8,13 @@
 
 服务器 `1.92.124.5`（CentOS 7，root 登录，密码见 `HuaweiCloud.txt`，**勿入库**）。Docker 26.x 已装。
 
-- 已就绪：Docker、MySQL（容器 `quju-mysql`）、Git 1.8、root 已存 CodeArts HTTPS 凭证（clone/push 免输）。开发需：JDK 17、Maven、Node 18+、各人的 AI CLI（Claude Code / Cursor server / …）。Redis 由部署编排提供（见 `deploy/`）。
+- 已就绪：Docker、MySQL（容器 `quju-mysql`）、Git 1.8。开发需：JDK 17、Maven、Node 18+、各人的 AI CLI（Claude Code / Cursor server / …）。Redis 由部署编排提供（见 `deploy/`）。
 - 在固定位置克隆"主/部署仓库"一次（部署用，分支 master）：
   ```bash
   sudo mkdir -p /srv/quju && sudo chown $USER /srv/quju
   cd /srv/quju
-  # 默认 HTTPS（首次提示输入 CodeArts「HTTPS 密码」，非 IAM AK/SK）；偏好 SSH 者先 export QUJU_REPO_URL=git@codehub.devcloud.cn-north-4.huaweicloud.com:5c09170aa96c46008547da02db15afa0/quju.git
-  git clone "${QUJU_REPO_URL:-https://codehub.devcloud.cn-north-4.huaweicloud.com/5c09170aa96c46008547da02db15afa0/quju.git}" main   # 主工作目录（CodeArts）
+  # 默认从 GitHub clone；偏好 SSH 者先 export QUJU_REPO_URL=git@github.com:GGGengXXX/quju.git
+  git clone "${QUJU_REPO_URL:-https://github.com/GGGengXXX/quju.git}" main   # 主工作目录（GitHub）
   ```
 - **MySQL 已就绪**：docker 容器 `quju-mysql`(mysql:8.4)，宿主端口 `13306`，生产库 `quju`，应用账号 `quju`；凭证在 `/root/quju/mysql.env`(root-only，**勿入库**)。`dev-bootstrap.sh` 用 `quju` 账号为每人建独立 `quju_dev_*` 库（已授权）。
 
@@ -24,19 +24,19 @@
 
 ```bash
 cd /srv/quju/main
-# 一次性设你的个人身份 + CodeArts push 凭证（每人不同；当前 SSH 会话内有效）：
+# 一次性设你的个人身份 + GitHub push 凭证（每人不同；当前 SSH 会话内有效）：
 export GIT_EMAIL='你的邮箱'
-export CODEARTS_USER='你的账号/用户名'      # 形如 DeNeRATe-cool/DeNeRATe-cool
-export CODEARTS_PASS='你的代码托管HTTPS密码'  # 个人设置→代码托管/HTTPS密码（不是 IAM AK/SK）
+export GITHUB_USER='你的 GitHub 用户名'
+export GITHUB_TOKEN='你的 GitHub Personal Access Token'
 scripts/dev-bootstrap.sh <你的名字拼音> <feature-slug> [module]
 # 例：scripts/dev-bootstrap.sh zhangsan activity-map activity
 ```
 
 脚本会自动：
-1. 从 CodeArts 克隆到 `/srv/quju/dev-<name>-<feature>`，并基于 `origin/dev` 切出 `feat/<module>-<feature>` 分支
+1. 从 GitHub 克隆到 `/srv/quju/dev-<name>-<feature>`，并基于 `origin/dev` 切出 `feat/<module>-<feature>` 分支
 2. 建独立库 `quju_dev_<name>_<feature>` 并**导入全部表结构**（contracts/schema.sql）
 3. 生成 `.env`：端口/DB + **OSS/AI/高德/邮件 等共享密钥自动注入（无需手填）**
-4. 配好你个人的 push 凭证（本 clone 专属；不设则回退共享凭证，提交作者仍是你）
+4. 配好你个人的 push 凭证（本 clone 专属；不设则需要你后续自行配置）
 
 然后进入你的 clone 开发（`.env` 已就绪，可直接连 DB/OSS/AI/邮件）：
 ```bash
@@ -73,7 +73,7 @@ make gen-backend && make gen-frontend
 # 提交 & 推送 & 开 PR
 git add -p && git commit -m "<module>: ..."     # 信息见 AGENTS §7
 git push -u origin feat/<module>-<feature>
-# 然后在 CodeArts 新建合并请求(MR)，目标 dev，描述用 docs/merge-request-template.md（部署时 dev→master）
+# 然后在 GitHub 新建 Pull Request，目标 dev，描述用 docs/merge-request-template.md 或 .github/pull_request_template.md（部署时 dev→master）
 ```
 
 ## 4. 收尾：删除 clone
