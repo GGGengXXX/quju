@@ -4,9 +4,9 @@
 # 部署分支可用 DEPLOY_BRANCH 覆盖（默认 master）。也可手动执行：bash deploy/deploy.sh
 set -euo pipefail
 
-# 用经典构建器：避开 buildkit 对基础镜像 manifest 的严格 HEAD 校验
-# （aliyun 镜像加速器对 nginx:alpine 偶发 403；经典构建器直接复用本地缓存镜像）
-export DOCKER_BUILDKIT=0
+# 启用 BuildKit 以支持 Dockerfile 的 cache mount，加速重复部署。
+export DOCKER_BUILDKIT=1
+export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
 
 REPO_DIR="${REPO_DIR:-/srv/quju/main}"
 COMPOSE="docker compose -f deploy/docker-compose.yml --env-file deploy/.env"
