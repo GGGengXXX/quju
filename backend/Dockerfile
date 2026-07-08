@@ -1,8 +1,13 @@
 # 后端镜像：多阶段（Maven 构建 → JRE 运行）。
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
-COPY . .
-RUN mvn -q -B -DskipTests package
+
+# 先预取依赖，再拷贝源码，避免每次源码变更都重新拉取 Maven 依赖。
+COPY pom.xml ./
+RUN mvn -B -DskipTests dependency:go-offline
+
+COPY src ./src
+RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
