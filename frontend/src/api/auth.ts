@@ -1,10 +1,15 @@
 import http from './http'
 
+export interface UserAiSettings {
+  systemPrompt?: string
+}
+
 export interface UserVO {
   id: number; accountId?: string; email: string; nickname?: string; avatar?: string
   userType: string; status: string; gender?: string; birthday?: string
   signature?: string; reputation?: number; interestTags?: string[]
   privacySettings?: Record<string, boolean>
+  aiSettings?: UserAiSettings
 }
 
 export const authApi = {

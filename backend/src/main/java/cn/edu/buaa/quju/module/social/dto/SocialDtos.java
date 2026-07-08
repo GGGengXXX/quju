@@ -48,6 +48,14 @@ public final class SocialDtos {
             @NotBlank String scope,
             @NotNull Long peerId) {}
 
+    public record GenerateAiReplyReq(
+            @NotBlank String scope,
+            @NotNull Long peerId) {}
+
+    public record AiReplySuggestionVO(
+            String suggestion,
+            Integer contextCount) {}
+
     public record MessageVO(
             Long id, String scope, Long senderId, Long receiverId, Long teamId,
             String contentType, String content, Boolean isRead, Boolean isRecalled,

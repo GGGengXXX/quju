@@ -3,7 +3,9 @@ package cn.edu.buaa.quju.module.social.controller;
 import cn.edu.buaa.quju.common.PageResult;
 import cn.edu.buaa.quju.common.R;
 import cn.edu.buaa.quju.common.UserContext;
+import cn.edu.buaa.quju.module.social.dto.SocialDtos.AiReplySuggestionVO;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.ForwardMessageReq;
+import cn.edu.buaa.quju.module.social.dto.SocialDtos.GenerateAiReplyReq;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.MarkReadReq;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.MessageVO;
 import cn.edu.buaa.quju.module.social.dto.SocialDtos.SendMessageReq;
@@ -36,6 +38,11 @@ public class MessageController {
     public R<Void> markRead(@RequestBody @Valid MarkReadReq req) {
         messageService.markRead(UserContext.require(), req);
         return R.<Void>ok(null);
+    }
+
+    @PostMapping("/ai-reply")
+    public R<AiReplySuggestionVO> generateAiReply(@RequestBody @Valid GenerateAiReplyReq req) {
+        return R.ok(messageService.generateAiReply(UserContext.require(), req));
     }
 
     @PostMapping("/{id}/recall")

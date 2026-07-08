@@ -18,6 +18,7 @@ const form = reactive({
   signature: '',
   interestTags: [] as string[],
   privacySettings: { showActivities: true, showTeams: true } as Record<string, boolean>,
+  aiSystemPrompt: '',
 })
 const merchantForm = reactive({ merchantName: '', nickname: '', focusFields: '', licenseUrl: '' })
 const merchant = ref<MerchantVO | null>(null)
@@ -40,6 +41,7 @@ onMounted(async () => {
   if ((auth.user as any)?.privacySettings) {
     form.privacySettings = { showActivities: true, showTeams: true, ...(auth.user as any).privacySettings }
   }
+  form.aiSystemPrompt = auth.user?.aiSettings?.systemPrompt || ''
   if (isMerchant.value) {
     try {
       merchant.value = await merchantApi.getMyProfile()
@@ -66,6 +68,7 @@ async function save() {
       birthday: form.birthday || undefined,
       signature: form.signature,
       privacySettings: form.privacySettings,
+      aiSettings: { systemPrompt: form.aiSystemPrompt.trim() || undefined },
     })
     ElMessage.success('已保存')
   } catch {
@@ -233,6 +236,18 @@ const auditTagType = computed(() => {
             <span>在主页展示我加入的小队</span>
             <el-switch v-model="form.privacySettings.showTeams" />
           </div>
+        </div>
+
+        <div class="privacy">
+          <span class="privacy-label">AI 助手 · 回复风格</span>
+          <el-input
+            v-model="form.aiSystemPrompt"
+            type="textarea"
+            :rows="4"
+            maxlength="1000"
+            show-word-limit
+            placeholder="例如：回复自然一点，偏礼貌，尽量简短，必要时提醒时间地点。"
+          />
         </div>
 
         <el-button type="primary" size="large" :loading="loading" @click="save">保存</el-button>
