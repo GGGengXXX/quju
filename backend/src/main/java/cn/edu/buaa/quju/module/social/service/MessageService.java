@@ -145,7 +145,8 @@ public class MessageService {
         List<Message> contextMessages = loadContextMessages(userId, normalizedScope, req.peerId());
         UserAiSettings aiSettings = userService.getAiSettings(userId);
         String prompt = buildConversationPrompt(userId, normalizedScope, req.peerId(), contextMessages);
-        String suggestion = chatAiService.generateReply(aiSettings.systemPrompt(), prompt);
+        String suggestion = chatAiService.generateReply(aiSettings.systemPrompt(), prompt,
+                normalizeText(req.draftText()), normalizeText(req.instruction()));
         return new AiReplySuggestionVO(suggestion, contextMessages.size());
     }
 
@@ -342,6 +343,12 @@ public class MessageService {
                 最近消息：
                 %s
                 """.formatted(conversationType, currentUserName, peerLabel, transcript);
+    }
+
+    private String normalizeText(String text) {
+        if (text == null) return null;
+        String normalized = text.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private Map<Long, String> loadNicknames(List<Long> userIds) {
