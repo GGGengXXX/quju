@@ -36,13 +36,17 @@ public final class UserDtos {
 
     public record LoginResp(String token, long expiresIn, UserBrief user) {}
 
+    public record UserAiSettings(String systemPrompt) {}
+
     public record UserVO(Long id, String accountId, String email, String nickname, String avatar, String userType,
                          String status, String gender, LocalDate birthday, String signature,
-                         Integer reputation, List<String> interestTags, Map<String, Boolean> privacySettings) {}
+                         Integer reputation, List<String> interestTags, Map<String, Boolean> privacySettings,
+                         UserAiSettings aiSettings) {}
 
     public record UpdateProfileReq(String accountId, String nickname, String avatar, String gender,
                                    LocalDate birthday, String signature,
-                                   List<String> interestTags, Map<String, Boolean> privacySettings) {}
+                                   List<String> interestTags, Map<String, Boolean> privacySettings,
+                                   UserAiSettings aiSettings) {}
 
     // ---- 商家 ----
     public record MerchantApplyReq(@NotBlank String merchantName, String nickname,
