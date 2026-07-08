@@ -16,9 +16,11 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -115,6 +117,46 @@ class MessageAiReplyControllerTest {
     }
 
     @Test
+    void friendConversationCanTargetSpecificMessage() throws Exception {
+        long userId = insertUser("我");
+        long peerId = insertUser("小王");
+        insertFriendship(userId, peerId);
+        insertFriendship(peerId, userId);
+        insertMessage("FRIEND", userId, peerId, null, "TEXT", "周六下午去吗？");
+        long targetMessageId = insertMessage("FRIEND", peerId, userId, null, "TEXT", "可以，我两点到。");
+        namedJdbcTemplate.update(
+                "update user set privacy_settings = :settings where id = :id",
+                new MapSqlParameterSource()
+                        .addValue("id", userId)
+                        .addValue("settings", "{\"showActivities\":true,\"showTeams\":true,\"aiSettings\":{\"systemPrompt\":\"礼貌一点\"}}"));
+
+        when(chatAiService.generateReply(
+                eq("礼貌一点"),
+                argThat(prompt -> prompt.contains("重点回复消息") && prompt.contains("可以，我两点到。") && prompt.contains("我") && prompt.contains("小王")),
+                isNull(),
+                isNull()))
+                .thenReturn("可以，我周六两点过去。");
+
+        mockMvc.perform(post("/v1/messages/ai-reply")
+                        .header("Authorization", "Bearer " + jwtUtil.generate(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "scope", "FRIEND",
+                                "peerId", peerId,
+                                "focusMessageIds", List.of(targetMessageId)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.suggestion").value("可以，我周六两点过去。"))
+                .andExpect(jsonPath("$.data.contextCount").value(2));
+
+        verify(chatAiService).generateReply(
+                eq("礼貌一点"),
+                argThat(prompt -> prompt.contains("重点回复消息") && prompt.contains("可以，我两点到。")),
+                isNull(),
+                isNull());
+    }
+
+    @Test
     void nonMemberCannotGenerateTeamAiReply() throws Exception {
         long userId = insertUser("我");
         long ownerId = insertUser("队长");
@@ -146,7 +188,8 @@ class MessageAiReplyControllerTest {
                 new MapSqlParameterSource().addValue("ownerId", ownerId).addValue("friendId", friendId));
     }
 
-    private void insertMessage(String scope, long senderId, Long receiverId, Long teamId, String contentType, String content) {
+    private long insertMessage(String scope, long senderId, Long receiverId, Long teamId, String contentType, String content) {
+        KeyHolder kh = new GeneratedKeyHolder();
         namedJdbcTemplate.update(
                 "insert into message(scope, sender_id, receiver_id, team_id, content_type, content, is_read, is_recalled) " +
                         "values (:scope, :senderId, :receiverId, :teamId, :contentType, :content, 0, 0)",
@@ -156,7 +199,9 @@ class MessageAiReplyControllerTest {
                         .addValue("receiverId", receiverId)
                         .addValue("teamId", teamId)
                         .addValue("contentType", contentType)
-                        .addValue("content", content));
+                        .addValue("content", content),
+                kh, new String[]{"id"});
+        return kh.getKey().longValue();
     }
 
     private long insertTeam(long ownerId, String name) {

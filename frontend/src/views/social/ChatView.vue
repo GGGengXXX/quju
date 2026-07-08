@@ -44,6 +44,7 @@ const composerAutosize = { minRows: 2, maxRows: 6 }
 const showAiDialog = ref(false)
 const aiDraftText = ref('')
 const aiInstruction = ref('')
+const aiFocusMessage = ref<MessageVO | null>(null)
 const showEmoji = ref(false)
 const showLocationPicker = ref(false)
 const locationPickerRef = ref<HTMLElement | null>(null)
@@ -142,13 +143,19 @@ function onComposerKeydown(event: KeyboardEvent) {
   }
 }
 
-function openAiAssistant() {
+function openAiAssistant(targetMessage?: MessageVO | null) {
+  aiFocusMessage.value = targetMessage || null
   aiDraftText.value = inputText.value.trim()
   showAiDialog.value = true
 }
 
 function closeAiAssistant() {
   showAiDialog.value = false
+  aiFocusMessage.value = null
+}
+
+function clearAiFocusMessage() {
+  aiFocusMessage.value = null
 }
 
 async function executeAiReply() {
@@ -162,6 +169,7 @@ async function executeAiReply() {
       peerId,
       draftText: draftText || undefined,
       instruction: instruction || undefined,
+      focusMessageIds: aiFocusMessage.value ? [aiFocusMessage.value.id] : undefined,
     })
     const suggestion = result.suggestion?.trim()
     if (!suggestion) {
@@ -361,6 +369,11 @@ function showContextMenu(e: MouseEvent, msg: MessageVO) {
   contextMenu.msg = msg
 }
 
+function openAiAssistantFromContext() {
+  hideContextMenu()
+  openAiAssistant(contextMenu.msg)
+}
+
 function hideContextMenu() {
   contextMenu.visible = false
 }
@@ -436,6 +449,12 @@ function connectWebSocket() {
 
 function isMine(msg: MessageVO) {
   return msg.senderId === auth.user?.id
+}
+
+function describeMessage(msg: MessageVO) {
+  if (msg.contentType === 'IMAGE') return '[图片]'
+  if (msg.contentType === 'LOCATION') return parseLocationLabel(msg.content)
+  return msg.content
 }
 
 function truncName(name: string) {
@@ -539,6 +558,20 @@ onBeforeUnmount(() => {
     <el-dialog v-model="showAiDialog" title="AI 回复助手" width="560px" @closed="closeAiAssistant">
       <div class="ai-helper">
         <p class="ai-hint">空着草稿就会先生成一版；已有草稿时会按下面的要求继续改写。按 <b>Ctrl/Cmd+J</b> 可打开，打开后再按一次会直接改写。</p>
+        <div v-if="aiFocusMessage" class="ai-focus">
+          <div class="ai-focus-head">
+            <span class="ai-focus-label">重点回复</span>
+            <el-button text size="small" @click="clearAiFocusMessage">清除</el-button>
+          </div>
+          <div class="ai-focus-meta">
+            {{ aiFocusMessage && isMine(aiFocusMessage) ? (auth.user?.nickname || '我') : getMemberName(aiFocusMessage.senderId) }}
+            · {{ aiFocusMessage.contentType }}
+            · {{ aiFocusMessage.createdAt?.slice(11, 16) }}
+          </div>
+          <div class="ai-focus-content">
+            {{ describeMessage(aiFocusMessage) }}
+          </div>
+        </div>
         <el-form label-position="top" @submit.prevent>
           <el-form-item label="当前草稿">
             <el-input v-model="aiDraftText" type="textarea" :rows="5" placeholder="AI 会基于这段内容继续改写；留空则生成新草稿" />
@@ -585,6 +618,7 @@ onBeforeUnmount(() => {
     <!-- 右键菜单 -->
     <div v-if="contextMenu.visible" class="context-menu" :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @mouseleave="hideContextMenu">
       <div v-if="contextMenu.msg && isMine(contextMenu.msg)" class="menu-item" @click="recall(contextMenu.msg!); hideContextMenu()">撤回</div>
+      <div v-if="contextMenu.msg && !contextMenu.msg.isRecalled" class="menu-item" @click="openAiAssistantFromContext">AI 回复此条</div>
       <div class="menu-item" @click="openForwardDialog">转发</div>
     </div>
 
@@ -669,4 +703,22 @@ onBeforeUnmount(() => {
 .at-all { font-weight: 600; color: var(--signal); }
 .ai-helper { display: flex; flex-direction: column; gap: 12px; }
 .ai-hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--ink-soft); }
+.ai-focus {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-focus-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ai-focus-label { font-size: 12px; font-weight: 600; color: var(--signal); }
+.ai-focus-meta { font-size: 11px; color: var(--ink-soft); }
+.ai-focus-content { font-size: 13px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
 </style>

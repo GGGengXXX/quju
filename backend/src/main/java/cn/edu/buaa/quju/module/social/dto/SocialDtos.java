@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public final class SocialDtos {
     private SocialDtos() {}
@@ -53,7 +54,8 @@ public final class SocialDtos {
             @NotBlank String scope,
             @NotNull Long peerId,
             @Size(max = 2000) String draftText,
-            @Size(max = 500) String instruction) {}
+            @Size(max = 500) String instruction,
+            List<Long> focusMessageIds) {}
 
     public record AiReplySuggestionVO(
             String suggestion,

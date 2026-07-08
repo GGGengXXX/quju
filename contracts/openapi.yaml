@@ -680,6 +680,10 @@ components:
         peerId: { type: integer, format: int64, description: FRIEND=对方userId / TEAM=teamId }
         draftText: { type: string, maxLength: 2000, description: 当前草稿；留空表示首次生成 }
         instruction: { type: string, maxLength: 500, description: 本次修改要求；留空表示按上下文和草稿默认改写 }
+        focusMessageIds:
+          type: array
+          items: { type: integer, format: int64 }
+          description: 重点回复消息ID列表；前端点选某条消息时传入
     AiReplySuggestion:
       type: object
       properties:

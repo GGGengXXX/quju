@@ -28,13 +28,16 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class MessageService {
-    private static final int AI_CONTEXT_LIMIT = 12;
+    private static final int AI_CONTEXT_LIMIT = 30;
 
     private final MessageMapper messageMapper;
     private final FriendshipMapper friendshipMapper;
@@ -143,8 +146,9 @@ public class MessageService {
     public AiReplySuggestionVO generateAiReply(long userId, GenerateAiReplyReq req) {
         String normalizedScope = normalizeScope(req.scope());
         List<Message> contextMessages = loadContextMessages(userId, normalizedScope, req.peerId());
+        List<Message> focusMessages = loadFocusMessages(userId, normalizedScope, req.peerId(), req.focusMessageIds(), contextMessages);
         UserAiSettings aiSettings = userService.getAiSettings(userId);
-        String prompt = buildConversationPrompt(userId, normalizedScope, req.peerId(), contextMessages);
+        String prompt = buildConversationPrompt(userId, normalizedScope, req.peerId(), contextMessages, focusMessages);
         String suggestion = chatAiService.generateReply(aiSettings.systemPrompt(), prompt,
                 normalizeText(req.draftText()), normalizeText(req.instruction()));
         return new AiReplySuggestionVO(suggestion, contextMessages.size());
@@ -308,7 +312,8 @@ public class MessageService {
         if (count == null || count == 0) throw new BizException(ErrorCode.FORBIDDEN);
     }
 
-    private String buildConversationPrompt(long currentUserId, String scope, long peerId, List<Message> contextMessages) {
+    private String buildConversationPrompt(long currentUserId, String scope, long peerId,
+                                           List<Message> contextMessages, List<Message> focusMessages) {
         List<Long> participantIds = new ArrayList<>();
         participantIds.add(currentUserId);
         if ("FRIEND".equals(scope)) {
@@ -328,6 +333,7 @@ public class MessageService {
                 : contextMessages.stream()
                         .map(message -> formatTranscriptLine(currentUserId, nicknames, message))
                         .collect(Collectors.joining("\n"));
+        String focusBlock = buildFocusBlock(currentUserId, nicknames, focusMessages);
 
         return """
                 你正在为趣聚聊天场景生成回复草稿。
@@ -339,10 +345,12 @@ public class MessageService {
                 2. 优先延续最近消息语气，简洁自然，避免编造事实。
                 3. 如果上下文里提到时间、地点、报名、活动安排，尽量围绕这些信息回复。
                 4. 群聊场景避免误用第一人称代替他人，不要假装系统通知。
+                5. 如果给出了重点消息，请优先回应重点消息并兼顾其上下文。
 
                 最近消息：
                 %s
-                """.formatted(conversationType, currentUserName, peerLabel, transcript);
+                %s
+                """.formatted(conversationType, currentUserName, peerLabel, transcript, focusBlock);
     }
 
     private String normalizeText(String text) {
@@ -383,6 +391,63 @@ public class MessageService {
         if ("IMAGE".equals(message.getContentType())) content = "[图片]";
         else if ("LOCATION".equals(message.getContentType())) content = "[位置]" + message.getContent();
         else content = message.getContent();
-        return speaker + "：" + content;
+        String timestamp = message.getCreatedAt() == null
+                ? "--:--"
+                : message.getCreatedAt().toLocalTime().withNano(0).toString();
+        return "[" + message.getId() + " | " + timestamp + " | " + speaker + " | " + message.getContentType() + "] " + content;
+    }
+
+    private String buildFocusBlock(long currentUserId, Map<Long, String> nicknames, List<Message> focusMessages) {
+        if (focusMessages == null || focusMessages.isEmpty()) {
+            return "";
+        }
+        String focusText = focusMessages.stream()
+                .map(message -> formatTranscriptLine(currentUserId, nicknames, message))
+                .collect(Collectors.joining("\n"));
+        return """
+                重点回复消息：
+                %s
+                """.formatted(focusText);
+    }
+
+    private List<Message> loadFocusMessages(long userId, String scope, long peerId, List<Long> focusMessageIds, List<Message> contextMessages) {
+        if (focusMessageIds == null || focusMessageIds.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> focusIds = new HashSet<>(focusMessageIds);
+        Map<Long, Message> contextById = contextMessages.stream()
+                .collect(Collectors.toMap(Message::getId, m -> m, (a, b) -> a, LinkedHashMap::new));
+        Map<Long, Message> focusById = new LinkedHashMap<>();
+        for (Long id : focusIds) {
+            Message fromContext = contextById.get(id);
+            if (fromContext != null) {
+                focusById.put(id, fromContext);
+            }
+        }
+        List<Message> loaded = messageMapper.selectBatchIds(focusIds);
+        for (Message message : loaded) {
+            if (messageBelongsToConversation(userId, scope, peerId, message)
+                    && !Boolean.TRUE.equals(message.getIsRecalled())) {
+                focusById.putIfAbsent(message.getId(), message);
+            }
+        }
+        return focusById.values().stream()
+                .sorted(Comparator.comparing(Message::getCreatedAt))
+                .toList();
+    }
+
+    private boolean messageBelongsToConversation(long userId, String scope, long peerId, Message message) {
+        if (message == null || !scope.equals(message.getScope())) return false;
+        if ("FRIEND".equals(scope)) {
+            boolean forward = message.getSenderId() != null && message.getSenderId() == userId
+                    && message.getReceiverId() != null && message.getReceiverId() == peerId;
+            boolean reverse = message.getSenderId() != null && message.getSenderId() == peerId
+                    && message.getReceiverId() != null && message.getReceiverId() == userId;
+            return forward || reverse;
+        }
+        if ("TEAM".equals(scope)) {
+            return message.getTeamId() != null && message.getTeamId() == peerId;
+        }
+        return false;
     }
 }

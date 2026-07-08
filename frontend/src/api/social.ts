@@ -63,6 +63,7 @@ export interface GenerateAiReplyRequest {
   peerId: number
   draftText?: string
   instruction?: string
+  focusMessageIds?: number[]
 }
 
 export interface PageResult<T> {
